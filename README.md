@@ -39,6 +39,7 @@
 | [002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) | **서비스 정의 SSOT** | v0.3 (검수 확정) |
 | [001_Admissions_Coach_wbs_v.3.1.md](docs/001_Admissions_Coach_wbs_v.3.1.md) | 6개월 로드맵 WBS | v0.3.2 |
 | [003_Admissions_Coach_personas_v.2.md](docs/003_Admissions_Coach_personas_v.2.md) | 핵심 사용자 페르소나 3명 | v0.1.2 |
+| [student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) | 학생 입력값 JSON Schema | v0.1 |
 | [002_Admissions_Coach_definition_v.2.md](docs/002_Admissions_Coach_definition_v.2.md) | 정의 v0.2 (자소서 폐지 패치 노트, 이력용) | v0.2 |
 | [002_definition_pivot_memo_v.1.md](docs/002_definition_pivot_memo_v.1.md) | 자소서 폐지 대응 방향 메모 (이력용) | v0.1 |
 
@@ -58,8 +59,9 @@
 
 **확정:** 한 줄 정의, 산출물 3종, §6 가드레일, 24h SLA 측정 정의, 8/1 출시, 명칭("진단"), 미성년자 정책 P0 격상.
 
+**완료:** [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·미성년자 동의(blocker) 스키마.
+
 **다음 의존 산출물 (대기):**
-- `student_profile_schema_v0.1.json` — 입력 5항목 + 마스킹 규칙
 - `prompt_v0.1.md` (M2) — §6 가드레일을 시스템 프롬프트 제약으로 구현
 - 미성년자 동의 플로우 + 보관·삭제 정책 v1 (출시 blocker, M1~M2 내 마감 필요)
 
