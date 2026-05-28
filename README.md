@@ -39,6 +39,9 @@
 | [002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) | **서비스 정의 SSOT** | v0.3 (검수 확정) |
 | [001_Admissions_Coach_wbs_v.3.1.md](docs/001_Admissions_Coach_wbs_v.3.1.md) | 6개월 로드맵 WBS | v0.3.2 |
 | [003_Admissions_Coach_personas_v.2.md](docs/003_Admissions_Coach_personas_v.2.md) | 핵심 사용자 페르소나 3명 | v0.1.2 |
+| [004_Admissions_Coach_coding_plan_v0.1.md](docs/004_Admissions_Coach_coding_plan_v0.1.md) | 6 Phase 코딩 계획 (PM) | v0.1 |
+| [005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) | 시스템 아키텍처 (AWS·앱·흐름) | v0.1 |
+| [006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) | 데이터 분류·암호화·보관 정책 (§6.3 P0 운영 사양) | v0.1 |
 | [student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) | 학생 입력값 JSON Schema | v0.1 |
 | [002_Admissions_Coach_definition_v.2.md](docs/002_Admissions_Coach_definition_v.2.md) | 정의 v0.2 (자소서 폐지 패치 노트, 이력용) | v0.2 |
 | [002_definition_pivot_memo_v.1.md](docs/002_definition_pivot_memo_v.1.md) | 자소서 폐지 대응 방향 메모 (이력용) | v0.1 |
@@ -59,11 +62,33 @@
 
 **확정:** 한 줄 정의, 산출물 3종, §6 가드레일, 24h SLA 측정 정의, 8/1 출시, 명칭("진단"), 미성년자 정책 P0 격상.
 
-**완료:** [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·미성년자 동의(blocker) 스키마.
+**완료:**
+- [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·미성년자 동의(blocker) 스키마
+- [docs/004_Admissions_Coach_coding_plan_v0.1.md](docs/004_Admissions_Coach_coding_plan_v0.1.md) — 6 Phase 코딩 계획
+- [docs/005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) — 시스템 아키텍처 v0.1
+- [docs/006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) — 데이터 분류·암호화 정책 v1 (§6.3 운영 사양서)
 
 **다음 의존 산출물 (대기):**
 - `prompt_v0.1.md` (M2) — §6 가드레일을 시스템 프롬프트 제약으로 구현
-- 미성년자 동의 플로우 + 보관·삭제 정책 v1 (출시 blocker, M1~M2 내 마감 필요)
+- 사고 대응 플레이북 / 약관 / 개인정보처리방침 / 법정대리인 동의서 (Phase E 법무 검토 필요)
+
+## 진행 단계 (Phase)
+
+상세는 [coding plan](docs/004_Admissions_Coach_coding_plan_v0.1.md) 참조.
+
+| Phase | 기간 | 목표 |
+|---|---|---|
+| **0. 인프라 부트스트랩** | ~1주 | AWS 서울 ECS·RDS·Redis·S3·WAF·SES 셸 (회사 표준 채택) |
+| **A. Visual Skeleton** | ~1주 | Next.js 5화면 + 박준호 mock, staging URL 시연 |
+| **B. Interactive Form** | ~1주 | Zod 검증·동의 게이트·24h SLA 상태머신 |
+| **C. Backend Stubs** | ~1주 | NestJS api + Prisma + BullMQ + Admin 검수 큐 |
+| **D. AI 통합** | ~2주 | Anthropic + §6 가드레일 프롬프트 + 골드 회귀 |
+| **E. 운영 출시** | M3~M4 | 인증·결제·동의 채널·KMS·보관/삭제·모니터링 (8/1 출시) |
+
+## 트랙 분담
+
+**권고:** 3트랙 (Infra/DevOps · Backend · FE)
+**차선:** 2트랙 (Platform = DevOps+Backend / Product = FE)
 
 ---
 
