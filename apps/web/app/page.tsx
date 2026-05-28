@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 type OutputCard = {
@@ -71,14 +72,18 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled
-            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
-            aria-disabled
+          <Link
+            href="/submit"
+            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
           >
-            생기부 업로드 시작 (준비 중)
-          </button>
+            생기부 업로드 시작
+          </Link>
+          <Link
+            href="/parent"
+            className="rounded-xl border border-ink-100 bg-white px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-200 hover:text-brand-700"
+          >
+            학부모용 보기
+          </Link>
           <span className="text-sm text-ink-500">
             출시 예정: <strong className="text-ink-700">2026-08-01</strong>
           </span>
