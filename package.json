@@ -1,0 +1,16 @@
+{
+  "name": "pullim-admissions-coach",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.7.0",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @pullim/web dev",
+    "build:web": "pnpm --filter @pullim/web build",
+    "start:web": "pnpm --filter @pullim/web start",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "pnpm -r --parallel lint"
+  }
+}
