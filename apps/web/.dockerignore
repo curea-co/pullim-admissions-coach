@@ -1,0 +1,31 @@
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/build
+**/.git
+**/.github
+**/.vscode
+**/.idea
+**/.DS_Store
+**/Thumbs.db
+
+# env / secrets
+**/.env
+**/.env.*
+!.env.example
+
+# logs / coverage
+**/*.log
+**/coverage
+
+# docs are not needed at runtime
+docs
+README.md
+**/*.md
+!apps/web/README.md
+
+# tests / dev-only files
+**/__tests__
+**/*.test.*
+**/*.spec.*
