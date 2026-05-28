@@ -20,7 +20,13 @@ pnpm install
 
 ```bash
 pnpm dev:web
-# → http://localhost:3000
+# → http://localhost:3030
+```
+
+다른 포트로 띄우려면:
+
+```bash
+pnpm --filter @pullim/web exec next dev -p 4000
 ```
 
 빌드·실행:
