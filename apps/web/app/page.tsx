@@ -62,8 +62,8 @@ export default function LandingPage() {
         <h1 className="mt-6 text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-5xl sm:leading-[1.15]">
           생기부를 넣으면
           <br />
-          <span className="text-brand-600">면접 준비·진단·보완안</span>을
-          <br />한 번에.
+          <span className="text-brand-600">면접 준비·진단·보완</span>을
+          <br />한 번에
         </h1>
         <p className="mt-6 max-w-prose text-lg leading-relaxed text-ink-700">
           학생부 종합 전형 평가 기준으로 내 생기부를 진단하고, 면접에서{' '}

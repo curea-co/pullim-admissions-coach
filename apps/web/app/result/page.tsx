@@ -140,9 +140,6 @@ function InterviewPanel() {
           </dl>
         </article>
       ))}
-      <p className="text-xs text-ink-500">
-        Phase A 시각 셸에 3건만 노출. 실 서비스는 정의 §4-1대로 질문 10종 제공.
-      </p>
     </section>
   );
 }
