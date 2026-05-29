@@ -61,7 +61,7 @@ export default function SubmitPage() {
   const [schoolType, setSchoolType] = useState<SchoolType>(
     parkJunho.identity.schoolType
   );
-  const [weakAreas, setWeakAreas] = useState<string>(parkJunho.profile.weakAreas);
+  const [weakAreas, setWeakAreas] = useState<string>('');
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export default function SubmitPage() {
           <StepIndicator current="submit" />
         </div>
         <p className="mb-6 text-ink-700">
-          학종 평가 기준 5항목으로 진단하기 위해 5가지 정보를 받습니다.
+          학생부 종합 전형 평가 기준 5항목으로 진단하기 위해 5가지 정보를 받습니다.
           개인 식별정보는 입력 단계에서 가려주세요.
         </p>
 
@@ -330,7 +330,7 @@ export default function SubmitPage() {
               rows={3}
               value={weakAreas}
               onChange={(e) => setWeakAreas(e.target.value)}
-              placeholder="예: 진로 활동 일관성, 면접 답변 준비 등"
+              placeholder="예: 진로 활동 일관성이 부족, 면접 답변 준비가 막막함 — 자유롭게 적어주세요"
               className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
               data-field-error="selfReportedWeakAreas"
             />

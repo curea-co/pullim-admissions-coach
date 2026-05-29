@@ -10,7 +10,7 @@ type OutputCard = {
 const outputs: OutputCard[] = [
   {
     badge: '01',
-    title: '학종 면접 준비 팩',
+    title: '학생부 종합 전형 면접 준비 팩',
     bullets: [
       '예상 질문 10종 × 답변 방향',
       '근거가 될 생기부 항목 매핑',
@@ -21,7 +21,7 @@ const outputs: OutputCard[] = [
     badge: '02',
     title: '생기부 진단 가이드',
     bullets: [
-      '학종 평가 기준 5항목 매핑',
+      '학생부 종합 전형 평가 기준 5항목 매핑',
       '항목별 강·약점 진단',
       '앞으로 할 활동·정리 방향',
     ],
@@ -39,7 +39,7 @@ const outputs: OutputCard[] = [
 
 const seasons = [
   { months: '7~9월', label: '수시 원서·학생부 마감' },
-  { months: '10~11월', label: '학종 면접 시즌' },
+  { months: '10~11월', label: '학생부 종합 전형 면접 시즌' },
 ];
 
 export default function LandingPage() {
@@ -50,7 +50,7 @@ export default function LandingPage() {
         <span className="text-lg font-bold tracking-tight text-ink-900">
           Pullim<span className="text-brand-600"> Admissions</span>
         </span>
-        <span className="text-sm text-ink-500">고1~고3 · 학종 진학 코치</span>
+        <span className="text-sm text-ink-500">고1~고3 · 학생부 종합 전형 진학 코치</span>
       </header>
 
       {/* Hero */}
@@ -66,7 +66,7 @@ export default function LandingPage() {
           <br />한 번에.
         </h1>
         <p className="mt-6 max-w-prose text-lg leading-relaxed text-ink-700">
-          학종 평가 기준으로 내 생기부를 진단하고, 면접에서{' '}
+          학생부 종합 전형 평가 기준으로 내 생기부를 진단하고, 면접에서{' '}
           <strong className="font-semibold text-ink-900">스스로 답할 수 있도록</strong> 준비합니다.
           고1~고3 학생을 위해 만들어진 AI 진학 코치입니다.
         </p>

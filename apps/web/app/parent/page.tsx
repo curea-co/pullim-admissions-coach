@@ -52,7 +52,7 @@ export default function ParentReportPage() {
           </h2>
           <ul className="mt-3 space-y-2 text-sm text-ink-700">
             <li className="flex items-center justify-between">
-              <span>학종 면접 준비 팩</span>
+              <span>학생부 종합 전형 면접 준비 팩</span>
               <span className="text-xs font-medium text-brand-700">학생 화면 전용</span>
             </li>
             <li className="flex items-center justify-between">

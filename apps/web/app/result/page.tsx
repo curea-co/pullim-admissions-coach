@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
 const tabs: { id: Tab; label: string }[] = [
-  { id: 'interview', label: '학종 면접 준비 팩' },
+  { id: 'interview', label: '학생부 종합 전형 면접 준비 팩' },
   { id: 'diagnosis', label: '생기부 진단 가이드' },
   { id: 'improvements', label: '부족 활동 보완안' },
 ];
