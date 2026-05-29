@@ -60,3 +60,13 @@ lib/
 - 학부모 리포트는 자녀 생기부·결과물 원문 미노출(요약만)
 
 상세: `docs/002_Admissions_Coach_definition_v.3.md` §6.
+
+## Vercel demo 배포 (임시 시연용)
+
+AWS staging이 가동되기 전 *공유용 preview URL* 한정으로 Vercel 사용.
+
+- **prod 아님.** AWS Seoul ECS가 prod (검수자 결정 4.2, 코딩 계획 §3).
+- 데모 환경 가드: `NEXT_PUBLIC_DEMO=true` 시 상단 노란 배너 + `robots: noindex` 자동 활성.
+- 설정 절차·retire 조건: [`docs/008_Admissions_Coach_vercel_demo_v0.1.md`](../../docs/008_Admissions_Coach_vercel_demo_v0.1.md)
+
+핵심: Vercel 프로젝트 import 시 **Root Directory = `apps/web`**, 환경변수 `NEXT_PUBLIC_DEMO=true` 설정.
