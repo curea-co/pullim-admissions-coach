@@ -75,9 +75,9 @@
     },
 
     "targetTrack": {
-      "description": "정의 §3-2. 지원 학부 4계열 중 택 1.",
-      "enum": ["humanities", "engineering", "medical_natural", "arts_athletics"],
-      "$comment": "humanities=인문, engineering=공학, medical_natural=의학·자연, arts_athletics=예체능"
+      "description": "정의 §3-2 (v0.3.1). 지원 학부 5계열 중 택 1.",
+      "enum": ["humanities", "science_engineering", "medical", "arts_athletics", "other"],
+      "$comment": "humanities=인문, science_engineering=이공(자연과학+공학), medical=의치한, arts_athletics=예체능, other=기타"
     },
 
     "targetUniversities": {
@@ -113,8 +113,8 @@
           "enum": [1, 2]
         },
         "schoolType": {
-          "description": "학교 유형. general=일반고, special_purpose=특목고, autonomous_private=자사고.",
-          "enum": ["general", "special_purpose", "autonomous_private"]
+          "description": "학교 유형 (정의 §3-4 v0.3.1). general=일반고, special_purpose=특목고, autonomous=자사고·자율고, ged=검정고시.",
+          "enum": ["general", "special_purpose", "autonomous", "ged"]
         }
       }
     },

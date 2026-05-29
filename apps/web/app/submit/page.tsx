@@ -43,9 +43,7 @@ export default function SubmitPage() {
 
   // 폼 상태 — 박준호 mock으로 초기화 (Phase A 시연 흐름 유지)
   const [inputType, setInputType] = useState<InputType>('text_paste');
-  const [recordText, setRecordText] = useState(
-    '(여기에 마스킹된 생기부 본문을 붙여넣으세요)'
-  );
+  const [recordText, setRecordText] = useState('');
   const [fileRef, setFileRef] = useState<string>('');
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
@@ -181,7 +179,7 @@ export default function SubmitPage() {
                 rows={6}
                 value={recordText}
                 onChange={(e) => setRecordText(e.target.value)}
-                placeholder="마스킹된 생기부 본문을 붙여넣어주세요"
+                placeholder="여기에 마스킹된 생기부 본문을 붙여넣어주세요"
                 className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 aria-invalid={!!errors['record.text']}
                 data-field-error="record.text"

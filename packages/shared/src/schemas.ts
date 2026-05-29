@@ -13,18 +13,22 @@ import { z } from 'zod';
 export const SCHEMA_VERSION = '0.1' as const;
 
 // ── enums ────────────────────────────────────────────────────────────
+// 정의 v0.3.1 §3-2: 5계열 (4→5 확장, 2026-05-29)
 export const targetTrackEnum = z.enum([
-  'humanities',
-  'engineering',
-  'medical_natural',
-  'arts_athletics',
+  'humanities',          // 인문
+  'science_engineering', // 이공 (자연과학 + 공학)
+  'medical',             // 의치한
+  'arts_athletics',      // 예체능
+  'other',               // 기타
 ]);
 export type TargetTrack = z.infer<typeof targetTrackEnum>;
 
+// 정의 v0.3.1 §3-4: 4종 (3→4 확장, 2026-05-29)
 export const schoolTypeEnum = z.enum([
-  'general',
-  'special_purpose',
-  'autonomous_private',
+  'general',          // 일반고
+  'special_purpose',  // 특목고
+  'autonomous',       // 자사고·자율고
+  'ged',              // 검정고시
 ]);
 export type SchoolType = z.infer<typeof schoolTypeEnum>;
 
@@ -42,15 +46,17 @@ export const maskedFieldEnum = z.enum([
 // ── 한국어 라벨 (UI에서 사용) ─────────────────────────────────────────
 export const targetTrackLabel: Record<TargetTrack, string> = {
   humanities: '인문',
-  engineering: '공학',
-  medical_natural: '의학·자연',
+  science_engineering: '이공',
+  medical: '의치한',
   arts_athletics: '예체능',
+  other: '기타',
 };
 
 export const schoolTypeLabel: Record<SchoolType, string> = {
   general: '일반고',
   special_purpose: '특목고',
-  autonomous_private: '자사고',
+  autonomous: '자사고·자율고',
+  ged: '검정고시',
 };
 
 // ── record (생기부 입력) — discriminated union ───────────────────────

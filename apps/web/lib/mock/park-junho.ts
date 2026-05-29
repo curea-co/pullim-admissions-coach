@@ -31,7 +31,7 @@ export const parkJunho = {
     schoolType: 'general' as SchoolType,
   },
   profile: {
-    targetTrack: 'engineering' as TargetTrack,
+    targetTrack: 'science_engineering' as TargetTrack,
     targetUniversities: [
       { name: '서울대학교', department: '컴퓨터공학부' },
       { name: '연세대학교', department: '컴퓨터과학공학부' },
