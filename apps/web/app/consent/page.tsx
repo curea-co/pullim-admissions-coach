@@ -1,12 +1,20 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { consentSchema } from '@pullim/shared';
 import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
+import { ErrorState } from '@/components/error-state';
+import { validate } from '@/lib/validation';
 
-// Phase A: 시각 셸. 실제 차단 로직·법정대리인 채널은 Phase E.
-// 화면이 정의 §6.3 검수자 결정(P0 blocker)을 사용자에게 가시화.
+// Phase B: 클라이언트 차단 로직.
+// 실 발송 채널(카카오 알림톡 등)·세션·DB 저장은 Phase E.
+// 본 화면은 정의 §6.3 가드를 사용자에게 가시화하고, 미충족 시 다음 단계 진입을 차단한다.
 
 type ConsentItem = {
-  id: string;
+  id: 'terms' | 'privacy' | 'guardian';
   required: boolean;
   title: string;
   body: string;
@@ -37,6 +45,73 @@ const items: ConsentItem[] = [
 ];
 
 export default function ConsentPage() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const [isMinor, setIsMinor] = useState(true);
+  const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
+    terms: false,
+    privacy: false,
+    guardian: false,
+  });
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  function toggle(id: ConsentItem['id'], v: boolean) {
+    setChecked((prev) => ({ ...prev, [id]: v }));
+  }
+
+  function toggleAll(v: boolean) {
+    setChecked({ terms: v, privacy: v, guardian: v });
+  }
+
+  function allRequiredMet(): boolean {
+    if (!checked.terms || !checked.privacy) return false;
+    // 미성년자가 아니면 guardian 동의는 면제. 미성년자면 필수.
+    if (isMinor && !checked.guardian) return false;
+    return true;
+  }
+
+  function handleProceed() {
+    setSubmitError(null);
+
+    if (!allRequiredMet()) {
+      const missing: string[] = [];
+      if (!checked.terms) missing.push('이용약관');
+      if (!checked.privacy) missing.push('개인정보');
+      if (isMinor && !checked.guardian) missing.push('법정대리인');
+      setSubmitError(
+        `진행하려면 ${missing.join(' · ')} 동의가 필요합니다.`
+      );
+      return;
+    }
+
+    // Zod로 schema 측면 재검증 (literal(true) 강제 / 미성년→guardian 강제)
+    const payload = {
+      isMinor,
+      termsAgreed: checked.terms as true,
+      privacyPolicyAgreed: checked.privacy as true,
+      guardianConsentObtained: checked.guardian,
+      consentTimestamp: new Date().toISOString(),
+    };
+    const r = validate(consentSchema, payload);
+    if (!r.ok) {
+      const firstKey = Object.keys(r.errors)[0];
+      setSubmitError(
+        `동의 항목을 확인해주세요${
+          firstKey ? ` (${r.errors[firstKey]})` : ''
+        }.`
+      );
+      return;
+    }
+
+    startTransition(() => {
+      router.push('/processing');
+    });
+  }
+
+  const allChecked = checked.terms && checked.privacy && checked.guardian;
+  const canProceed = allRequiredMet();
+
   return (
     <>
       <PageHeader />
@@ -45,18 +120,64 @@ export default function ConsentPage() {
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">동의</h1>
           <StepIndicator current="consent" />
         </div>
-        <p className="mb-8 text-ink-700">
+        <p className="mb-6 text-ink-700">
           학종 진단 서비스를 진행하려면 아래 3가지 동의가 모두 필요합니다.
           한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
 
+        {/* 미성년자 여부 토글 — 실 서비스에서는 회원가입 단계에서 결정. 데모용 토글. */}
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-ink-900">미성년자(만 19세 미만)인가요?</p>
+            <p className="mt-0.5 text-xs text-ink-500">
+              미성년자라면 법정대리인 동의가 필수로 추가됩니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMinor((v) => !v)}
+            className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200"
+          >
+            {isMinor ? '미성년 · 변경' : '성인 · 변경'}
+          </button>
+        </div>
+
+        <div className="mb-4 flex items-center justify-between rounded-xl bg-ink-100/50 px-4 py-2.5 text-sm">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allChecked}
+              onChange={(e) => toggleAll(e.target.checked)}
+              className="size-4 accent-brand-600"
+            />
+            <span className="font-medium text-ink-900">전체 동의</span>
+          </label>
+          <span className="text-xs text-ink-500">필수 3개</span>
+        </div>
+
         <section className="space-y-3">
           {items.map((item) => (
-            <ConsentRow key={item.id} item={item} />
+            <ConsentRow
+              key={item.id}
+              item={item}
+              required={item.id !== 'guardian' || isMinor}
+              dim={item.id === 'guardian' && !isMinor}
+              checked={checked[item.id]}
+              onChange={(v) => toggle(item.id, v)}
+            />
           ))}
         </section>
 
-        <BlockerNote />
+        {submitError ? (
+          <ErrorState
+            title="동의가 부족합니다"
+            message={submitError}
+            tone="warning"
+            className="mt-6"
+          />
+        ) : (
+          <BlockerNote />
+        )}
 
         <div className="mt-8 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link
@@ -65,31 +186,58 @@ export default function ConsentPage() {
           >
             ← 입력으로
           </Link>
-          <Link
-            href="/result"
-            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+          <button
+            type="button"
+            onClick={handleProceed}
+            disabled={!canProceed || isPending}
+            aria-disabled={!canProceed || isPending}
+            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            동의 후 진단 시작 →
-          </Link>
+            {isPending ? '이동 중…' : '동의 후 진단 시작 →'}
+          </button>
         </div>
       </main>
     </>
   );
 }
 
-function ConsentRow({ item }: { item: ConsentItem }) {
+function ConsentRow({
+  item,
+  required,
+  dim,
+  checked,
+  onChange,
+}: {
+  item: ConsentItem;
+  required: boolean;
+  dim?: boolean;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
-    <label className="flex cursor-pointer gap-3 rounded-2xl border border-ink-100 bg-white p-5 transition hover:border-brand-200 has-[input:checked]:border-brand-300 has-[input:checked]:bg-brand-50/40">
+    <label
+      className={
+        dim
+          ? 'flex cursor-not-allowed gap-3 rounded-2xl border border-ink-100 bg-ink-100/30 p-5 opacity-60'
+          : 'flex cursor-pointer gap-3 rounded-2xl border border-ink-100 bg-white p-5 transition hover:border-brand-200 has-[input:checked]:border-brand-300 has-[input:checked]:bg-brand-50/40'
+      }
+    >
       <input
         type="checkbox"
-        defaultChecked
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={dim}
         className="mt-1.5 size-4 shrink-0 accent-brand-600"
       />
       <div className="flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-semibold text-ink-900">{item.title}</span>
-          {item.required && (
+          <span className="text-base font-semibold text-ink-900">
+            {item.title}
+          </span>
+          {required ? (
             <span className="text-xs font-medium text-brand-600">필수</span>
+          ) : (
+            <span className="text-xs font-medium text-ink-500">생략 가능</span>
           )}
         </div>
         <p className="mt-1 text-sm leading-relaxed text-ink-700">{item.body}</p>
@@ -108,7 +256,7 @@ function BlockerNote() {
       <p className="mt-1 text-amber-900/80">
         본 서비스는 미성년자 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두
         가동된 이후에만 실제 사용자 데이터를 받습니다. 본 화면은 그 절차를 사용자에게
-        가시화하는 Phase A 시각 셸입니다.
+        가시화한 Phase B 검증 시각 셸입니다.
       </p>
     </aside>
   );
