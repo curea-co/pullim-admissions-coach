@@ -36,13 +36,18 @@
 
 | 파일 | 내용 | 최신 버전 |
 |---|---|---|
-| [002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) | **서비스 정의 SSOT** | v0.3 (검수 확정) |
+| [002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) | **서비스 정의 SSOT** | v0.3.1 (검수 확정) |
 | [001_Admissions_Coach_wbs_v.3.1.md](docs/001_Admissions_Coach_wbs_v.3.1.md) | 6개월 로드맵 WBS | v0.3.2 |
 | [003_Admissions_Coach_personas_v.2.md](docs/003_Admissions_Coach_personas_v.2.md) | 핵심 사용자 페르소나 3명 | v0.1.2 |
 | [004_Admissions_Coach_coding_plan_v0.1.md](docs/004_Admissions_Coach_coding_plan_v0.1.md) | 6 Phase 코딩 계획 (PM) | v0.1 |
 | [005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) | 시스템 아키텍처 (AWS·앱·흐름) | v0.1 |
 | [006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) | 데이터 분류·암호화·보관 정책 (§6.3 P0 운영 사양) | v0.1 |
+| [007_Admissions_Coach_member_db_v0.1.md](docs/007_Admissions_Coach_member_db_v0.1.md) | 회원·인증 DB 모델 (Gate keeper 회신용) | v0.1 |
+| [008_Admissions_Coach_vercel_demo_v0.1.md](docs/008_Admissions_Coach_vercel_demo_v0.1.md) | Vercel demo 운영·retire 정책 | v0.1 |
+| [009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md](docs/009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md) | 6/1 CEO 평가 시연 시나리오 (동선·Q&A·회귀) | v0.1 |
+| [prompt_v0.1.md](docs/prompt_v0.1.md) | **AI 시스템 프롬프트 SSOT** (§6 가드 코드화 + NG 정규식) | v0.1 |
 | [student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) | 학생 입력값 JSON Schema | v0.1 |
+| [golden/](docs/golden/) | Phase D 회귀 기준 5 케이스 + §6 NG 셋 | v0.1 |
 | [002_Admissions_Coach_definition_v.2.md](docs/002_Admissions_Coach_definition_v.2.md) | 정의 v0.2 (자소서 폐지 패치 노트, 이력용) | v0.2 |
 | [002_definition_pivot_memo_v.1.md](docs/002_definition_pivot_memo_v.1.md) | 자소서 폐지 대응 방향 메모 (이력용) | v0.1 |
 
@@ -58,18 +63,27 @@
 
 ---
 
-## 현재 상태 (2026-05-26)
+## 현재 상태 (2026-06-01, 출시 D-62)
 
-**확정:** 한 줄 정의, 산출물 3종, §6 가드레일, 24h SLA 측정 정의, 8/1 출시, 명칭("진단"), 미성년자 정책 P0 격상.
+**확정:** 한 줄 정의, 산출물 3종, §6 가드레일, 24h SLA 측정 정의, 8/1 출시, 명칭("진단"·"준비"), 5계열·4학교유형 enum, 미성년자 정책 P0 격상, PR 워크플로 + main 브랜치 보호.
 
-**완료:**
-- [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·미성년자 동의(blocker) 스키마
+**완료 (SSOT 9건 + 코드):**
+- [docs/002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) — 정의 v0.3.1 (§6 가드레일 3선 + 5계열·4학교유형)
 - [docs/004_Admissions_Coach_coding_plan_v0.1.md](docs/004_Admissions_Coach_coding_plan_v0.1.md) — 6 Phase 코딩 계획
-- [docs/005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) — 시스템 아키텍처 v0.1
-- [docs/006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) — 데이터 분류·암호화 정책 v1 (§6.3 운영 사양서)
+- [docs/005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) — 시스템 아키텍처
+- [docs/006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) — 데이터 정책 (§6.3 P0 운영 사양)
+- [docs/007_Admissions_Coach_member_db_v0.1.md](docs/007_Admissions_Coach_member_db_v0.1.md) — 회원·인증 DB 모델 5 엔티티
+- [docs/008_Admissions_Coach_vercel_demo_v0.1.md](docs/008_Admissions_Coach_vercel_demo_v0.1.md) — Vercel demo 운영 정책
+- [docs/009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md](docs/009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md) — 6/1 CEO 시연 시나리오
+- [docs/prompt_v0.1.md](docs/prompt_v0.1.md) — **★ M2 시스템 프롬프트 SSOT** (§6 가드 코드화, NG 정규식, 회귀 게이트)
+- [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·동의 강제
+- [docs/golden/](docs/golden/) — Phase D 회귀 기준 5 케이스 (5계열·4학교유형 100% 커버)
+
+**Phase A+B 시각 셸 라이브:** https://pullim-admissions-coach.vercel.app/ (Vercel demo, AWS staging 대기 중)
 
 **다음 의존 산출물 (대기):**
-- `prompt_v0.1.md` (M2) — §6 가드레일을 시스템 프롬프트 제약으로 구현
+- `prompt_parent_report_v0.1.md` (M3) — 학부모 주간 리포트 프롬프트
+- Phase 0 AWS 인프라 — Gate keeper의 AWS Organizations + 3계정 회신 대기 (외부 의존)
 - 사고 대응 플레이북 / 약관 / 개인정보처리방침 / 법정대리인 동의서 (Phase E 법무 검토 필요)
 
 ## 진행 단계 (Phase)
