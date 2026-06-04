@@ -98,19 +98,18 @@ export default function SubmitPage() {
     // Phase A+B: 클라이언트 측 PDF → 텍스트 추출.
     // 백엔드 부재 상황에서 파일 자체를 서버로 보내지 않고 텍스트만 폼에 채운다.
     // Phase D에서 S3 presigned URL 업로드 경로가 추가되면 본 함수는 *프리뷰*용으로 유지.
+
+    // codex review PR #15 round 3 후속: 검증 *이전*에 이전 작업을 무효화한다.
+    // invalid file 재선택 분기에서도 이전 파싱이 계속 살아남아 stale done 으로 덮어쓰는
+    // 정합성 문제 차단. cancel + reqId 증가를 가장 먼저 실행.
+    currentPdfHandleRef.current?.cancel();
+    const reqId = ++pdfRequestIdRef.current;
+
     const v = validatePdfFile(file);
     if (!v.ok) {
       setPdfStatus({ state: 'error', message: v.error });
       return;
     }
-
-    // codex review P2 후속: 이전 핸들을 실제 cancel. setState 가드만으로는 막을 수 없는
-    // 백그라운드 파싱 CPU/메모리 이중 소비를 차단한다.
-    currentPdfHandleRef.current?.cancel();
-
-    // codex review P1: race guard. 새 요청 id 할당. 본 호출 도중 다른 파일이 선택되거나
-    // clear가 호출되면 ref 값이 증가해 본 호출의 setState가 stale로 무시됨.
-    const reqId = ++pdfRequestIdRef.current;
 
     setPdfStatus({
       state: 'parsing',

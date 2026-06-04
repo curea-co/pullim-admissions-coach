@@ -150,9 +150,13 @@ export function extractPdfText(
           code: 'encrypted',
         };
       }
+      // codex review PR #15 round 3 후속: pdfjs raw 에러 문자열은 사용자에게 그대로
+      // 노출하지 않는다(운영 안정성·UX·정보 노출 차단). 실 디버깅용 메시지는
+      // console.warn 으로만 남기고, 사용자에게는 일반화된 안내 + 대체 경로 제시.
+      console.warn('[pdf] parse failed:', message);
       return {
         ok: false,
-        error: `PDF 파싱 실패: ${message}`,
+        error: 'PDF를 처리하지 못했습니다. 다른 PDF로 다시 시도하거나 텍스트 직접 붙여넣기 탭을 이용해주세요.',
         code: 'parse_failed',
       };
     } finally {
