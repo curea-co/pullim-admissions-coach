@@ -1,0 +1,144 @@
+name: Codex Bot Daily Smoke Test
+
+# 매일 00:00 UTC (09:00 KST) admissions 리포의 codex-review 봇이 살아있는지
+# 1건 trivial PR 으로 자동 검증. 통과 시 PR close + branch 삭제.
+#
+# 목적:
+# - 조용한 날(PR 0건)에도 봇 health 신호 1건/일 보장
+# - 봇 인프라(runner·App·secret) 회귀 조기 발견
+# - writing-coach 측 동시 패치가 admissions 봇 동작을 깨면 다음 day 알람
+#
+# 미통과 시: smoke test PR 이 close 안 되고 남음 → 운영자가 확인 신호
+
+on:
+  schedule:
+    # 매일 09:00 KST = 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 트리거
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: codex-smoke-test
+  cancel-in-progress: false # 누적 미통과 PR 보존
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Create smoke test branch + commit
+        id: pr
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +%Y-%m-%d-%H%M)
+          BRANCH="test/codex-smoke-$DATE"
+          git checkout -b "$BRANCH"
+          {
+            echo "# Codex Bot Smoke Test (자동)"
+            echo ""
+            echo "- 생성: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "- 워크플로: codex-bot-smoke-test.yml"
+            echo "- 본 파일은 자동 close 됨 (1회용 marker)"
+          } > docs/.codex-smoke-test.md
+          git add docs/.codex-smoke-test.md
+          git commit -m "test: daily codex bot smoke test ($DATE)"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open smoke test PR
+        id: open
+        run: |
+          set -euo pipefail
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "${{ steps.pr.outputs.branch }}" \
+            --title "test: codex bot daily smoke test ($(date -u +%Y-%m-%d-%H%M))" \
+            --body "Automated codex-review bot health check. Auto-closed within 20 min on bot success, otherwise stays open for investigation.")
+          PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Opened: $PR_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for codex-review job (max 15 min)
+        id: wait
+        run: |
+          set -uo pipefail
+          BRANCH="${{ steps.pr.outputs.branch }}"
+          for i in $(seq 1 15); do
+            sleep 60
+            RUN_JSON=$(gh run list \
+              --workflow=codex-review.yml \
+              --branch "$BRANCH" \
+              --limit 1 \
+              --json status,conclusion,databaseId 2>/dev/null || echo '[]')
+            STATUS=$(echo "$RUN_JSON" | jq -r '.[0].status // "missing"')
+            CONCLUSION=$(echo "$RUN_JSON" | jq -r '.[0].conclusion // ""')
+            RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId // ""')
+            echo "[t+${i}m] status=$STATUS conclusion=$CONCLUSION run_id=$RUN_ID"
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "outcome=success" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "outcome=fail" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          done
+          echo "outcome=timeout" >> "$GITHUB_OUTPUT"
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup on success — close PR + delete branch
+        if: steps.wait.outputs.outcome == 'success'
+        run: |
+          set -euo pipefail
+          gh pr close "${{ steps.open.outputs.pr }}" \
+            --delete-branch \
+            --comment "✅ Codex bot smoke test PASS — automated close."
+          echo "Cleaned up PR #${{ steps.open.outputs.pr }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Alert on failure — leave PR open
+        if: steps.wait.outputs.outcome != 'success'
+        run: |
+          echo "❌ Codex bot smoke test ${{ steps.wait.outputs.outcome }} — PR #${{ steps.open.outputs.pr }} 보존"
+          echo "운영자 확인 필요: ${{ steps.open.outputs.url }}"
+          # GitHub Actions UI 의 job summary 에 노출
+          {
+            echo "## ❌ Codex Bot Smoke Test FAIL"
+            echo ""
+            echo "- Outcome: ${{ steps.wait.outputs.outcome }}"
+            echo "- PR: ${{ steps.open.outputs.url }}"
+            echo "- Branch: ${{ steps.pr.outputs.branch }}"
+            echo ""
+            echo "### 진단표"
+            echo "| 증상 | 가능 원인 |"
+            echo "|---|---|"
+            echo "| outcome=timeout (job 15분 안 미완료) | runner group 미할당 / 봇 인프라 회귀 |"
+            echo "| outcome=fail (job 완료되나 실패) | secret 접근 실패 / Codex CLI 오류 / App 권한 부족 |"
+            echo ""
+            echo "PR 본문에 codex-review job logs 확인 후 봇 개발자에게 보고."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
