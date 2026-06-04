@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -57,6 +57,16 @@ export default function SubmitPage() {
   const pdfRequestIdRef = useRef(0);
   // codex review P2 후속: 진행 중 핸들. 새 파일/clear 시 cancel()로 *실제* pdf.js 작업 중단.
   const currentPdfHandleRef = useRef<PdfExtractHandle | null>(null);
+
+  // codex review PR #15 2차: unmount cleanup. PDF 파싱 중 학생이 뒤로가기·다른 화면으로
+  // 이동해 SubmitPage가 내려가면 clearPdf()가 호출되지 않아 워커가 계속 돈다. 빈 deps라
+  // mount/unmount 한 번씩만 실행되고, 본문은 unmount 시점에 진행 중인 작업을 중단.
+  useEffect(() => {
+    return () => {
+      currentPdfHandleRef.current?.cancel();
+      currentPdfHandleRef.current = null;
+    };
+  }, []);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
 
