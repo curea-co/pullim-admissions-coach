@@ -4,6 +4,8 @@
 
 // 'use client' 부착된 컴포넌트에서만 호출. SSR 환경에서는 호출 금지.
 
+import type { PDFDocumentLoadingTask } from 'pdfjs-dist';
+
 export type PdfExtractProgress = {
   current: number;
   total: number;
@@ -22,14 +24,29 @@ export type PdfExtractResult =
       code:
         | 'invalid_type'
         | 'too_large'
+        | 'too_many_pages'
         | 'parse_failed'
         | 'encrypted'
         | 'empty'
+        | 'cancelled'
         | 'unknown';
     };
 
+// codex review P2 후속: 취소 가능한 핸들. 실제 pdf.js 작업을 destroy()로 중단해
+// 큰 PDF 연속 선택 시 CPU/메모리 이중 소비·UI 프리즈 위험을 차단한다.
+export type PdfExtractHandle = {
+  promise: Promise<PdfExtractResult>;
+  cancel: () => void;
+};
+
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const MAX_PAGES = 50; // 안전 상한
+const MAX_PAGES = 50; // 안전 상한 — 초과 시 silent truncation 대신 명시 실패 (codex review P1)
+
+const CANCELLED: PdfExtractResult = {
+  ok: false,
+  error: '이전 PDF 처리가 중단되었습니다.',
+  code: 'cancelled',
+};
 
 export function validatePdfFile(file: File): { ok: true } | { ok: false; error: string; code: 'invalid_type' | 'too_large' } {
   // Type check — accept application/pdf or .pdf extension fallback (some browsers omit MIME)
@@ -49,72 +66,113 @@ export function validatePdfFile(file: File): { ok: true } | { ok: false; error: 
   return { ok: true };
 }
 
-export async function extractPdfText(
+export function extractPdfText(
   file: File,
   onProgress?: (p: PdfExtractProgress) => void
-): Promise<PdfExtractResult> {
-  const v = validatePdfFile(file);
-  if (!v.ok) return { ...v, ok: false };
+): PdfExtractHandle {
+  let cancelled = false;
+  let loadingTask: PDFDocumentLoadingTask | null = null;
 
-  try {
-    // dynamic import: pdfjs는 ~1MB, SSR 회피, 초기 번들 비대화 회피
-    const pdfjs = await import('pdfjs-dist');
+  const promise = (async (): Promise<PdfExtractResult> => {
+    const v = validatePdfFile(file);
+    if (!v.ok) return { ...v, ok: false };
 
-    // Worker 설정: jsdelivr CDN (버전 자동 매칭). CSP 헤더 도입 시 self-host로 전환.
-    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-    }
+    try {
+      // dynamic import: pdfjs는 ~1MB, SSR 회피, 초기 번들 비대화 회피
+      const pdfjs = await import('pdfjs-dist');
+      if (cancelled) return CANCELLED;
 
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
+      // Worker 설정: same-origin self-host (codex review P2).
+      // 학교망·사내망 CDN 차단 위험 + 미성년자 데이터 흐름의 외부 의존 최소화.
+      // 파일 위치: apps/web/public/pdf.worker.min.mjs (pdfjs-dist 4.10.38 빌드 카피).
+      // package.json은 4.10.38 exact pin이라 메인 번들과 워커 버전 드리프트 차단 (codex review P1).
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      }
 
-    const numPages = Math.min(pdf.numPages, MAX_PAGES);
-    if (numPages === 0) {
-      return { ok: false, error: 'PDF에 페이지가 없습니다.', code: 'empty' };
-    }
+      const arrayBuffer = await file.arrayBuffer();
+      if (cancelled) return CANCELLED;
 
-    let fullText = '';
-    for (let i = 1; i <= numPages; i++) {
-      onProgress?.({ current: i, total: numPages });
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item) => ('str' in item ? item.str : ''))
-        .join(' ');
-      fullText += pageText + '\n\n';
-    }
+      loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      if (cancelled) return CANCELLED;
 
-    const trimmed = fullText.trim();
-    if (trimmed.length === 0) {
+      if (pdf.numPages === 0) {
+        return { ok: false, error: 'PDF에 페이지가 없습니다.', code: 'empty' };
+      }
+
+      // codex review P1: silent truncation 차단. MAX_PAGES 초과 시 명시 실패.
+      if (pdf.numPages > MAX_PAGES) {
+        return {
+          ok: false,
+          error: `PDF가 ${pdf.numPages}페이지로 너무 깁니다. 최대 ${MAX_PAGES}페이지까지 지원합니다. 필요한 부분만 잘라낸 PDF로 다시 시도하거나 텍스트 직접 붙여넣기 탭을 이용해주세요.`,
+          code: 'too_many_pages',
+        };
+      }
+
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        if (cancelled) return CANCELLED;
+        onProgress?.({ current: i, total: pdf.numPages });
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ');
+        fullText += pageText + '\n\n';
+      }
+
+      const trimmed = fullText.trim();
+      if (trimmed.length === 0) {
+        return {
+          ok: false,
+          error:
+            '텍스트를 추출하지 못했습니다. 이미지 기반 PDF이거나 보호된 파일일 수 있어요. 텍스트 직접 붙여넣기 탭을 사용해주세요.',
+          code: 'empty',
+        };
+      }
+
+      return {
+        ok: true,
+        text: trimmed,
+        pages: pdf.numPages,
+        sizeBytes: file.size,
+      };
+    } catch (err) {
+      // destroy() 중단으로 발생한 예외는 cancel 결과로 흡수.
+      if (cancelled) return CANCELLED;
+      const message = err instanceof Error ? err.message : String(err);
+      // 암호화 PDF는 pdfjs가 PasswordException을 던짐
+      if (message.toLowerCase().includes('password')) {
+        return {
+          ok: false,
+          error: '비밀번호로 보호된 PDF입니다. 보호를 해제한 후 다시 시도해주세요.',
+          code: 'encrypted',
+        };
+      }
+      // codex review PR #15 round 3 후속: pdfjs raw 에러 문자열은 사용자에게 그대로
+      // 노출하지 않는다(운영 안정성·UX·정보 노출 차단). 실 디버깅용 메시지는
+      // console.warn 으로만 남기고, 사용자에게는 일반화된 안내 + 대체 경로 제시.
+      console.warn('[pdf] parse failed:', message);
       return {
         ok: false,
-        error:
-          '텍스트를 추출하지 못했습니다. 이미지 기반 PDF이거나 보호된 파일일 수 있어요. 텍스트 직접 붙여넣기 탭을 사용해주세요.',
-        code: 'empty',
+        error: 'PDF를 처리하지 못했습니다. 다른 PDF로 다시 시도하거나 텍스트 직접 붙여넣기 탭을 이용해주세요.',
+        code: 'parse_failed',
       };
+    } finally {
+      loadingTask = null;
     }
+  })();
 
-    return {
-      ok: true,
-      text: trimmed,
-      pages: pdf.numPages,
-      sizeBytes: file.size,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // 암호화 PDF는 pdfjs가 PasswordException을 던짐
-    if (message.toLowerCase().includes('password')) {
-      return {
-        ok: false,
-        error: '비밀번호로 보호된 PDF입니다. 보호를 해제한 후 다시 시도해주세요.',
-        code: 'encrypted',
-      };
-    }
-    return {
-      ok: false,
-      error: `PDF 파싱 실패: ${message}`,
-      code: 'parse_failed',
-    };
-  }
+  return {
+    promise,
+    cancel: () => {
+      cancelled = true;
+      // pdfjs loadingTask.destroy()는 워커 측 작업과 future page reads를 모두 중단한다.
+      // 에러는 위 try/catch의 cancelled 가드로 흡수.
+      if (loadingTask) {
+        loadingTask.destroy().catch(() => {});
+      }
+    },
+  };
 }

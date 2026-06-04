@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -16,7 +16,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { validate, type FieldErrors } from '@/lib/validation';
-import { extractPdfText, validatePdfFile } from '@/lib/pdf';
+import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +53,20 @@ export default function SubmitPage() {
   const [recordText, setRecordText] = useState('');
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ state: 'idle' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // codex review P1: race guard. 가장 최근 요청 id만 반영. 이전 요청은 stale로 무시.
+  const pdfRequestIdRef = useRef(0);
+  // codex review P2 후속: 진행 중 핸들. 새 파일/clear 시 cancel()로 *실제* pdf.js 작업 중단.
+  const currentPdfHandleRef = useRef<PdfExtractHandle | null>(null);
+
+  // codex review PR #15 2차: unmount cleanup. PDF 파싱 중 학생이 뒤로가기·다른 화면으로
+  // 이동해 SubmitPage가 내려가면 clearPdf()가 호출되지 않아 워커가 계속 돈다. 빈 deps라
+  // mount/unmount 한 번씩만 실행되고, 본문은 unmount 시점에 진행 중인 작업을 중단.
+  useEffect(() => {
+    return () => {
+      currentPdfHandleRef.current?.cancel();
+      currentPdfHandleRef.current = null;
+    };
+  }, []);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
 
@@ -84,18 +98,27 @@ export default function SubmitPage() {
     // Phase A+B: 클라이언트 측 PDF → 텍스트 추출.
     // 백엔드 부재 상황에서 파일 자체를 서버로 보내지 않고 텍스트만 폼에 채운다.
     // Phase D에서 S3 presigned URL 업로드 경로가 추가되면 본 함수는 *프리뷰*용으로 유지.
+
+    // codex review PR #15 round 3 후속: 검증 *이전*에 이전 작업을 무효화한다.
+    // invalid file 재선택 분기에서도 이전 파싱이 계속 살아남아 stale done 으로 덮어쓰는
+    // 정합성 문제 차단. cancel + reqId 증가를 가장 먼저 실행.
+    currentPdfHandleRef.current?.cancel();
+    const reqId = ++pdfRequestIdRef.current;
+
     const v = validatePdfFile(file);
     if (!v.ok) {
       setPdfStatus({ state: 'error', message: v.error });
       return;
     }
+
     setPdfStatus({
       state: 'parsing',
       current: 0,
       total: 0,
       fileName: file.name,
     });
-    const result = await extractPdfText(file, (p) => {
+    const handle = extractPdfText(file, (p) => {
+      if (reqId !== pdfRequestIdRef.current) return; // stale progress 무시
       setPdfStatus({
         state: 'parsing',
         current: p.current,
@@ -103,6 +126,12 @@ export default function SubmitPage() {
         fileName: file.name,
       });
     });
+    currentPdfHandleRef.current = handle;
+    const result = await handle.promise;
+    // 본 호출 도중 cancel/clear 발생 시 silent skip (stale 덮어쓰기 방지)
+    if (reqId !== pdfRequestIdRef.current) return;
+    if (result.ok === false && result.code === 'cancelled') return;
+
     if (!result.ok) {
       setPdfStatus({ state: 'error', message: result.error });
       return;
@@ -117,6 +146,10 @@ export default function SubmitPage() {
   }
 
   function clearPdf() {
+    // codex review P2 후속: 진행 중 파싱을 실제 중단 + stale 가드 동시 적용.
+    currentPdfHandleRef.current?.cancel();
+    currentPdfHandleRef.current = null;
+    pdfRequestIdRef.current++;
     setPdfStatus({ state: 'idle' });
     setRecordText('');
     if (fileInputRef.current) fileInputRef.current.value = '';
