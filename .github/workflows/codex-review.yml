@@ -1,0 +1,233 @@
+name: Codex Review
+
+on:
+  # Codex 지적(3차 #1): pull_request_target 패턴 — base 브랜치의 워크플로 yml만
+  # secret 에 접근. PR 가 본 yml 자체를 수정해도 secret 유출 불가.
+  # 단점: 본 yml 의 변경은 main 머지 후 다음 PR 부터 효력 발생.
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: codex-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review
+    runs-on:
+      # default group (visibility=all) 의존성 격리 — pullim-planner 전용 group 명시.
+      # group 미지정 시 다른 group 후보까지 잡혀 다른 레포 부하와 큐 경합 발생.
+      # labels로 self-hosted 한정해 group에 hosted larger runner 추가돼도 자동 배제.
+      group: curea-runner-groups-2
+      labels: [self-hosted]
+    # 사전 sweep: workflow hang 방지 — 15분 상한.
+    timeout-minutes: 15
+    # 포크 PR 차단 — curea-co 소속 브랜치만 self-hosted runner 실행.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      # Codex 지적(3차 #2): PR head SHA 명시 체크아웃.
+      # pull_request_target 의 기본은 base 체크아웃이므로 head 받기 위해 ref 의무.
+      # diff·라인 매핑이 pr.head.sha 와 일치해야 인라인 코멘트 위치 정확.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Clean Codex config
+        run: rm -f ~/.codex/config.toml
+
+      - name: Clean previous review
+        run: rm -f /tmp/codex-review-${{ github.event.repository.name }}.json /tmp/pr-diff-${{ github.event.repository.name }}.txt
+
+      - name: Extract PR diff
+        run: |
+          set -euo pipefail
+          # base.sha · head.sha 직접 사용 — base.ref 가 force-push 시 흔들리지 않음.
+          git diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" \
+            > /tmp/pr-diff-${{ github.event.repository.name }}.txt
+          echo "PR diff: $(wc -l < /tmp/pr-diff-${{ github.event.repository.name }}.txt) lines"
+
+      # safety_strategy=unsafe 정당화:
+      # Codex CLI 가 /tmp/pr-diff*.txt 읽기 · /tmp/codex-review*.json 쓰기 필요.
+      # workspace-write sandbox + unsafe = 워크스페이스 외부 파일 시스템 접근 허용.
+      # /tmp 만 사용 + concurrency group 으로 PR 격리 → 실제 영향 격리됨.
+      - name: Codex Review
+        id: codex
+        run: |
+          cat <<PROMPT | codex exec --model gpt-5.4 --sandbox workspace-write -c safety_strategy=unsafe -
+          /tmp/pr-diff-${{ github.event.repository.name }}.txt 파일에 이 PR의 변경 diff가 있다.
+          이 diff를 대상으로 루트 AGENTS.md 와 CLAUDE.md 를 우선 적용해 리뷰해라.
+          명시되지 않은 공통 규칙은 CLAUDE.md 가 가리키는 권위 문서를 참조해라.
+          모든 리뷰 코멘트는 반드시 한국어로 작성해라.
+
+          변경된 코드의 맥락 이해가 필요하면 워크스페이스의 관련 파일을 참조해라.
+          단, 전체 파일을 읽지 말고 필요한 부분만 확인해라.
+
+          리뷰 결과를 /tmp/codex-review-${{ github.event.repository.name }}.json 파일에 아래 JSON 형식으로 출력해라:
+          {
+            "action": "COMMENT" 또는 "APPROVE",
+            "body": "전체 리뷰 요약 (한국어)",
+            "comments": [
+              {
+                "path": "리포지토리 루트 기준 상대 경로",
+                "line": <줄번호>,
+                "body": "인라인 코멘트 내용 (한국어)\n\n— Reviewed by Codex"
+              }
+            ]
+          }
+
+          규칙:
+          - 발견한 이슈를 빠짐없이 모두 comments 배열에 포함해라. 개수를 줄이지 마라.
+          - 이슈가 없으면 action을 "APPROVE"로, comments는 빈 배열로 설정
+          - 모든 인라인 코멘트 body 끝에 반드시 `— Reviewed by Codex` 서명 포함
+          - JSON 파일에는 순수 JSON만 출력 (마크다운 펜스나 부가 텍스트 금지)
+          PROMPT
+
+      # 사전 sweep: Codex 산출 JSON 보관 — 디버깅·감사·회귀 추적용.
+      - name: Upload Codex review artifact
+        if: always() && steps.codex.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-review-${{ github.event.pull_request.number }}
+          path: /tmp/codex-review-${{ github.event.repository.name }}.json
+          retention-days: 7
+
+      - name: Generate App Token
+        id: app-token
+        if: always() && steps.codex.outcome == 'success'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.REVIEW_BOT_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BOT_PRIVATE_KEY }}
+          owner: curea-co
+
+      - name: Post Review
+        if: always() && steps.codex.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          REVIEW_PATH: /tmp/codex-review-${{ github.event.repository.name }}.json
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fs = require('fs');
+            const path = process.env.REVIEW_PATH;
+
+            if (!fs.existsSync(path)) {
+              core.setFailed(`No review JSON found at ${path}`);
+              return;
+            }
+
+            let review;
+            try {
+              review = JSON.parse(fs.readFileSync(path, 'utf8'));
+            } catch (e) {
+              core.setFailed('JSON 파싱 실패: ' + e.message);
+              return;
+            }
+
+            // Codex 지적(3차 #3): JSON 스키마 인라인 검증 — "외부 입력 런타임 검증" 룰 준수.
+            // Codex JSON 도 외부 입력. (워크플로 안 javascript 에 Zod import 불가 — 인라인 검증으로 대체.)
+            const isString = (v) => typeof v === 'string';
+            const isNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+            const ACTIONS = ['COMMENT', 'APPROVE'];
+
+            if (!review || typeof review !== 'object') {
+              core.setFailed('스키마 검증 실패: review 가 객체가 아님');
+              return;
+            }
+            if (!ACTIONS.includes(review.action)) {
+              core.setFailed(`스키마 검증 실패: action 은 ${ACTIONS.join('/')} 만 허용. 실제: ${review.action}`);
+              return;
+            }
+            if (review.body !== undefined && !isString(review.body)) {
+              core.setFailed('스키마 검증 실패: body 는 문자열');
+              return;
+            }
+            const rawComments = Array.isArray(review.comments) ? review.comments : [];
+            const validatedComments = [];
+            let skipped = 0;
+            for (let i = 0; i < rawComments.length; i++) {
+              const c = rawComments[i];
+              if (!c || typeof c !== 'object') {
+                console.warn(`comment[${i}] 객체 아님 — 건너뜀`);
+                skipped++;
+                continue;
+              }
+              if (!isString(c.path) || !isNumber(c.line) || !isString(c.body)) {
+                console.warn(`comment[${i}] 필드 누락/형식 오류 — 건너뜀`, c);
+                skipped++;
+                continue;
+              }
+              validatedComments.push(c);
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            // Codex 지적(2차): pagination — 301+ 파일 PR 인라인 손실 방지.
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            const diffLines = new Map();
+            for (const file of files) {
+              if (!file.patch) continue;
+              const lines = new Set();
+              let lineNum = 0;
+              for (const patchLine of file.patch.split('\n')) {
+                const hunkMatch = patchLine.match(/^@@ -\d+(?:,\d+)? \+(\d+)/);
+                if (hunkMatch) {
+                  lineNum = parseInt(hunkMatch[1], 10);
+                  continue;
+                }
+                if (patchLine.startsWith('-')) continue;
+                lines.add(lineNum);
+                lineNum++;
+              }
+              diffLines.set(file.filename, lines);
+            }
+
+            const validComments = [];
+            const fallbackComments = [];
+
+            for (const c of validatedComments) {
+              const fileLines = diffLines.get(c.path);
+              if (fileLines && fileLines.has(c.line)) {
+                validComments.push({ path: c.path, line: c.line, side: 'RIGHT', body: c.body });
+              } else {
+                fallbackComments.push(`**${c.path}:${c.line}**\n${c.body}`);
+              }
+            }
+
+            const bodyParts = [`## Codex Review\n\n${review.body || 'Review by Codex'}`];
+            if (fallbackComments.length > 0) {
+              bodyParts.push('\n---\n**diff 범위 밖 코멘트:**\n');
+              bodyParts.push(fallbackComments.join('\n\n'));
+            }
+
+            const params = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              commit_id: pr.head.sha,
+              event: review.action === 'APPROVE' ? 'APPROVE' : 'COMMENT',
+              body: bodyParts.join('\n'),
+            };
+
+            if (validComments.length > 0) {
+              params.comments = validComments;
+            }
+
+            await github.rest.pulls.createReview(params);
+            console.log(`인라인: ${validComments.length}, fallback: ${fallbackComments.length}, 스키마 검증 거른 코멘트: ${skipped}`);
