@@ -34,7 +34,7 @@ const maskedFieldOptions = [
   { id: 'school_name', label: '학교명' },
   { id: 'birth_date', label: '생년월일' },
   { id: 'phone', label: '전화·주소' },
-  { id: 'teacher_name', label: '교사 성명' },
+  { id: 'teacher_name', label: '교사명' },
 ] as const;
 
 export default function SubmitPage() {

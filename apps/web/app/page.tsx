@@ -38,7 +38,7 @@ const outputs: OutputCard[] = [
 ];
 
 const seasons = [
-  { months: '7~9월', label: '수시 원서·학생부 마감' },
+  { months: '7~9월', label: '수시 원서·학교생활기록부 마감' },
   { months: '10~11월', label: '학생부 종합 전형 면접 시즌' },
 ];
 
