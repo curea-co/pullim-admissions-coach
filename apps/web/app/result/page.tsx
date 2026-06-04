@@ -30,7 +30,7 @@ export default function ResultPage() {
           <StepIndicator current="result" />
         </div>
         <p className="mb-6 text-ink-700">
-          박준호 (mock) · 고3 2학기 · 공학계열 · 24시간 안에 1차 결과 도착
+          {parkJunho.identity.displayLabel} · 고3 2학기 · 공학계열 · 24시간 안에 1차 결과 도착
         </p>
 
         <GuardrailLabel

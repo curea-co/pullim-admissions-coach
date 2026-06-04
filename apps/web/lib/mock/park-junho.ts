@@ -25,7 +25,7 @@ export type ImprovementSuggestion = {
 
 export const parkJunho = {
   identity: {
-    displayLabel: '박준호 (mock)',
+    displayLabel: '예시 학생 (데모)',
     grade: 3,
     semester: 2,
     schoolType: 'general' as SchoolType,
@@ -139,7 +139,7 @@ export const parkJunho = {
     ] satisfies ImprovementSuggestion[],
   },
   parentReport: {
-    weekOf: '2026-05-25',
+    weekOf: '2026-06-01',
     progress: 'AI 1차 결과 도착 · 학생 검토 진행 중',
     summaryHighlights: [
       '면접 준비 팩과 생기부 진단이 24시간 안에 도착했습니다.',
