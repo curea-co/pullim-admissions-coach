@@ -16,7 +16,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { validate, type FieldErrors } from '@/lib/validation';
-import { extractPdfText, validatePdfFile } from '@/lib/pdf';
+import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +55,8 @@ export default function SubmitPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // codex review P1: race guard. 가장 최근 요청 id만 반영. 이전 요청은 stale로 무시.
   const pdfRequestIdRef = useRef(0);
+  // codex review P2 후속: 진행 중 핸들. 새 파일/clear 시 cancel()로 *실제* pdf.js 작업 중단.
+  const currentPdfHandleRef = useRef<PdfExtractHandle | null>(null);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
 
@@ -92,6 +94,10 @@ export default function SubmitPage() {
       return;
     }
 
+    // codex review P2 후속: 이전 핸들을 실제 cancel. setState 가드만으로는 막을 수 없는
+    // 백그라운드 파싱 CPU/메모리 이중 소비를 차단한다.
+    currentPdfHandleRef.current?.cancel();
+
     // codex review P1: race guard. 새 요청 id 할당. 본 호출 도중 다른 파일이 선택되거나
     // clear가 호출되면 ref 값이 증가해 본 호출의 setState가 stale로 무시됨.
     const reqId = ++pdfRequestIdRef.current;
@@ -102,7 +108,7 @@ export default function SubmitPage() {
       total: 0,
       fileName: file.name,
     });
-    const result = await extractPdfText(file, (p) => {
+    const handle = extractPdfText(file, (p) => {
       if (reqId !== pdfRequestIdRef.current) return; // stale progress 무시
       setPdfStatus({
         state: 'parsing',
@@ -111,7 +117,11 @@ export default function SubmitPage() {
         fileName: file.name,
       });
     });
-    if (reqId !== pdfRequestIdRef.current) return; // stale result 무시 (덮어쓰기 방지)
+    currentPdfHandleRef.current = handle;
+    const result = await handle.promise;
+    // 본 호출 도중 cancel/clear 발생 시 silent skip (stale 덮어쓰기 방지)
+    if (reqId !== pdfRequestIdRef.current) return;
+    if (result.ok === false && result.code === 'cancelled') return;
 
     if (!result.ok) {
       setPdfStatus({ state: 'error', message: result.error });
@@ -127,7 +137,9 @@ export default function SubmitPage() {
   }
 
   function clearPdf() {
-    // codex review P1: 진행 중인 파싱을 stale로 만들어 추후 setState 무시되게 함.
+    // codex review P2 후속: 진행 중 파싱을 실제 중단 + stale 가드 동시 적용.
+    currentPdfHandleRef.current?.cancel();
+    currentPdfHandleRef.current = null;
     pdfRequestIdRef.current++;
     setPdfStatus({ state: 'idle' });
     setRecordText('');
