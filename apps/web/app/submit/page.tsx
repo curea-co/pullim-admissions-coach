@@ -53,6 +53,8 @@ export default function SubmitPage() {
   const [recordText, setRecordText] = useState('');
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ state: 'idle' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // codex review P1: race guard. 가장 최근 요청 id만 반영. 이전 요청은 stale로 무시.
+  const pdfRequestIdRef = useRef(0);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
 
@@ -89,6 +91,11 @@ export default function SubmitPage() {
       setPdfStatus({ state: 'error', message: v.error });
       return;
     }
+
+    // codex review P1: race guard. 새 요청 id 할당. 본 호출 도중 다른 파일이 선택되거나
+    // clear가 호출되면 ref 값이 증가해 본 호출의 setState가 stale로 무시됨.
+    const reqId = ++pdfRequestIdRef.current;
+
     setPdfStatus({
       state: 'parsing',
       current: 0,
@@ -96,6 +103,7 @@ export default function SubmitPage() {
       fileName: file.name,
     });
     const result = await extractPdfText(file, (p) => {
+      if (reqId !== pdfRequestIdRef.current) return; // stale progress 무시
       setPdfStatus({
         state: 'parsing',
         current: p.current,
@@ -103,6 +111,8 @@ export default function SubmitPage() {
         fileName: file.name,
       });
     });
+    if (reqId !== pdfRequestIdRef.current) return; // stale result 무시 (덮어쓰기 방지)
+
     if (!result.ok) {
       setPdfStatus({ state: 'error', message: result.error });
       return;
@@ -117,6 +127,8 @@ export default function SubmitPage() {
   }
 
   function clearPdf() {
+    // codex review P1: 진행 중인 파싱을 stale로 만들어 추후 setState 무시되게 함.
+    pdfRequestIdRef.current++;
     setPdfStatus({ state: 'idle' });
     setRecordText('');
     if (fileInputRef.current) fileInputRef.current.value = '';
