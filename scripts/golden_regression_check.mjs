@@ -106,4 +106,6 @@ if (schemaGap.length)
   );
 else console.log("v0.2 schema: 진단 evidence 컬럼 전 케이스 존재 ✅");
 
-process.exit(totalViolations === 0 ? 0 : 1);
+// 머지 게이트 강화 (Codex review PR #9 P1): NG 위반 OR v0.2 schema 갭이 있으면 FAIL.
+// 진단 가이드 evidence 컬럼 누락 케이스가 있으면 머지 차단 (스키마 불일치 = Phase D 회귀 무력화).
+process.exit(totalViolations === 0 && schemaGap.length === 0 ? 0 : 1);
