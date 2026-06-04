@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -16,10 +16,17 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { validate, type FieldErrors } from '@/lib/validation';
+import { extractPdfText, validatePdfFile } from '@/lib/pdf';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 
 type InputType = 'pdf_upload' | 'text_paste';
+
+type PdfStatus =
+  | { state: 'idle' }
+  | { state: 'parsing'; current: number; total: number; fileName: string }
+  | { state: 'done'; fileName: string; pages: number; sizeBytes: number }
+  | { state: 'error'; message: string };
 
 const tracks: { value: TargetTrack; label: string }[] = (
   Object.entries(targetTrackLabel) as [TargetTrack, string][]
@@ -44,7 +51,8 @@ export default function SubmitPage() {
   // 폼 상태 — 박준호 mock으로 초기화 (Phase A 시연 흐름 유지)
   const [inputType, setInputType] = useState<InputType>('text_paste');
   const [recordText, setRecordText] = useState('');
-  const [fileRef, setFileRef] = useState<string>('');
+  const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ state: 'idle' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
 
@@ -72,21 +80,58 @@ export default function SubmitPage() {
     );
   }
 
+  async function handlePdfFile(file: File) {
+    // Phase A+B: 클라이언트 측 PDF → 텍스트 추출.
+    // 백엔드 부재 상황에서 파일 자체를 서버로 보내지 않고 텍스트만 폼에 채운다.
+    // Phase D에서 S3 presigned URL 업로드 경로가 추가되면 본 함수는 *프리뷰*용으로 유지.
+    const v = validatePdfFile(file);
+    if (!v.ok) {
+      setPdfStatus({ state: 'error', message: v.error });
+      return;
+    }
+    setPdfStatus({
+      state: 'parsing',
+      current: 0,
+      total: 0,
+      fileName: file.name,
+    });
+    const result = await extractPdfText(file, (p) => {
+      setPdfStatus({
+        state: 'parsing',
+        current: p.current,
+        total: p.total,
+        fileName: file.name,
+      });
+    });
+    if (!result.ok) {
+      setPdfStatus({ state: 'error', message: result.error });
+      return;
+    }
+    setPdfStatus({
+      state: 'done',
+      fileName: file.name,
+      pages: result.pages,
+      sizeBytes: result.sizeBytes,
+    });
+    setRecordText(result.text);
+  }
+
+  function clearPdf() {
+    setPdfStatus({ state: 'idle' });
+    setRecordText('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
   function buildPayload() {
-    const recordPart =
-      inputType === 'pdf_upload'
-        ? {
-            inputType: 'pdf_upload' as const,
-            fileRef,
-            maskingApplied,
-            maskedFields,
-          }
-        : {
-            inputType: 'text_paste' as const,
-            text: recordText,
-            maskingApplied,
-            maskedFields,
-          };
+    // Phase A+B: PDF든 텍스트든 최종 제출은 항상 text_paste.
+    // PDF 탭은 *입력 방법*이고, 추출된 텍스트가 recordText에 들어가 있다.
+    // Phase D에서 백엔드 S3 업로드 도착 시 pdf_upload 변환 경로 추가.
+    const recordPart = {
+      inputType: 'text_paste' as const,
+      text: recordText,
+      maskingApplied,
+      maskedFields,
+    };
 
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -185,29 +230,16 @@ export default function SubmitPage() {
                 data-field-error="record.text"
               />
             ) : (
-              <div
-                className="rounded-xl border-2 border-dashed border-ink-100 bg-white px-4 py-8 text-center text-sm text-ink-500"
-                data-field-error="record.fileRef"
-              >
-                <p className="font-medium text-ink-700">PDF 업로드 (준비 중)</p>
-                <p className="mt-1 text-xs">
-                  Phase A 시각 셸 — 실제 업로드는 Phase C에 활성화됩니다.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setFileRef('mock-file-ref-' + Date.now())}
-                  className="mt-3 rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200"
-                >
-                  Mock 파일 첨부 (개발용)
-                </button>
-                {fileRef && (
-                  <p className="mt-2 truncate text-xs text-brand-700">
-                    첨부됨: <code>{fileRef}</code>
-                  </p>
-                )}
-              </div>
+              <PdfUploader
+                status={pdfStatus}
+                onFile={handlePdfFile}
+                onClear={clearPdf}
+                inputRef={fileInputRef}
+                extractedText={recordText}
+                onExtractedTextChange={setRecordText}
+              />
             )}
-            <FieldError msg={errors['record.text'] ?? errors['record.fileRef']} />
+            <FieldError msg={errors['record.text']} />
 
             <MaskingChecklist
               checked={maskingApplied}
@@ -413,6 +445,171 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function PdfUploader({
+  status,
+  onFile,
+  onClear,
+  inputRef,
+  extractedText,
+  onExtractedTextChange,
+}: {
+  status: PdfStatus;
+  onFile: (f: File) => void;
+  onClear: () => void;
+  inputRef: React.RefObject<HTMLInputElement>;
+  extractedText: string;
+  onExtractedTextChange: (t: string) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+
+  function pick() {
+    inputRef.current?.click();
+  }
+
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) onFile(file);
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+        }}
+      />
+
+      {status.state === 'idle' && (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={pick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              pick();
+            }
+          }}
+          className={cn(
+            'cursor-pointer rounded-xl border-2 border-dashed bg-white px-4 py-10 text-center text-sm transition',
+            dragOver
+              ? 'border-brand-400 bg-brand-50/40'
+              : 'border-ink-100 hover:border-brand-200'
+          )}
+        >
+          <p className="font-medium text-ink-700">
+            PDF 파일을 끌어다 놓거나 클릭해서 선택하세요
+          </p>
+          <p className="mt-1 text-xs text-ink-500">최대 10 MB · 텍스트 PDF만 (이미지 스캔은 미지원)</p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              pick();
+            }}
+            className="mt-3 rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200"
+          >
+            파일 선택
+          </button>
+        </div>
+      )}
+
+      {status.state === 'parsing' && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50/30 px-4 py-4 text-sm">
+          <p className="font-medium text-brand-700">{status.fileName} 분석 중…</p>
+          <p className="mt-1 text-xs text-ink-500">
+            {status.total > 0
+              ? `페이지 ${status.current} / ${status.total}`
+              : '파일 읽는 중'}
+          </p>
+          <div
+            className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={
+              status.total > 0
+                ? Math.round((status.current / status.total) * 100)
+                : 0
+            }
+          >
+            <div
+              className="h-full bg-brand-500 transition-all duration-300"
+              style={{
+                width:
+                  status.total > 0
+                    ? `${(status.current / status.total) * 100}%`
+                    : '12%',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {status.state === 'error' && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50/40 px-4 py-4 text-sm">
+          <p className="font-medium text-rose-700">PDF 처리 실패</p>
+          <p className="mt-1 text-xs text-rose-700/80">{status.message}</p>
+          <button
+            type="button"
+            onClick={onClear}
+            className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+          >
+            다시 선택
+          </button>
+        </div>
+      )}
+
+      {status.state === 'done' && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3 text-sm">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-emerald-800">
+                ✓ {status.fileName}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-800/70">
+                {status.pages}페이지 · {(status.sizeBytes / 1024 / 1024).toFixed(2)} MB
+                · {extractedText.length.toLocaleString()}자 추출
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50"
+            >
+              다시 선택
+            </button>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-ink-500">
+              추출된 본문 (마스킹 확인 후 필요 시 직접 수정)
+            </label>
+            <textarea
+              rows={8}
+              value={extractedText}
+              onChange={(e) => onExtractedTextChange(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
