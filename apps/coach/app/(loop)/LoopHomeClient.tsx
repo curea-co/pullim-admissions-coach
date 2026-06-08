@@ -13,12 +13,10 @@ export function LoopHomeClient() {
   const params = useSearchParams()
   const isDemo = params.get('demo') === '1'
   const [data, setData] = useState<AnalyzeResult | null>(null)
-  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     if (isDemo) {
       setData(SAMPLE_RESULT)
-      setReady(true)
       return
     }
     const raw = sessionStorage.getItem('coach:result')
@@ -29,12 +27,10 @@ export function LoopHomeClient() {
         /* ignore malformed cache */
       }
     }
-    setReady(true)
   }, [isDemo])
 
-  // avoid flashing the landing before sessionStorage is read
-  if (!ready) return <div aria-hidden style={{ minHeight: '100vh' }} />
-
+  // Landing is static marketing — render it immediately (good SSR, no blank flash).
+  // It swaps to the result view once a sessionStorage result or ?demo=1 is found.
   if (!data) return <Landing />
 
   return (
