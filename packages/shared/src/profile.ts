@@ -11,5 +11,10 @@ export const StudentProfileSchema = z.object({
     sensitive: z.literal(true), // §23 민감정보 별도 동의 필수
     guardian: z.boolean(),      // 만14세 미만 시 true 요구(라우트에서 검사)
   }),
+  // 종단 트윈(선택) — 이전 학기 생기부가 있으면 2학기 비교(처방 안착) 분석을 수행한다.
+  // 없으면 단일 학기 경로(기존과 100% 동일)로 동작한다.
+  priorSaengbu: z.string().min(1).optional(), // 이전 학기 생기부 원문
+  priorTerm: z.string().optional(),           // 예: '이전 학기'(기본값)
+  currentTerm: z.string().optional(),         // 예: '이번 학기'(기본값)
 })
 export type StudentProfile = z.infer<typeof StudentProfileSchema>
