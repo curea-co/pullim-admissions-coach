@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import { LoopHomeClient } from './LoopHomeClient'
+import { Landing } from '@/components/Landing'
 
 export default function Page() {
   return (
-    <Suspense fallback={<div aria-hidden style={{ minHeight: '100vh' }} />}>
+    <Suspense fallback={<Landing />}>
       <LoopHomeClient />
     </Suspense>
   )

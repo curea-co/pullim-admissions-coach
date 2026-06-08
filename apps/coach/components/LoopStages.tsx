@@ -25,11 +25,11 @@ const REGION_LABEL: Record<string, string> = {
 
 function StageHead({ n, title, meta, icon }: { n: string; title: string; meta: string; icon: ReactNode }) {
   return (
-    <div className="mb-4 mt-9 flex items-center gap-[14px]">
+    <div className="mb-4 mt-9 flex flex-wrap items-center gap-[14px]">
       <span className="sg brand">{icon}</span>
       <span style={{ fontFamily: 'var(--f-brand)', fontSize: 32, fontWeight: 700, color: 'var(--pullim-blue)', lineHeight: 1 }}>{n}</span>
       <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h3>
-      <span className="ml-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
+      <span className="basis-full md:ml-auto md:basis-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
         {meta}
       </span>
     </div>
@@ -96,7 +96,7 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
           <div
             key={i}
             className="rv card card-hover"
-            style={{ borderLeft: '4px solid var(--pullim-blue)', animationDelay: `${i * 0.06}s`, padding: '16px 18px' }}
+            style={{ borderLeft: '3px solid var(--pullim-blue)', animationDelay: `${i * 0.06}s`, padding: '16px 18px' }}
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="chip brand">{AREA_LABEL[it.recordArea] ?? it.recordArea}</span>
@@ -114,17 +114,22 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
             현재 생기부 근거로는 합법 처방을 산출하지 못했습니다. 더 상세한 세특·창체 기록을 추가해 다시 시도해 보세요.
           </p>
         )}
+        {rubric.uncertaintyNote && (
+          <p className="mt-1" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+            {rubric.uncertaintyNote}
+          </p>
+        )}
       </div>
 
       {/* stripped panel */}
       {rubric.stripped.length > 0 && (
         <div className="rv mt-3 px-4 py-[14px]" style={{ border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)', background: 'var(--bg)' }}>
-          <div className="mb-2" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-ink5)' }}>
+          <div className="mb-2" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-ink4)' }}>
             AI가 제안했으나 자동 제외됨 — 대입 미반영 · 금지 항목
           </div>
           <ul className="flex list-none flex-col gap-[6px] p-0">
             {rubric.stripped.map((s, i) => (
-              <li key={i} className="flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink5)' }}>
+              <li key={i} className="flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink4)' }}>
                 <s>{s.recordArea}</s>
                 <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-[2px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, background: 'var(--ok-bg)', color: 'var(--ok)' }}>
                   <IconCheck size={11} /> {s.reason}
@@ -143,23 +148,23 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
           <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>진단 완료</div>
         </div>
         {['다음 학기', '그다음 학기', '고3 시즌'].map((t, i) => (
-          <div key={i} className="p-[13px] text-center opacity-50" style={{ background: '#fff', border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>{t}</div>
-            <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--fg-muted)' }}>
+          <div key={i} className="p-[13px] text-center" style={{ background: '#fff', border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)' }}>
+            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--pullim-ink5)' }}>{t}</div>
+            <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--pullim-ink4)' }}>
               {i === 2 ? '면접 노드' : '변화 반영?'}
             </div>
           </div>
         ))}
       </div>
       <p className="mt-3 flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
-        🔒 학기별 변화 비교(디지털 트윈)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
+        🔒 학기별 생기부 변화 비교(연중 추적)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
       </p>
 
       {/* 04 증명 */}
       <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" icon={<IconProve size={18} />} />
       <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-lg)' }}>
         <div className="px-[18px] py-[18px]" style={{ borderBottom: '1px solid var(--hairline-soft)', background: 'linear-gradient(120% 140% at 0 0,rgba(230,255,76,.28),#fff)' }}>
-          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--pullim-blue)' }}>parent report</div>
+          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--pullim-blue)' }}>학부모 리포트</div>
           <div className="mt-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>이번 학기, 우리 아이가 할 것</div>
         </div>
         <div className="px-[18px] py-[18px]" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>

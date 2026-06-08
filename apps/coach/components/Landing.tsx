@@ -105,15 +105,15 @@ export function Landing() {
                 transform="rotate(-90 100 100)"
               />
               <circle cx="100" cy="14" r="5" fill="var(--pullim-lemon)" />
-              <circle cx="186" cy="100" r="4" fill="#5AA9FF" />
-              <circle cx="100" cy="186" r="4" fill="#5AA9FF" />
-              <circle cx="14" cy="100" r="4" fill="#5AA9FF" />
+              <circle cx="186" cy="100" r="4" fill="var(--pb-4)" />
+              <circle cx="100" cy="186" r="4" fill="var(--pb-4)" />
+              <circle cx="14" cy="100" r="4" fill="var(--pb-4)" />
             </svg>
             <div className="absolute text-center" style={{ color: '#fff' }}>
               <IconLoop size={30} accent />
               <div style={{ fontFamily: 'var(--f-brand)', fontSize: 42, fontWeight: 700, lineHeight: 1, marginTop: 8 }}>01–04</div>
               <div className="eyebrow muted mt-2" style={{ color: 'rgba(240,246,251,.55)', justifyContent: 'center' }}>
-                closed loop
+                폐쇄 루프
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export function Landing() {
                     <span className="sg" style={{ background: s.act ? 'rgba(255,255,255,.08)' : 'var(--pb-1)', color: s.act ? 'var(--pullim-lemon)' : 'var(--pullim-blue)' }}>
                       <Icon size={18} accent={s.act} />
                     </span>
-                    <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: '0.12em', color: s.act ? 'var(--pullim-lemon)' : 'var(--pullim-ink5)' }}>
+                    <span style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: '0.12em', color: s.act ? 'var(--pullim-lemon)' : 'var(--pullim-ink4)' }}>
                       {s.tag}
                     </span>
                   </div>
@@ -196,7 +196,7 @@ export function Landing() {
             style={{ borderRadius: 'var(--r-lg)' }}
           >
             <div>
-              <span className="eyebrow" style={{ color: 'var(--pullim-lemon)' }}>start now</span>
+              <span className="eyebrow" style={{ color: 'var(--pullim-lemon)' }}>지금 시작</span>
               <p className="mt-2" style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: '#fff' }}>
                 생기부를 넣고, 코호트를 고르면 끝.
               </p>

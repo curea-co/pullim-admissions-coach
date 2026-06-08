@@ -1,6 +1,6 @@
 import './globals.css'
 import type { ReactNode } from 'react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Bai_Jamjuree, JetBrains_Mono } from 'next/font/google'
 import localFont from 'next/font/local'
 
@@ -30,6 +30,11 @@ export const metadata: Metadata = {
   description:
     '지금 무엇을 해야 생기부가 채워지는가. 진단 → 합법 액션 처방 → 학기별 추적 → 증명까지 한 흐름으로 돕는 고1·2 학종 코치. 무학습·즉시삭제.',
   icons: { icon: '/favicon.svg' },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

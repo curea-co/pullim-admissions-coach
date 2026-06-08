@@ -5,7 +5,7 @@ import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { IconArrow, IconShield, IconLegal } from '@/components/icons'
 
 const YEARS = [
-  { v: 2024, label: '2024 입학 · 현 고3', sys: '구체제' },
+  { v: 2024, label: '2024 입학 · 현 고3', sys: '2027 구체제' },
   { v: 2025, label: '2025 입학 · 현 고2', sys: '2028 신체제' },
   { v: 2026, label: '2026 입학 · 현 고1', sys: '2028 신체제' },
 ]
@@ -109,7 +109,7 @@ export default function IntakePage() {
               </svg>
             </div>
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--pullim-blue)' }}>
-              analyzing
+              분석 중
             </div>
             <p className="mt-1" style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>생기부를 분석하는 중…</p>
             <p className="mt-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
@@ -138,7 +138,7 @@ export default function IntakePage() {
             <div className="mb-4">
               <label htmlFor="saengbu" className="field-label">
                 생기부 붙여넣기{' '}
-                <span style={{ color: 'var(--pullim-ink5)', fontWeight: 500 }}>(식별정보 자동 마스킹)</span>
+                <span style={{ color: 'var(--pullim-ink4)', fontWeight: 500 }}>(식별정보 자동 마스킹)</span>
               </label>
               <textarea
                 id="saengbu"
@@ -146,7 +146,7 @@ export default function IntakePage() {
                 style={{ height: 200, fontSize: 13, fontFamily: 'var(--f-mono)' }}
                 value={saengbu}
                 onChange={(e) => setSaengbu(e.target.value)}
-                placeholder="세특·창체 등 생기부 텍스트를 붙여넣으세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
+                placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣으세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
               />
             </div>
 
@@ -272,7 +272,7 @@ export default function IntakePage() {
                 <IconShield size={18} />
               </span>
               <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--pullim-blue)' }}>
-                trust by design
+                설계된 신뢰
               </div>
               <div className="my-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>데이터 미학습 · 즉시삭제</div>
               <small style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>

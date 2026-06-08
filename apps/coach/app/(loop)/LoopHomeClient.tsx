@@ -22,15 +22,20 @@ export function LoopHomeClient() {
     const raw = sessionStorage.getItem('coach:result')
     if (raw) {
       try {
-        setData(JSON.parse(raw))
+        const parsed = JSON.parse(raw)
+        // Defend against stale/truncated cache: only swap to the result view
+        // when the shape LoopStages destructures is fully present.
+        if (parsed?.cohort && parsed?.diagnosis?.criteria && parsed?.rubric?.items) {
+          setData(parsed)
+        }
       } catch {
         /* ignore malformed cache */
       }
     }
   }, [isDemo])
 
-  // Landing is static marketing — render it immediately (good SSR, no blank flash).
-  // It swaps to the result view once a sessionStorage result or ?demo=1 is found.
+  // Result swap depends on ?demo=1 / sessionStorage; the prerender fallback
+  // (page.tsx Suspense) renders <Landing /> so there is no blank flash.
   if (!data) return <Landing />
 
   return (
