@@ -12,7 +12,7 @@ import { anthropic } from './client'
  * matchedQuote로 돌려준다(근거 없는 landed 금지).
  *
  * 제약: 이 판정은 액션당 yes/no + 인용이라는 제약된 작업이므로 claude-haiku-4-5(저비용·고속)가 적합하다.
- *       no-budget_tokens/temperature, thinking adaptive, parsed_output null → throw.
+ *       no budget_tokens/temperature/thinking (Haiku 4.5 무지원), structured output만 사용, parsed_output null → throw.
  */
 
 // 판정 전용 모델(제약된 액션별 yes/no + 인용 — opus보다 haiku가 비용·속도 면에서 적절).
@@ -57,7 +57,8 @@ export async function judgeLanded(
   const res = await anthropic.messages.parse({
     model: JUDGE_MODEL,
     max_tokens: 16000,
-    thinking: { type: 'adaptive' },
+    // NOTE: Haiku 4.5 does not support adaptive thinking (Opus/Sonnet-4.6 only) — sending it 400s.
+    // Structured output (output_config.format) IS supported on Haiku 4.5; that's all the judge needs.
     output_config: { format: zodOutputFormat(TwinJudgeSchema) },
     system: [{ type: 'text', text: JUDGE_SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [
