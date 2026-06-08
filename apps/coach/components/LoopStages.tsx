@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { TwinDiff } from '@pullim/engine'
 import type { AnalyzeResult } from '@/lib/analyze'
 import { IconDiagnose, IconPrescribe, IconTrack, IconProve, IconCheck } from './icons'
 
@@ -36,7 +37,156 @@ function StageHead({ n, title, meta, icon }: { n: string; title: string; meta: s
   )
 }
 
-export function LoopStages({ data }: { data: AnalyzeResult }) {
+/** ③ 추적 — 종단 트윈 학기 비교 뷰(twin 제공 시). */
+function TwinTrack({ twin }: { twin: TwinDiff }) {
+  const pct = Math.round(twin.summary.landedRate * 100)
+  return (
+    <div>
+      {/* header: from → to + 반영률 chip */}
+      <div className="mb-4 flex flex-wrap items-center gap-[10px]">
+        <span
+          className="inline-flex items-center gap-2"
+          style={{ fontFamily: 'var(--f-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700 }}
+        >
+          {twin.from} <span aria-hidden style={{ color: 'var(--pullim-blue)' }}>→</span> {twin.to}
+        </span>
+        <span className="chip brand" aria-label={`반영률 ${pct} 퍼센트`}>
+          반영률 {pct}%
+        </span>
+        <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--fg-muted)' }}>
+          반영 {twin.summary.landed} · 대기 {twin.summary.pending}
+        </span>
+      </div>
+
+      {/* per-action outcomes */}
+      <ul className="flex list-none flex-col gap-3 p-0">
+        {twin.outcomes.map((o, i) => {
+          const landed = o.status === 'landed'
+          return (
+            <li
+              key={i}
+              className="rv card"
+              style={{
+                borderLeft: `3px solid ${landed ? 'var(--ok)' : 'var(--hairline)'}`,
+                animationDelay: `${i * 0.06}s`,
+                padding: '15px 18px',
+                background: landed ? 'var(--ok-bg)' : 'var(--bg)',
+              }}
+            >
+              <div className="flex flex-wrap items-start gap-2">
+                <span
+                  className="mt-[2px] inline-flex flex-none items-center gap-1 rounded-full px-2 py-[2px]"
+                  style={{
+                    fontFamily: 'var(--f-mono)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: landed ? 'var(--ok)' : 'transparent',
+                    color: landed ? '#fff' : 'var(--pullim-ink4)',
+                    border: landed ? 'none' : '1px solid var(--hairline)',
+                  }}
+                >
+                  {landed ? (
+                    <>
+                      <IconCheck size={11} /> 반영됨
+                    </>
+                  ) : (
+                    '아직 반영 전'
+                  )}
+                </span>
+                <h3
+                  style={{
+                    fontSize: 'var(--fs-base)',
+                    fontWeight: 700,
+                    color: landed ? 'var(--pullim-ink)' : 'var(--pullim-ink4)',
+                  }}
+                >
+                  {o.action.text}
+                </h3>
+              </div>
+              {landed && o.matchedQuote ? (
+                <p
+                  className="mt-[10px] py-[6px] pl-[11px]"
+                  style={{
+                    borderLeft: '3px solid var(--pullim-lemon)',
+                    background: 'rgba(230,255,76,.14)',
+                    borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                    fontFamily: 'var(--f-mono)',
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--fg-muted)',
+                  }}
+                >
+                  <span
+                    className="mb-[3px] block"
+                    style={{
+                      fontSize: 9.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.12em',
+                      color: 'var(--ok)',
+                    }}
+                  >
+                    이번 학기 생기부 반영 근거
+                  </span>
+                  “{o.matchedQuote}”
+                </p>
+              ) : (
+                <p className="mt-[8px]" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
+                  다음 학기 생기부에 아직 안착하지 않았습니다. 계속 추적합니다.
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* new evidence accrued this term */}
+      {twin.newEvidence.length > 0 && (
+        <div
+          className="rv mt-4 px-4 py-[14px]"
+          style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)', background: '#fff' }}
+        >
+          <div
+            className="mb-[10px]"
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: 'var(--pullim-blue)',
+            }}
+          >
+            이번 학기 새로 쌓인 근거 · {twin.newEvidence.length}건
+          </div>
+          <ul className="flex list-none flex-col gap-2 p-0">
+            {twin.newEvidence.map((e, i) => (
+              <li
+                key={i}
+                className="py-[6px] pl-[11px]"
+                style={{
+                  borderLeft: '3px solid var(--pullim-lemon)',
+                  background: 'rgba(230,255,76,.14)',
+                  borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                  fontFamily: 'var(--f-mono)',
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                <span
+                  className="mb-[3px] block"
+                  style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--pullim-blue)' }}
+                >
+                  근거 · {e.section}
+                </span>
+                “{e.quote}”
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDiff }) {
   const { cohort, diagnosis, rubric } = data
 
   return (
@@ -141,26 +291,37 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
       )}
 
       {/* 03 추적 */}
-      <StageHead n="03" title="추적" meta="학기별 실행 추적" icon={<IconTrack size={18} />} />
-      <div className="grid grid-cols-2 gap-[10px] md:grid-cols-4">
-        <div className="p-[13px] text-center" style={{ background: '#fff', border: '1px solid var(--pullim-blue)', borderRadius: 'var(--r-md)', boxShadow: '0 0 0 3px rgba(3,98,218,.08)' }}>
-          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>지금</div>
-          <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>진단 완료</div>
-        </div>
-        {['다음 학기', '그다음 학기', '고3 시즌'].map((t, i) => (
-          <div key={i} className="p-[13px] text-center" style={{ background: '#fff', border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--pullim-ink5)' }}>{t}</div>
-            <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--pullim-ink4)' }}>
-              {i === 2 ? '면접 노드' : '변화 반영?'}
+      <StageHead
+        n="03"
+        title="추적"
+        meta={twin ? '학기별 생기부 변화 비교' : '학기별 실행 추적'}
+        icon={<IconTrack size={18} />}
+      />
+      {twin ? (
+        <TwinTrack twin={twin} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-[10px] md:grid-cols-4">
+            <div className="p-[13px] text-center" style={{ background: '#fff', border: '1px solid var(--pullim-blue)', borderRadius: 'var(--r-md)', boxShadow: '0 0 0 3px rgba(3,98,218,.08)' }}>
+              <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>지금</div>
+              <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>진단 완료</div>
             </div>
+            {['다음 학기', '그다음 학기', '고3 시즌'].map((t, i) => (
+              <div key={i} className="p-[13px] text-center" style={{ background: '#fff', border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)' }}>
+                <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--pullim-ink5)' }}>{t}</div>
+                <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--pullim-ink4)' }}>
+                  {i === 2 ? '면접 노드' : '변화 반영?'}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <p className="mt-3 flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
-        <span aria-hidden>🔒</span>
-        <span className="sr-only">잠김: </span>
-        학기별 생기부 변화 비교(연중 추적)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
-      </p>
+          <p className="mt-3 flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
+            <span aria-hidden>🔒</span>
+            <span className="sr-only">잠김: </span>
+            학기별 생기부 변화 비교(연중 추적)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
+          </p>
+        </>
+      )}
 
       {/* 04 증명 */}
       <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" icon={<IconProve size={18} />} />

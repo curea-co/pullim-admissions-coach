@@ -2,19 +2,28 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import type { TwinDiff } from '@pullim/engine'
 import type { AnalyzeResult } from '@/lib/analyze'
 import { LoopStages } from '@/components/LoopStages'
 import { Landing } from '@/components/Landing'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { IconArrow } from '@/components/icons'
-import { SAMPLE_RESULT } from '@/lib/sample'
+import { SAMPLE_RESULT, SAMPLE_TWIN_DIFF } from '@/lib/sample'
 
 export function LoopHomeClient() {
   const params = useSearchParams()
-  const isDemo = params.get('demo') === '1'
+  const demo = params.get('demo')
+  const isTwinDemo = demo === 'twin'
+  const isDemo = demo === '1' || isTwinDemo
   const [data, setData] = useState<AnalyzeResult | null>(null)
+  const [twin, setTwin] = useState<TwinDiff | undefined>(undefined)
 
   useEffect(() => {
+    if (isTwinDemo) {
+      setData(SAMPLE_RESULT) // 고2-2 (나중 학기)
+      setTwin(SAMPLE_TWIN_DIFF) // 고2-1 → 고2-2 비교
+      return
+    }
     if (isDemo) {
       setData(SAMPLE_RESULT)
       return
@@ -32,7 +41,7 @@ export function LoopHomeClient() {
         /* ignore malformed cache */
       }
     }
-  }, [isDemo])
+  }, [isDemo, isTwinDemo])
 
   // Result swap depends on ?demo=1 / sessionStorage; the prerender fallback
   // (page.tsx Suspense) renders <Landing /> so there is no blank flash.
@@ -67,8 +76,14 @@ export function LoopHomeClient() {
               </Link>
             </p>
           )}
+          {isTwinDemo && (
+            <p className="mt-2 inline-flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+              <span className="chip accent">학기 비교 예시: 고2-1 → 고2-2</span>
+              <span>③ 추적 단계에서 지난 학기 처방이 실제 생기부에 반영됐는지 대조합니다.</span>
+            </p>
+          )}
         </div>
-        <LoopStages data={data} />
+        <LoopStages data={data} twin={twin} />
       </main>
       <SiteFooter />
     </>

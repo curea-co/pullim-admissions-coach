@@ -1,4 +1,6 @@
+import { diffSnapshots, type TwinDiff } from '@pullim/engine'
 import type { AnalyzeResult } from './analyze'
+import { toSnapshot } from './twin'
 
 /**
  * 키 없이 결과 UI를 검토할 수 있는 현실적 샘플.
@@ -103,3 +105,124 @@ export const SAMPLE_RESULT: AnalyzeResult = {
     ],
   },
 }
+
+/**
+ * 종단 트윈 데모용 "이전 학기"(고2-1) 상태.
+ * SAMPLE_RESULT(고2-2)보다 EARLIER — 근거가 더 적고/약하며, 위 3개 처방이 아직 반영되기 전.
+ * diffSnapshots(고2-1 → 고2-2)를 돌리면:
+ *  - 회귀분석 확장 처방 = 반영됨(landed): 고2-2 근거 "지역 소득격차를 회귀분석하고 정책 대안을 발표함"이
+ *    처방 토큰의 34% 이상을 충족.
+ *  - 불평등 탐구보고서 처방 = 반영됨(landed): 고2-2 근거 "'불평등의 사회학' 탐구보고서 작성"과 토큰 다수 공유.
+ *  - 봉사 동아리 리더 처방 = 아직 반영 전(pending): 고2-2 근거에 충분히 안착하지 못함.
+ *  ⇒ landed 2 · pending 1 · 반영률 67%.
+ * 김서연 · 고2 · 2028 신체제 · 사회계열 — 현실적 시나리오.
+ */
+export const SAMPLE_PREV: AnalyzeResult = {
+  cohort: {
+    system: '2028_new',
+    track: 'core',
+    region: 'metro',
+    emphasizeSetuk: true,
+  },
+  diagnosis: {
+    criteria: [
+      {
+        key: 'ACADEMIC',
+        mapping: '학업역량 — 탐구력·정량 분석',
+        strength: '사회현상을 자료로 분석하려는 태도가 보입니다.',
+        weakness: '분석 도구가 단일 과목에 머물러 정량 탐구의 깊이가 얕습니다.',
+        evidence: [
+          {
+            quote: '사회문화 시간에 소득격차 자료를 표로 정리해 발표함',
+            section: '세특(사회문화)',
+          },
+        ],
+      },
+      {
+        key: 'CAREER',
+        mapping: '진로역량 — 전공 적합성·심화',
+        strength: '사회 불평등 주제에 꾸준한 관심을 보입니다.',
+        weakness: '관심이 보고서 한 편에 그쳐 후속 심화가 없습니다.',
+        evidence: [
+          {
+            quote: '불평등 관련 진로 희망을 발표함',
+            section: '진로활동',
+          },
+        ],
+      },
+      {
+        key: 'COMMUNITY',
+        mapping: '공동체역량 — 협업·기여',
+        strength: '학급 활동에 성실히 참여합니다.',
+        weakness: '협업에서 맡은 역할·기여가 구체적으로 드러나지 않습니다.',
+        evidence: [
+          {
+            quote: '학급 행사 준비에 참여함',
+            section: '자율활동',
+          },
+        ],
+      },
+    ],
+  },
+  rubric: {
+    cohort: {
+      system: '2028_new',
+      track: 'core',
+      region: 'metro',
+      emphasizeSetuk: true,
+    },
+    items: [
+      {
+        recordArea: 'SETUK',
+        competency: 'ACADEMIC',
+        // landed 예상: 고2-2 근거 "지역 소득격차를 회귀분석하고 정책 대안을 발표함"과 토큰 다수 공유.
+        text: '소득격차를 회귀분석하고 정책 대안을 발표해 보세요.',
+        rationale:
+          '표 정리 수준의 분석을 회귀분석으로 끌어올려 단일 도구 편중이라는 약점을 메우세요.',
+        evidence: {
+          quote: '소득격차 자료를 표로 정리해 발표함',
+          section: '세특(사회문화)',
+        },
+      },
+      {
+        recordArea: 'CREATIVE_REGULAR',
+        competency: 'CAREER',
+        // landed 예상: 고2-2 근거 "'불평등의 사회학' 탐구보고서 작성"과 토큰 다수 공유.
+        text: "'불평등의 사회학' 탐구보고서 작성으로 심화하세요.",
+        rationale:
+          "진로 희망 발표에 머문 관심을, 주제 탐구보고서 작성으로 한 단계 심화하면 '관심'이 '역량'으로 보입니다.",
+        evidence: {
+          quote: '불평등의 사회학 주제로 탐구함',
+          section: '진로활동',
+        },
+      },
+      {
+        recordArea: 'BEHAVIOR',
+        competency: 'COMMUNITY',
+        // pending 예상: 고2-2 근거에 충분히 안착하지 못함(역할/기여 기록 미반영).
+        text: '봉사 동아리에서 리더 역할을 맡아 운영 기여를 남기세요.',
+        rationale:
+          '단순 참여를 넘어, 직접 맡은 역할과 운영 기여가 기록에 드러나도록 활동하세요. 역할이 아니라 영향이 평가됩니다.',
+        evidence: {
+          quote: '학급 행사 준비에 참여함',
+          section: '자율활동',
+        },
+      },
+    ],
+    uncertaintyNote:
+      '이 진단·처방은 업로드된 생기부 근거에 기반한 해석이며, 합격 여부를 보장하지 않습니다. 최종 평가 기준은 대학별 시행계획을 직접 확인하세요. 제안은 모두 학생 본인이 앞으로 할 활동이며, 교사 기재영역을 대신 작성하지 않습니다.',
+    stripped: [
+      { recordArea: '교내 토론대회 수상 준비', reason: '수상경력 = 대입 미반영' },
+      { recordArea: '불평등 관련 독서활동 기재', reason: '독서활동 = 대입 미반영' },
+    ],
+  },
+}
+
+/**
+ * 데모에서 바로 쓰는, 엔진으로 계산한 학기 비교 결과(고2-1 → 고2-2).
+ * 결정론적 순수 함수 산출 — 클라이언트에서 재계산해도 동일.
+ */
+export const SAMPLE_TWIN_DIFF: TwinDiff = diffSnapshots(
+  toSnapshot('고2-1', SAMPLE_PREV),
+  toSnapshot('고2-2', SAMPLE_RESULT),
+)
