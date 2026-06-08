@@ -34,6 +34,7 @@ export const GOLDEN_CASES: GoldenCase[] = [
     candidates: [
       { recordArea: 'SETUK', competency: 'ACADEMIC', text: '물리 역학 실험 설계 세특 심화', rationale: 'x', evidence: ev('물리') },
       { recordArea: 'BEHAVIOR', competency: 'COMMUNITY', text: '협업 리더십 행동 방향', rationale: 'x', evidence: ev('모둠') },
+      { recordArea: 'SETUK', competency: 'ACADEMIC', text: '깨끗한 탐구 활동', rationale: 'x', evidence: ev('소논문 발표 실적') }, // ⛔ evidence.quote 키워드 → 제거
     ],
   },
   {
@@ -50,6 +51,7 @@ export const GOLDEN_CASES: GoldenCase[] = [
     candidates: [
       { recordArea: 'CREATIVE_REGULAR', competency: 'CAREER', text: '미술 정규동아리 작품 활동', rationale: 'x', evidence: ev('미술') },
       { recordArea: 'GIFTED', competency: 'ACADEMIC', text: '영재교육 실적', rationale: 'x', evidence: ev('x') }, // ❌
+      { recordArea: 'SETUK', competency: 'ACADEMIC', text: 'R & E 프로젝트 참여 권장', rationale: 'x', evidence: ev('탐구') }, // ⛔ 띄어쓰기 변형 → 제거
     ],
   },
 ]

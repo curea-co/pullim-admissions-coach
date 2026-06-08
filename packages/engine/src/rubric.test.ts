@@ -20,4 +20,11 @@ describe('assembleRubric', () => {
     const r = assembleRubric(cohort, ['SETUK','AWARD','READING','PRIVATE_EDU'].map(cand))
     for (const it of r.items) expect(['SETUK','CREATIVE_REGULAR','BEHAVIOR']).toContain(it.recordArea)
   })
+  it('공백뿐인 증거 후보 하나가 전체 루브릭을 throw로 무너뜨리지 않는다', () => {
+    const blank: ActionCandidate = { recordArea: 'SETUK', competency: 'ACADEMIC', text: '내용', rationale: 'r', evidence: { quote: '  ', section: '세특' } }
+    let r!: ReturnType<typeof assembleRubric>
+    expect(() => { r = assembleRubric(cohort, [blank, cand('SETUK')]) }).not.toThrow()
+    expect(r.items).toHaveLength(1)
+    expect(r.stripped.some(s => s.reason.includes('증거인용 누락'))).toBe(true)
+  })
 })
