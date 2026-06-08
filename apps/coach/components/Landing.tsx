@@ -32,8 +32,9 @@ export function Landing() {
     <>
       <SiteNav />
 
+      <main id="main">
       {/* HERO — on-ink */}
-      <header className="on-ink relative overflow-hidden">
+      <section className="on-ink relative overflow-hidden" aria-labelledby="hero-heading">
         <div
           aria-hidden
           className="absolute inset-0"
@@ -48,6 +49,7 @@ export function Landing() {
               <span style={{ color: 'var(--pullim-lemon)' }}>생기부 실행 루프</span>
             </span>
             <h1
+              id="hero-heading"
               className="rv mt-5"
               style={{
                 fontFamily: 'var(--f-brand)',
@@ -118,7 +120,7 @@ export function Landing() {
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
       {/* HOW */}
       <section style={{ paddingBlock: 'clamp(64px,8vw,110px)' }}>
@@ -184,7 +186,7 @@ export function Landing() {
                   <span className="sg brand mb-3">
                     <Icon size={18} />
                   </span>
-                  <h4 className="mb-[5px]" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>{g.h}</h4>
+                  <h3 className="mb-[5px]" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>{g.h}</h3>
                   <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)', lineHeight: 1.6 }}>{g.p}</p>
                 </div>
               )
@@ -207,6 +209,7 @@ export function Landing() {
           </div>
         </div>
       </section>
+      </main>
 
       <SiteFooter />
     </>

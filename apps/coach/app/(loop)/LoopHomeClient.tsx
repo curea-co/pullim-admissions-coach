@@ -50,7 +50,7 @@ export function LoopHomeClient() {
           </div>
         }
       />
-      <main className="container-x py-12">
+      <main id="main" className="container-x py-12">
         <div className="mb-7">
           <span className="eyebrow">{isDemo ? '결과 예시' : '진단 결과'}</span>
           <h1

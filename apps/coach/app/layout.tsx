@@ -43,7 +43,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="ko"
       className={`${baiJamjuree.variable} ${jetbrainsMono.variable} ${pretendard.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <a href="#main" className="skip-link">
+          본문으로 건너뛰기
+        </a>
+        {children}
+      </body>
     </html>
   )
 }

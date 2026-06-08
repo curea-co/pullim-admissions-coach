@@ -25,6 +25,7 @@ function base({ size = 24, accent, ...rest }: IconProps) {
       strokeLinecap: 'round' as const,
       strokeLinejoin: 'round' as const,
       'aria-hidden': true,
+      focusable: false,
       ...rest,
     },
   }

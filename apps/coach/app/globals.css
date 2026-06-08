@@ -151,12 +151,50 @@ a { color: inherit; text-decoration: none; }
   --bg:        var(--pullim-ink);
   --bg-raised: var(--pullim-ink2);
   --fg:        var(--pullim-paper);
-  --fg-muted:  rgba(240, 246, 251, 0.72);
-  --fg-subtle: rgba(240, 246, 251, 0.45);
+  /* a11y: muted/subtle text on the ink hero raised to ≥4.5:1 contrast
+     (0.72→0.78 muted, 0.45/0.55→0.66 subtle) — see captions on .on-ink. */
+  --fg-muted:  rgba(240, 246, 251, 0.78);
+  --fg-subtle: rgba(240, 246, 251, 0.66);
   --hairline:  rgba(240, 246, 251, 0.18);
   --hairline-soft: rgba(240, 246, 251, 0.10);
   background: var(--bg);
   color: var(--fg);
+}
+
+/* ── Skip link (visually hidden until focused) ── */
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link:focus {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 100;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  padding: 10px 16px;
+  background: var(--pullim-blue);
+  color: var(--pullim-white);
+  border-radius: var(--r-sm);
+  font-family: var(--f-brand);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  box-shadow: var(--sh-2);
+  outline: 2px solid var(--pullim-white);
+  outline-offset: 2px;
 }
 
 /* ==========================================================================

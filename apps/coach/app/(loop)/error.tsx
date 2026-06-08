@@ -13,7 +13,7 @@ export default function LoopError({ error, reset }: { error: Error & { digest?: 
   return (
     <>
       <SiteNav cta={<span />} />
-      <main className="container-x grid place-items-center py-24">
+      <main id="main" className="container-x grid place-items-center py-24">
         <div className="card w-full max-w-[480px] p-8 text-center">
           <span className="eyebrow" style={{ justifyContent: 'center' }}>오류</span>
           <h1

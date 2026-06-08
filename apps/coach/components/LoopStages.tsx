@@ -27,8 +27,8 @@ function StageHead({ n, title, meta, icon }: { n: string; title: string; meta: s
   return (
     <div className="mb-4 mt-9 flex flex-wrap items-center gap-[14px]">
       <span className="sg brand">{icon}</span>
-      <span style={{ fontFamily: 'var(--f-brand)', fontSize: 32, fontWeight: 700, color: 'var(--pullim-blue)', lineHeight: 1 }}>{n}</span>
-      <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h3>
+      <span aria-hidden style={{ fontFamily: 'var(--f-brand)', fontSize: 32, fontWeight: 700, color: 'var(--pullim-blue)', lineHeight: 1 }}>{n}</span>
+      <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h2>
       <span className="basis-full md:ml-auto md:basis-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
         {meta}
       </span>
@@ -102,7 +102,7 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
               <span className="chip brand">{AREA_LABEL[it.recordArea] ?? it.recordArea}</span>
               <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{COMP_LABEL[it.competency] ?? it.competency}</span>
             </div>
-            <h4 className="mb-1 mt-[9px]" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>{it.text}</h4>
+            <h3 className="mb-1 mt-[9px]" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>{it.text}</h3>
             <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>{it.rationale}</p>
             <p className="mt-[9px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--fg-muted)' }}>
               근거: <b style={{ color: 'var(--pullim-blue)' }}>“{it.evidence.quote}”</b> · {it.evidence.section}
@@ -157,7 +157,9 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
         ))}
       </div>
       <p className="mt-3 flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
-        🔒 학기별 생기부 변화 비교(연중 추적)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
+        <span aria-hidden>🔒</span>
+        <span className="sr-only">잠김: </span>
+        학기별 생기부 변화 비교(연중 추적)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
       </p>
 
       {/* 04 증명 */}
@@ -165,7 +167,7 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
       <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-lg)' }}>
         <div className="px-[18px] py-[18px]" style={{ borderBottom: '1px solid var(--hairline-soft)', background: 'linear-gradient(120% 140% at 0 0,rgba(230,255,76,.28),#fff)' }}>
           <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--pullim-blue)' }}>학부모 리포트</div>
-          <div className="mt-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>이번 학기, 우리 아이가 할 것</div>
+          <h3 className="mt-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>이번 학기, 우리 아이가 할 것</h3>
         </div>
         <div className="px-[18px] py-[18px]" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>
           {rubric.items.length > 0 ? (

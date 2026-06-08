@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { IconArrow, IconShield, IconLegal } from '@/components/icons'
@@ -34,14 +34,44 @@ export default function IntakePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  // a11y: which control failed validation, for aria-invalid / focus
+  const [invalid, setInvalid] = useState<'saengbu' | 'consent' | null>(null)
+  const saengbuRef = useRef<HTMLTextAreaElement>(null)
+  const consentRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const submitRef = useRef<HTMLButtonElement>(null)
+  // remember focus before the modal opened, to restore on close/error
+  const lastFocus = useRef<HTMLElement | null>(null)
+
+  // Move focus to the offending field when validation fails.
+  useEffect(() => {
+    if (invalid === 'saengbu') saengbuRef.current?.focus()
+    else if (invalid === 'consent') consentRef.current?.focus()
+  }, [invalid])
+
+  // Modal focus management: move focus into the dialog while busy,
+  // restore to the trigger when it closes (success navigates away; error returns).
+  useEffect(() => {
+    if (busy) {
+      lastFocus.current = (document.activeElement as HTMLElement) ?? null
+      dialogRef.current?.focus()
+    } else if (lastFocus.current) {
+      lastFocus.current.focus()
+      lastFocus.current = null
+    }
+  }, [busy])
+
   async function submit() {
     setError('')
+    setInvalid(null)
     if (!consent) {
       setError('민감정보(생기부) 처리에 동의해야 진단을 진행할 수 있습니다.')
+      setInvalid('consent')
       return
     }
     if (!saengbu.trim()) {
       setError('생기부 내용을 붙여넣어 주세요.')
+      setInvalid('saengbu')
       return
     }
     setBusy(true)
@@ -82,19 +112,21 @@ export default function IntakePage() {
 
   return (
     <>
-      <SiteNav cta={<span />} />
-
-      {/* processing overlay */}
+      {/* processing overlay — modal status dialog (kept outside the inert tree) */}
       {busy && (
         <div
-          className="fixed inset-0 z-[200] grid place-items-center px-6"
+          ref={dialogRef}
+          className="fixed inset-0 z-[200] grid place-items-center px-6 outline-none"
           style={{ background: 'rgba(13,26,31,.55)', backdropFilter: 'blur(6px)' }}
-          role="status"
-          aria-live="polite"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="busy-title"
+          aria-describedby="busy-desc"
+          tabIndex={-1}
         >
-          <div className="card w-full max-w-[420px] p-8 text-center">
+          <div className="card w-full max-w-[420px] p-8 text-center" role="status" aria-live="polite">
             <div className="mx-auto mb-4 grid place-items-center">
-              <svg viewBox="0 0 200 200" fill="none" className="ring-spin h-20 w-20">
+              <svg viewBox="0 0 200 200" fill="none" className="ring-spin h-20 w-20" aria-hidden focusable={false}>
                 <circle cx="100" cy="100" r="86" stroke="var(--pullim-line)" strokeWidth="6" />
                 <circle
                   cx="100"
@@ -111,15 +143,20 @@ export default function IntakePage() {
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--pullim-blue)' }}>
               분석 중
             </div>
-            <p className="mt-1" style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>생기부를 분석하는 중…</p>
-            <p className="mt-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
+            <p id="busy-title" className="mt-1" style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>생기부를 분석하는 중…</p>
+            <p id="busy-desc" className="mt-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
               식별정보를 마스킹하고 코호트 규칙으로 합법 액션을 산출합니다. 결과는 저장하지 않고 처리 후 즉시 폐기합니다.
             </p>
           </div>
         </div>
       )}
 
-      <main className="container-x py-12">
+      {/* Background made inert while the modal is open so AT and the keyboard
+          cannot reach controls behind the overlay; focus is trapped to the dialog. */}
+      <div inert={busy || undefined}>
+      <SiteNav cta={<span />} />
+
+      <main id="main" className="container-x py-12">
         <span className="eyebrow">시작하기</span>
         <h1
           className="mt-4"
@@ -142,15 +179,19 @@ export default function IntakePage() {
               </label>
               <textarea
                 id="saengbu"
+                ref={saengbuRef}
                 className="control"
                 style={{ height: 200, fontSize: 13, fontFamily: 'var(--f-mono)' }}
                 value={saengbu}
                 onChange={(e) => setSaengbu(e.target.value)}
+                aria-invalid={invalid === 'saengbu' || undefined}
+                aria-describedby={invalid === 'saengbu' ? 'intake-error' : undefined}
                 placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣으세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <fieldset className="grid grid-cols-1 gap-3 border-0 p-0 m-0 sm:grid-cols-2">
+              <legend className="field-label mb-2 p-0">코호트 정보</legend>
               <div>
                 <label htmlFor="year" className="field-label">
                   입학연도 (코호트)
@@ -219,10 +260,11 @@ export default function IntakePage() {
                   ))}
                 </select>
               </div>
-            </div>
+            </fieldset>
 
             {error && (
               <p
+                id="intake-error"
                 className="mt-4 px-4 py-3"
                 role="alert"
                 style={{ borderRadius: 'var(--r-md)', background: 'var(--bad-bg)', color: 'var(--bad)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}
@@ -234,10 +276,10 @@ export default function IntakePage() {
 
           {/* right: consent + seal */}
           <div className="flex flex-col gap-4">
-            <div>
-              <span className="field-label flex items-center gap-2">
+            <fieldset className="border-0 p-0 m-0">
+              <legend className="field-label flex items-center gap-2 p-0">
                 <IconLegal size={15} /> 법적 동의 (§23 민감정보)
-              </span>
+              </legend>
               <label
                 className="flex cursor-pointer items-start gap-3 px-4 py-[14px]"
                 style={{
@@ -253,16 +295,19 @@ export default function IntakePage() {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
+                  ref={consentRef}
+                  required
                   className="mt-[2px] h-[18px] w-[18px] flex-none"
                   style={{ accentColor: 'var(--pullim-blue)' }}
-                  aria-describedby="consent-text"
+                  aria-invalid={invalid === 'consent' || undefined}
+                  aria-describedby={invalid === 'consent' ? 'consent-text intake-error' : 'consent-text'}
                 />
                 <span id="consent-text">
                   <b>[필수]</b> 생기부는 민감정보입니다. 진단 목적의 처리에 동의하며, 결과가{' '}
                   <b>저장되지 않고 처리 후 즉시 폐기</b>됨을 확인합니다. (AI 학습에 사용하지 않음)
                 </span>
               </label>
-            </div>
+            </fieldset>
 
             <div
               className="card p-4 text-center"
@@ -280,7 +325,13 @@ export default function IntakePage() {
               </small>
             </div>
 
-            <button onClick={submit} disabled={busy || !consent} className="btn-primary w-full justify-center">
+            <button
+              ref={submitRef}
+              onClick={submit}
+              disabled={busy || !consent}
+              aria-describedby="submit-hint submit-note"
+              className="btn-primary w-full justify-center"
+            >
               {busy ? (
                 <>
                   <span className="spinner" aria-hidden /> 분석 중…
@@ -291,13 +342,19 @@ export default function IntakePage() {
                 </>
               )}
             </button>
-            <p className="text-center" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+            {!consent && !busy && (
+              <p id="submit-hint" className="text-center" style={{ fontSize: 'var(--fs-xs)', color: 'var(--bad)', fontWeight: 600 }}>
+                §23 민감정보 처리에 동의하면 진단을 시작할 수 있습니다.
+              </p>
+            )}
+            <p id="submit-note" className="text-center" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
               제안은 모두 학생 본인이 앞으로 할 활동이며, 교사 기재영역을 대신 작성하지 않습니다.
             </p>
           </div>
         </div>
       </main>
       <SiteFooter />
+      </div>
     </>
   )
 }
