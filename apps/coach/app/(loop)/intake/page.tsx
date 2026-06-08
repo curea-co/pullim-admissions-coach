@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
+import { SaengbuInput } from '@/components/SaengbuInput'
 import { IconArrow, IconShield, IconLegal } from '@/components/icons'
 
 const YEARS = [
@@ -197,16 +198,15 @@ export default function IntakePage() {
                 생기부 붙여넣기{' '}
                 <span style={{ color: 'var(--pullim-ink4)', fontWeight: 500 }}>(식별정보 자동 마스킹)</span>
               </label>
-              <textarea
+              <SaengbuInput
                 id="saengbu"
-                ref={saengbuRef}
-                className="control"
-                style={{ height: 200, fontSize: 13, fontFamily: 'var(--f-mono)' }}
+                textareaRef={saengbuRef}
+                height={200}
                 value={saengbu}
-                onChange={(e) => setSaengbu(e.target.value)}
-                aria-invalid={invalid === 'saengbu' || undefined}
-                aria-describedby={invalid === 'saengbu' ? 'intake-error' : undefined}
-                placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣으세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
+                onChange={setSaengbu}
+                ariaInvalid={invalid === 'saengbu'}
+                ariaDescribedby={invalid === 'saengbu' ? 'intake-error' : undefined}
+                placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣거나 위에서 PDF를 올리세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
               />
             </div>
 
@@ -217,7 +217,7 @@ export default function IntakePage() {
                 className="flex cursor-pointer items-start gap-3 px-4 py-3"
                 style={{
                   border: `1.5px solid ${compare ? 'var(--pullim-blue)' : 'var(--hairline)'}`,
-                  borderRadius: 'var(--r-md)',
+                  borderRadius: 'var(--r-sm)',
                   background: compare ? 'var(--pb-1)' : 'var(--bg)',
                   fontSize: 'var(--fs-sm)',
                   color: 'var(--pullim-ink2)',
@@ -248,13 +248,12 @@ export default function IntakePage() {
                       이전 학기 생기부 붙여넣기{' '}
                       <span style={{ color: 'var(--pullim-ink4)', fontWeight: 500 }}>(식별정보 자동 마스킹)</span>
                     </label>
-                    <textarea
+                    <SaengbuInput
                       id="prior-saengbu"
-                      className="control"
-                      style={{ height: 160, fontSize: 13, fontFamily: 'var(--f-mono)' }}
+                      height={160}
                       value={priorSaengbu}
-                      onChange={(e) => setPriorSaengbu(e.target.value)}
-                      placeholder="이전 학기의 세특·창체·행특 텍스트를 붙여넣으세요. 식별정보는 이번 학기 생기부와 동일하게 분석 전 자동으로 가립니다."
+                      onChange={setPriorSaengbu}
+                      placeholder="이전 학기의 세특·창체·행특 텍스트를 붙여넣거나 위에서 PDF를 올리세요. 식별정보는 이번 학기 생기부와 동일하게 분석 전 자동으로 가립니다."
                     />
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -369,7 +368,7 @@ export default function IntakePage() {
                 id="intake-error"
                 className="mt-4 px-4 py-3"
                 role="alert"
-                style={{ borderRadius: 'var(--r-md)', background: 'var(--bad-bg)', color: 'var(--bad)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}
+                style={{ borderRadius: 'var(--r-sm)', background: 'var(--bad-bg)', color: 'var(--bad)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}
               >
                 {error}
               </p>
@@ -386,7 +385,7 @@ export default function IntakePage() {
                 className="flex cursor-pointer items-start gap-3 px-4 py-[14px]"
                 style={{
                   border: `1.5px solid ${consent ? 'var(--pullim-blue)' : 'var(--hairline)'}`,
-                  borderRadius: 'var(--r-md)',
+                  borderRadius: 'var(--r-sm)',
                   background: consent ? 'var(--pb-1)' : 'rgba(3,98,218,.04)',
                   fontSize: 'var(--fs-sm)',
                   color: 'var(--pullim-ink2)',

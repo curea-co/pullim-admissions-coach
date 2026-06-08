@@ -10,7 +10,7 @@ import {
   IconLegal,
   IconCheck,
   IconArrow,
-  IconLoop,
+  ExamCoachGlyph,
 } from './icons'
 
 const LOOP: { tag: string; n: string; t: string; d: string; act: boolean; Icon: (p: { size?: number; accent?: boolean }) => ReactNode }[] = [
@@ -111,11 +111,10 @@ export function Landing() {
               <circle cx="100" cy="186" r="4" fill="var(--pb-4)" />
               <circle cx="14" cy="100" r="4" fill="var(--pb-4)" />
             </svg>
-            <div className="absolute text-center" style={{ color: '#fff' }}>
-              <IconLoop size={30} accent />
-              <div style={{ fontFamily: 'var(--f-brand)', fontSize: 42, fontWeight: 700, lineHeight: 1, marginTop: 8 }}>01–04</div>
-              <div className="eyebrow muted mt-2" style={{ color: 'rgba(240,246,251,.55)', justifyContent: 'center' }}>
-                폐쇄 루프
+            <div className="absolute grid place-items-center text-center" style={{ color: '#fff' }}>
+              <ExamCoachGlyph size={84} />
+              <div className="eyebrow muted mt-3" style={{ color: 'rgba(240,246,251,.55)', justifyContent: 'center' }}>
+                폐쇄 루프 · 01–04
               </div>
             </div>
           </div>
@@ -195,7 +194,7 @@ export function Landing() {
 
           <div
             className="on-ink mt-10 flex flex-col items-start gap-4 p-7 sm:flex-row sm:items-center sm:justify-between"
-            style={{ borderRadius: 'var(--r-lg)' }}
+            style={{ borderRadius: 'var(--r-md)' }}
           >
             <div>
               <span className="eyebrow" style={{ color: 'var(--pullim-lemon)' }}>지금 시작</span>

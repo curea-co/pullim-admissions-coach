@@ -52,10 +52,21 @@
   --s-1:  4px;  --s-2:  8px;  --s-3:  12px; --s-4:  16px; --s-5:  24px;
   --s-6:  32px; --s-7:  48px; --s-8:  64px; --s-9:  96px; --s-10: 128px;
 
-  /* ───── Radii ───── */
-  --r-sm: 4px;   /* buttons */
-  --r-md: 8px;   /* cards, modals, fields */
-  --r-lg: 18px;  /* feature cards / symbol container */
+  /* ───── Radii ─────
+     Unified rounding system — matches pullim.ai exam-coach reference (subtle, flat).
+     Mapping (the ONLY radii used app-wide; no stray px / rounded-xl):
+       --r-sm  6px  → buttons, inputs/controls/selects, dropzone, small affordance tiles,
+                      chips that are NOT pills, status banners, evidence quote blocks
+       --r-md 10px  → THE single card/surface radius. Every `.card`, panel, banner,
+                      report container, cohort/CTA strip uses this one value.
+       --r-lg 14px  → large app-glyph tiles only (.sg-host big tiles); kept modest so it
+                      never reads chunkier than the reference's flat cards.
+       --r-pill     → pill chips & round badges only.
+     Reduced from the old 4/8/18 scale: 18px cards read too chunky vs the reference,
+     so all card surfaces collapsed onto a single 10px (--r-md). */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
   --r-pill: 999px;
 
   /* ───── Typography sizes ───── */
@@ -288,7 +299,7 @@ a { color: inherit; text-decoration: none; }
 .card {
   background: var(--bg-raised);
   border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md); /* THE single card/surface radius (unified) */
   padding: 22px;
   box-shadow: var(--sh-1);
 }
@@ -355,7 +366,7 @@ a { color: inherit; text-decoration: none; }
 .control {
   width: 100%;
   border: 1.5px solid var(--hairline);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm); /* inputs/controls → --r-sm (unified) */
   padding: 12px 14px;
   font-size: 14px;
   font-family: var(--f-kr);

@@ -192,7 +192,7 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
   return (
     <div>
       {/* cohort banner */}
-      <div className="on-ink rv flex flex-wrap items-center gap-[10px] px-[18px] py-4" style={{ borderRadius: 'var(--r-lg)' }}>
+      <div className="on-ink rv flex flex-wrap items-center gap-[10px] px-[18px] py-4" style={{ borderRadius: 'var(--r-md)' }}>
         <span style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: '#fff' }}>진단 코호트</span>
         <span className="chip ghost">{SYS_LABEL[cohort.system] ?? cohort.system}</span>
         {cohort.emphasizeSetuk && <span className="chip accent">세특 정성평가 가중</span>}
@@ -325,7 +325,7 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
 
       {/* 04 증명 */}
       <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" icon={<IconProve size={18} />} />
-      <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-lg)' }}>
+      <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)' }}>
         <div className="px-[18px] py-[18px]" style={{ borderBottom: '1px solid var(--hairline-soft)', background: 'linear-gradient(120% 140% at 0 0,rgba(230,255,76,.28),#fff)' }}>
           <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--pullim-blue)' }}>학부모 리포트</div>
           <h3 className="mt-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>이번 학기, 우리 아이가 할 것</h3>
