@@ -1,30 +1,26 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { PullimMark } from './PullimMark'
+import { IconArrow } from './icons'
 
 export function SiteNav({ cta }: { cta?: ReactNode }) {
   return (
     <nav
-      className="sticky top-0 z-40 border-b"
+      className="sticky top-0 z-40"
       style={{
-        background: 'rgba(250,247,239,.82)',
-        backdropFilter: 'blur(8px)',
-        borderColor: 'var(--color-line-soft)',
+        height: 'var(--nav-h)',
+        background: 'rgba(255,255,255,.82)',
+        backdropFilter: 'saturate(180%) blur(14px)',
+        borderBottom: '1px solid var(--hairline)',
       }}
     >
-      <div className="mx-auto flex h-[60px] max-w-[1060px] items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-[9px] font-extrabold no-underline">
-          <span className="brand-dot" aria-hidden />
-          <span>
-            풀림 <span style={{ color: 'var(--color-muted)', fontWeight: 600 }}>입시코치</span>
-          </span>
+      <div className="container-x flex h-full items-center justify-between">
+        <Link href="/" aria-label="풀림 입시코치 홈">
+          <PullimMark size={28} sub="입시코치" />
         </Link>
         {cta ?? (
-          <Link
-            href="/intake"
-            className="rounded-full px-4 py-[9px] text-[13px] font-bold text-white no-underline"
-            style={{ background: 'var(--color-ink)' }}
-          >
-            생기부 진단 →
+          <Link href="/intake" className="btn-primary">
+            생기부 진단 <IconArrow size={16} />
           </Link>
         )}
       </div>
@@ -34,12 +30,10 @@ export function SiteNav({ cta }: { cta?: ReactNode }) {
 
 export function SiteFooter() {
   return (
-    <footer style={{ background: 'var(--color-ink)', color: '#9b978a' }}>
-      <div className="mx-auto flex max-w-[1060px] flex-wrap items-center justify-between gap-[14px] px-6 py-12">
-        <div className="flex items-center gap-[9px] font-extrabold text-white">
-          <span className="brand-dot on-dark" aria-hidden /> 풀림 입시코치
-        </div>
-        <small className="text-[12px]">
+    <footer className="on-ink" style={{ borderTop: '1px solid var(--hairline)' }}>
+      <div className="container-x flex flex-wrap items-center justify-between gap-4 py-12">
+        <PullimMark size={26} sub="입시코치" variant="white" />
+        <small style={{ fontFamily: 'var(--f-mono)', fontSize: 12, color: 'var(--fg-muted)', letterSpacing: '0.02em' }}>
           생기부 실행 루프 · 고1–2 연중 코어 + 고3 시즌 비치헤드 · 무학습 · 즉시삭제
         </small>
       </div>

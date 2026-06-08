@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import type { AnalyzeResult } from '@/lib/analyze'
+import { IconDiagnose, IconPrescribe, IconTrack, IconProve, IconCheck } from './icons'
 
 const AREA_LABEL: Record<string, string> = {
   SETUK: '세특',
@@ -21,14 +23,13 @@ const REGION_LABEL: Record<string, string> = {
   unknown: '권역 미정',
 }
 
-function StageHead({ n, title, meta }: { n: string; title: string; meta: string }) {
+function StageHead({ n, title, meta, icon }: { n: string; title: string; meta: string; icon: ReactNode }) {
   return (
-    <div className="mb-4 mt-8 flex items-baseline gap-[14px]">
-      <span className="font-serif-display text-[34px]" style={{ color: 'var(--color-blue)' }}>
-        {n}
-      </span>
-      <h3 className="text-[20px] font-extrabold">{title}</h3>
-      <span className="font-mono-label ml-auto text-[11px]" style={{ color: 'var(--color-muted)' }}>
+    <div className="mb-4 mt-9 flex items-center gap-[14px]">
+      <span className="sg brand">{icon}</span>
+      <span style={{ fontFamily: 'var(--f-brand)', fontSize: 32, fontWeight: 700, color: 'var(--pullim-blue)', lineHeight: 1 }}>{n}</span>
+      <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h3>
+      <span className="ml-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
         {meta}
       </span>
     </div>
@@ -41,56 +42,44 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
   return (
     <div>
       {/* cohort banner */}
-      <div
-        className="rv flex flex-wrap items-center gap-[10px] rounded-[16px] px-[18px] py-4"
-        style={{ background: 'var(--color-blue-ink)', color: '#fff' }}
-      >
-        <span className="text-[15px] font-extrabold">진단 코호트</span>
-        <span className="chip">{SYS_LABEL[cohort.system] ?? cohort.system}</span>
-        {cohort.emphasizeSetuk && <span className="chip lemon">세특 정성평가 가중</span>}
-        <span className="chip">{REGION_LABEL[cohort.region] ?? cohort.region}</span>
-        <span className="chip">
-          {cohort.track === 'core' ? '코어 트랙 · 연중' : '비치헤드 · 시즌'}
-        </span>
+      <div className="on-ink rv flex flex-wrap items-center gap-[10px] px-[18px] py-4" style={{ borderRadius: 'var(--r-lg)' }}>
+        <span style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: '#fff' }}>진단 코호트</span>
+        <span className="chip ghost">{SYS_LABEL[cohort.system] ?? cohort.system}</span>
+        {cohort.emphasizeSetuk && <span className="chip accent">세특 정성평가 가중</span>}
+        <span className="chip ghost">{REGION_LABEL[cohort.region] ?? cohort.region}</span>
+        <span className="chip ghost">{cohort.track === 'core' ? '코어 트랙 · 연중' : '비치헤드 · 시즌'}</span>
       </div>
 
       {/* 01 진단 */}
-      <StageHead n="01" title="진단" meta="학종 3역량 · 근거 100%" />
+      <StageHead n="01" title="진단" meta="학종 3역량 · 근거 100%" icon={<IconDiagnose size={18} />} />
       <div className="grid grid-cols-1 gap-[14px] md:grid-cols-3">
         {diagnosis.criteria.map((c, i) => (
-          <div
-            key={i}
-            className="rv surface p-[18px]"
-            style={{ animationDelay: `${i * 0.06}s` }}
-          >
-            <div className="flex items-center gap-2 text-[14px] font-extrabold">
+          <div key={i} className="rv card" style={{ animationDelay: `${i * 0.06}s` }}>
+            <div className="flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>
               {COMP_LABEL[c.key] ?? c.key}
             </div>
             {c.mapping && (
-              <div className="font-mono-label mt-1 text-[10.5px]" style={{ color: 'var(--color-muted)' }}>
-                {c.mapping}
-              </div>
+              <div className="mt-1" style={{ fontFamily: 'var(--f-mono)', fontSize: 10.5, color: 'var(--fg-muted)' }}>{c.mapping}</div>
             )}
-            <p className="mt-3 text-[12.5px]" style={{ color: 'var(--color-ink-soft)' }}>
-              <b className="text-[var(--color-good)]">강점</b> · {c.strength}
+            <p className="mt-3" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>
+              <b style={{ color: 'var(--ok)' }}>강점</b> · {c.strength}
             </p>
-            <p className="mt-[6px] text-[12.5px]" style={{ color: 'var(--color-ink-soft)' }}>
-              <b className="text-[var(--color-bad)]">약점</b> · {c.weakness}
+            <p className="mt-[6px]" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>
+              <b style={{ color: 'var(--bad)' }}>약점</b> · {c.weakness}
             </p>
             {c.evidence.map((e, j) => (
               <div
                 key={j}
-                className="mt-[10px] py-[6px] pl-[11px] text-[12px]"
+                className="mt-[10px] py-[6px] pl-[11px]"
                 style={{
-                  borderLeft: '3px solid var(--color-lemon-deep)',
-                  background: 'rgba(255,216,58,.1)',
-                  color: 'var(--color-muted)',
+                  borderLeft: '3px solid var(--pullim-lemon)',
+                  background: 'rgba(230,255,76,.14)',
+                  borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--fg-muted)',
                 }}
               >
-                <span
-                  className="font-mono-label mb-[3px] block text-[9.5px] uppercase tracking-[0.12em]"
-                  style={{ color: 'var(--color-blue)' }}
-                >
+                <span className="mb-[3px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--pullim-blue)' }}>
                   근거 · {e.section}
                 </span>
                 “{e.quote}”
@@ -101,72 +90,44 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
       </div>
 
       {/* 02 처방 */}
-      <StageHead n="02" title="처방 · 합법 액션" meta="세특 · 정규창체 · 행특만" />
+      <StageHead n="02" title="처방 · 합법 액션" meta="세특 · 정규창체 · 행특만" icon={<IconPrescribe size={18} />} />
       <div className="flex flex-col gap-3">
         {rubric.items.map((it, i) => (
           <div
             key={i}
-            className="rv rounded-[14px] border bg-white px-[18px] py-4 transition-all duration-200 hover:-translate-y-[2px]"
-            style={{
-              borderColor: 'var(--color-line)',
-              borderLeft: '4px solid var(--color-blue)',
-              animationDelay: `${i * 0.06}s`,
-            }}
+            className="rv card card-hover"
+            style={{ borderLeft: '4px solid var(--pullim-blue)', animationDelay: `${i * 0.06}s`, padding: '16px 18px' }}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className="font-mono-label rounded-[7px] px-[9px] py-1 text-[10.5px] font-semibold"
-                style={{ background: 'rgba(29,78,216,.1)', color: 'var(--color-blue)' }}
-              >
-                {AREA_LABEL[it.recordArea] ?? it.recordArea}
-              </span>
-              <span className="text-[11px]" style={{ color: 'var(--color-muted)' }}>
-                {COMP_LABEL[it.competency] ?? it.competency}
-              </span>
+              <span className="chip brand">{AREA_LABEL[it.recordArea] ?? it.recordArea}</span>
+              <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{COMP_LABEL[it.competency] ?? it.competency}</span>
             </div>
-            <h4 className="mb-1 mt-[9px] text-[15px] font-bold">{it.text}</h4>
-            <p className="text-[13px]" style={{ color: 'var(--color-ink-soft)' }}>
-              {it.rationale}
-            </p>
-            <p className="font-mono-label mt-[9px] text-[11px]" style={{ color: 'var(--color-muted)' }}>
-              근거: <b style={{ color: 'var(--color-blue)' }}>“{it.evidence.quote}”</b> ·{' '}
-              {it.evidence.section}
+            <h4 className="mb-1 mt-[9px]" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>{it.text}</h4>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>{it.rationale}</p>
+            <p className="mt-[9px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--fg-muted)' }}>
+              근거: <b style={{ color: 'var(--pullim-blue)' }}>“{it.evidence.quote}”</b> · {it.evidence.section}
             </p>
           </div>
         ))}
         {rubric.items.length === 0 && (
-          <p className="surface p-4 text-[13px]" style={{ color: 'var(--color-muted)' }}>
-            현재 생기부 근거로는 합법 처방을 산출하지 못했습니다. 더 상세한 세특·창체 기록을
-            추가해 다시 시도해 보세요.
+          <p className="card" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
+            현재 생기부 근거로는 합법 처방을 산출하지 못했습니다. 더 상세한 세특·창체 기록을 추가해 다시 시도해 보세요.
           </p>
         )}
       </div>
 
       {/* stripped panel */}
       {rubric.stripped.length > 0 && (
-        <div
-          className="rv mt-3 rounded-[14px] border border-dashed px-4 py-[14px]"
-          style={{ borderColor: 'var(--color-line)', background: 'var(--color-paper)' }}
-        >
-          <div
-            className="font-mono-label mb-2 text-[11px] uppercase tracking-[0.1em]"
-            style={{ color: 'var(--color-strike)' }}
-          >
+        <div className="rv mt-3 px-4 py-[14px]" style={{ border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)', background: 'var(--bg)' }}>
+          <div className="mb-2" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-ink5)' }}>
             AI가 제안했으나 자동 제외됨 — 대입 미반영 · 금지 항목
           </div>
           <ul className="flex list-none flex-col gap-[6px] p-0">
             {rubric.stripped.map((s, i) => (
-              <li
-                key={i}
-                className="flex flex-wrap items-center gap-2 text-[12.5px]"
-                style={{ color: 'var(--color-strike)' }}
-              >
+              <li key={i} className="flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink5)' }}>
                 <s>{s.recordArea}</s>
-                <span
-                  className="font-mono-label ml-auto rounded-full px-2 py-[2px] text-[10px]"
-                  style={{ background: 'rgba(20,122,77,.08)', color: 'var(--color-good)' }}
-                >
-                  ✓ {s.reason}
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-[2px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, background: 'var(--ok-bg)', color: 'var(--ok)' }}>
+                  <IconCheck size={11} /> {s.reason}
                 </span>
               </li>
             ))}
@@ -175,79 +136,46 @@ export function LoopStages({ data }: { data: AnalyzeResult }) {
       )}
 
       {/* 03 추적 */}
-      <StageHead n="03" title="추적" meta="학기별 실행 추적" />
+      <StageHead n="03" title="추적" meta="학기별 실행 추적" icon={<IconTrack size={18} />} />
       <div className="grid grid-cols-2 gap-[10px] md:grid-cols-4">
-        <div
-          className="rounded-[12px] border bg-white p-[13px] text-center"
-          style={{ borderColor: 'var(--color-blue)', boxShadow: '0 0 0 3px rgba(29,78,216,.08)' }}
-        >
-          <div className="font-mono-label text-[10px]" style={{ color: 'var(--color-muted)' }}>
-            지금
-          </div>
-          <div className="mt-[5px] text-[13px] font-extrabold">진단 완료</div>
+        <div className="p-[13px] text-center" style={{ background: '#fff', border: '1px solid var(--pullim-blue)', borderRadius: 'var(--r-md)', boxShadow: '0 0 0 3px rgba(3,98,218,.08)' }}>
+          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>지금</div>
+          <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>진단 완료</div>
         </div>
         {['다음 학기', '그다음 학기', '고3 시즌'].map((t, i) => (
-          <div
-            key={i}
-            className="rounded-[12px] border border-dashed bg-white p-[13px] text-center opacity-50"
-            style={{ borderColor: 'var(--color-line)' }}
-          >
-            <div className="font-mono-label text-[10px]" style={{ color: 'var(--color-muted)' }}>
-              {t}
-            </div>
-            <div className="mt-[5px] text-[13px] font-semibold" style={{ color: 'var(--color-muted)' }}>
+          <div key={i} className="p-[13px] text-center opacity-50" style={{ background: '#fff', border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)' }}>
+            <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>{t}</div>
+            <div className="mt-[5px]" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--fg-muted)' }}>
               {i === 2 ? '면접 노드' : '변화 반영?'}
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--color-muted)' }}>
+      <p className="mt-3 flex items-center gap-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
         🔒 학기별 변화 비교(디지털 트윈)는 연중 구독에서 열립니다. 지금은 단일 스냅샷입니다.
       </p>
 
       {/* 04 증명 */}
-      <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" />
-      <div
-        className="overflow-hidden rounded-[16px] border bg-white"
-        style={{ borderColor: 'var(--color-line)' }}
-      >
-        <div
-          className="border-b px-[18px] py-[18px]"
-          style={{
-            borderColor: 'var(--color-line-soft)',
-            background: 'linear-gradient(120% 140% at 0 0,rgba(255,216,58,.22),#fff)',
-          }}
-        >
-          <div
-            className="font-mono-label text-[11px] uppercase tracking-[0.14em]"
-            style={{ color: 'var(--color-blue)' }}
-          >
-            parent report
-          </div>
-          <div className="mt-1 text-[16px] font-extrabold">이번 학기, 우리 아이가 할 것</div>
+      <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" icon={<IconProve size={18} />} />
+      <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-lg)' }}>
+        <div className="px-[18px] py-[18px]" style={{ borderBottom: '1px solid var(--hairline-soft)', background: 'linear-gradient(120% 140% at 0 0,rgba(230,255,76,.28),#fff)' }}>
+          <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--pullim-blue)' }}>parent report</div>
+          <div className="mt-1" style={{ fontSize: 'var(--fs-base)', fontWeight: 700 }}>이번 학기, 우리 아이가 할 것</div>
         </div>
-        <div className="px-[18px] py-[18px] text-[13.5px]" style={{ color: 'var(--color-ink-soft)' }}>
+        <div className="px-[18px] py-[18px]" style={{ fontSize: 'var(--fs-sm)', color: 'var(--pullim-ink2)' }}>
           {rubric.items.length > 0 ? (
             <ol className="m-0 mb-[10px] list-none space-y-2 p-0">
               {rubric.items.map((it, i) => (
                 <li key={i} className="flex gap-2">
-                  <span className="font-serif-display flex-none" style={{ color: 'var(--color-blue)' }}>
-                    {i + 1}
-                  </span>
+                  <span className="flex-none" style={{ fontFamily: 'var(--f-brand)', fontWeight: 700, color: 'var(--pullim-blue)' }}>{i + 1}</span>
                   <span>
-                    <b>{it.text}</b>{' '}
-                    <span style={{ color: 'var(--color-muted)' }}>
-                      ({COMP_LABEL[it.competency] ?? it.competency})
-                    </span>
+                    <b>{it.text}</b> <span style={{ color: 'var(--fg-muted)' }}>({COMP_LABEL[it.competency] ?? it.competency})</span>
                   </span>
                 </li>
               ))}
             </ol>
           ) : null}
-          <div
-            className="rounded-[12px] p-3 text-[12px]"
-            style={{ background: 'var(--color-paper)', color: 'var(--color-muted)' }}
-          >
+          <div className="p-3" style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
             {rubric.uncertaintyNote}
           </div>
         </div>

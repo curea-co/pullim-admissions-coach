@@ -6,6 +6,7 @@ import type { AnalyzeResult } from '@/lib/analyze'
 import { LoopStages } from '@/components/LoopStages'
 import { Landing } from '@/components/Landing'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
+import { IconArrow } from '@/components/icons'
 import { SAMPLE_RESULT } from '@/lib/sample'
 
 export function LoopHomeClient() {
@@ -40,39 +41,27 @@ export function LoopHomeClient() {
     <>
       <SiteNav
         cta={
-          <div className="flex items-center gap-4">
-            {isDemo && (
-              <span
-                className="font-mono-label rounded-full px-3 py-1 text-[11px]"
-                style={{ background: 'rgba(240,189,0,.18)', color: 'var(--color-lemon-deep)' }}
-              >
-                예시 데이터
-              </span>
-            )}
-            <Link
-              href="/intake"
-              className="rounded-full px-4 py-[9px] text-[13px] font-bold text-white no-underline"
-              style={{ background: 'var(--color-ink)' }}
-            >
-              새로 분석 →
+          <div className="flex items-center gap-3">
+            {isDemo && <span className="chip accent">예시 데이터</span>}
+            <Link href="/intake" className="btn-primary">
+              새로 분석 <IconArrow size={16} />
             </Link>
           </div>
         }
       />
-      <main className="mx-auto max-w-[1060px] px-6 py-10">
-        <div className="mb-6">
-          <span className="kicker">{isDemo ? '결과 예시' : '진단 결과'}</span>
+      <main className="container-x py-12">
+        <div className="mb-7">
+          <span className="eyebrow">{isDemo ? '결과 예시' : '진단 결과'}</span>
           <h1
-            className="mt-[14px] text-[clamp(24px,3.4vw,34px)] font-extrabold"
-            style={{ letterSpacing: '-0.02em' }}
+            className="mt-4"
+            style={{ fontFamily: 'var(--f-brand)', fontSize: 'clamp(26px,3.4vw,38px)', fontWeight: 700, letterSpacing: 'var(--ls-display)' }}
           >
             생기부 실행 루프
           </h1>
           {isDemo && (
-            <p className="mt-2 text-[14px]" style={{ color: 'var(--color-muted)' }}>
-              아래는 실제 산출 형태의 예시(김서연 · 고2 · 2028 신체제 · 사회계열)입니다. API 호출
-              없이 표시됩니다.{' '}
-              <Link href="/intake" style={{ color: 'var(--color-blue)', fontWeight: 700 }}>
+            <p className="mt-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
+              아래는 실제 산출 형태의 예시(김서연 · 고2 · 2028 신체제 · 사회계열)입니다. API 호출 없이 표시됩니다.{' '}
+              <Link href="/intake" style={{ color: 'var(--pullim-blue)', fontWeight: 700 }}>
                 내 생기부로 진단하기 →
               </Link>
             </p>

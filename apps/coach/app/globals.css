@@ -1,283 +1,384 @@
 @import "tailwindcss";
 
-@theme {
-  --color-ink: #14130f;
-  --color-ink-soft: #2a2820;
-  --color-paper: #faf7ef;
-  --color-paper-2: #f1ecdd;
-  --color-blue: #1b43d6;
-  --color-blue-700: #1d4ed8;
-  --color-blue-deep: #0f1f5e;
-  --color-blue-ink: #0f1a45;
-  --color-lemon: #ffd83a;
-  --color-lemon-deep: #f0bd00;
-  --color-muted: #6c6859;
-  --color-line: rgba(20, 19, 15, 0.13);
-  --color-line-soft: rgba(20, 19, 15, 0.07);
-  --color-good: #147a4d;
-  --color-bad: #b23b3b;
-  --color-strike: #9a968a;
+/* ==========================================================================
+   풀림 입시코치 · Pullim Design System
+   Canonical tokens ported from pullim-web/src/app/globals.css (브랜드 v0.1).
+   Cool blue-tinted paper · electric lemon · blue #0362DA. No warm cream.
+   ========================================================================== */
 
-  --font-serif: var(--font-fraunces), Georgia, serif;
-  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
-  --font-sans: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+:root {
+  /* ───── Color · Core 4 ───── */
+  --pullim-blue:   #0362DA;
+  --pullim-ink:    #0D1A1F;
+  --pullim-paper:  #F0F6FB;
+  --pullim-lemon:  #E6FF4C;
 
-  --radius-card: 18px;
-  --radius-lg: 22px;
-  --radius-xl: 24px;
+  /* ───── Color · Extended ───── */
+  --pullim-white:  #FFFFFF;
+  --pullim-paper2: #F0F6FB;
+  --pullim-paper3: #F4FAFF;
+  --pullim-ink2:   #1F2C32;
+  --pullim-ink3:   #45555C;
+  --pullim-ink4:   #5E6B72;
+  --pullim-ink5:   #B0BCC3;
+  --pullim-line:   #D6E2EE;
+  --pullim-line2:  #E8EFF6;
+
+  /* Blue scale (for soft fills / on-ink accents) */
+  --pb-1:  #F4FAFF;
+  --pb-3:  #9FC8FF;
+  --pb-7:  #004BB9;
+  --pb-8:  #00389E;
+  --pb-9:  #002878;
+
+  /* Semantic status */
+  --ok:     #147A4D; --ok-bg:     rgba(20,122,77,.10);
+  --bad:    #B23B3B; --bad-bg:    rgba(178,59,59,.08);
+  --warn:   #F0883E; --warn-bg:   #FDF1E7;
+
+  /* ───── Semantic aliases ───── */
+  --bg:            var(--pullim-paper);
+  --bg-raised:     var(--pullim-white);
+  --fg:            var(--pullim-ink);
+  --fg-muted:      var(--pullim-ink3);
+  --fg-subtle:     var(--pullim-ink4);
+  --accent:        var(--pullim-blue);
+  --highlight:     var(--pullim-lemon);
+  --hairline:      var(--pullim-line);
+  --hairline-soft: var(--pullim-line2);
+
+  /* ───── Spacing (4px base) ───── */
+  --s-1:  4px;  --s-2:  8px;  --s-3:  12px; --s-4:  16px; --s-5:  24px;
+  --s-6:  32px; --s-7:  48px; --s-8:  64px; --s-9:  96px; --s-10: 128px;
+
+  /* ───── Radii ───── */
+  --r-sm: 4px;   /* buttons */
+  --r-md: 8px;   /* cards, modals, fields */
+  --r-lg: 18px;  /* feature cards / symbol container */
+  --r-pill: 999px;
+
+  /* ───── Typography sizes ───── */
+  --fs-xxs:     11px;
+  --fs-xs:      12px;
+  --fs-sm:      13px;
+  --fs-base:    16px;
+  --fs-md:      18px;
+  --fs-lg:      22px;
+  --fs-xl:      28px;
+  --fs-2xl:     36px;
+  --fs-3xl:     48px;
+  --fs-display: 68px;
+
+  --lh-tight: 1.05;
+  --lh-snug:  1.2;
+  --lh-body:  1.65;
+
+  --ls-tight:   -0.02em;
+  --ls-display: -0.03em;
+  --ls-label:   0.16em;
+  --ls-wide:    0.22em;
+
+  /* ───── Layout ───── */
+  --container:   1280px;
+  --nav-h:       72px;
+  --section-pad: clamp(72px, 10vw, 160px);
+
+  /* ───── Shadows ───── */
+  --sh-1: 0 1px 2px rgba(13,26,31,.04), 0 1px 3px rgba(13,26,31,.06);
+  --sh-2: 0 2px 8px rgba(13,26,31,.06), 0 8px 24px rgba(13,26,31,.05);
+  --sh-3: 0 12px 40px rgba(3,98,218,.12), 0 4px 12px rgba(13,26,31,.06);
+
+  /* ───── Font stacks (next/font CSS vars filled at runtime) ───── */
+  --f-kr:    var(--font-pretendard), "Pretendard Variable", "Pretendard", -apple-system, system-ui, sans-serif;
+  --f-brand: var(--font-bai-jamjuree), "Pretendard Variable", system-ui, sans-serif;
+  --f-mono:  var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --f-body:  var(--f-kr);
 }
 
-* {
-  box-sizing: border-box;
+/* ==========================================================================
+   Tailwind v4 · @theme inline · expose tokens as utility classes
+   ========================================================================== */
+@theme inline {
+  --color-blue:   var(--pullim-blue);
+  --color-ink:    var(--pullim-ink);
+  --color-ink2:   var(--pullim-ink2);
+  --color-ink3:   var(--pullim-ink3);
+  --color-ink4:   var(--pullim-ink4);
+  --color-ink5:   var(--pullim-ink5);
+  --color-paper:  var(--pullim-paper);
+  --color-paper3: var(--pullim-paper3);
+  --color-lemon:  var(--pullim-lemon);
+  --color-line:   var(--pullim-line);
+  --color-line2:  var(--pullim-line2);
+  --color-good:   var(--ok);
+  --color-bad:    var(--bad);
+
+  --font-brand: var(--f-brand);
+  --font-mono:  var(--f-mono);
+  --font-kr:    var(--f-kr);
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* ==========================================================================
+   Resets / globals
+   ========================================================================== */
+* { box-sizing: border-box; }
 
-body {
+::selection { background: var(--pullim-blue); color: var(--pullim-white); }
+
+html { scroll-behavior: smooth; }
+
+html, body {
   margin: 0;
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  line-height: 1.6;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: var(--fs-base);
+  line-height: var(--lh-body);
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
-/* grain overlay */
+h1, h2, h3, h4, h5, h6 { text-wrap: balance; font-weight: 700; }
+p, li, dd, blockquote, figcaption { text-wrap: pretty; }
+a { color: inherit; text-decoration: none; }
+
+/* subtle grain (optional, very low opacity) */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 9999;
   pointer-events: none;
-  opacity: 0.045;
+  opacity: 0.025;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
-::selection {
-  background: var(--color-lemon);
-  color: var(--color-blue-deep);
+/* On-ink theme (dark sections) */
+.on-ink {
+  --bg:        var(--pullim-ink);
+  --bg-raised: var(--pullim-ink2);
+  --fg:        var(--pullim-paper);
+  --fg-muted:  rgba(240, 246, 251, 0.72);
+  --fg-subtle: rgba(240, 246, 251, 0.45);
+  --hairline:  rgba(240, 246, 251, 0.18);
+  --hairline-soft: rgba(240, 246, 251, 0.10);
+  background: var(--bg);
+  color: var(--fg);
 }
 
-a {
-  color: inherit;
+/* ==========================================================================
+   Layout primitives (ported from pullim-web)
+   ========================================================================== */
+.container-x {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: clamp(20px, 4vw, 48px);
 }
+.section { padding-block: var(--section-pad); }
 
-/* ===== typographic helpers ===== */
-.font-serif-display {
-  font-family: var(--font-serif);
-}
-.font-mono-label {
-  font-family: var(--font-mono);
-}
-.lemonmark {
-  background: linear-gradient(transparent 58%, var(--color-lemon) 0);
-  padding: 0 1px;
-}
-
-/* eyebrow / kicker */
-.kicker {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-blue);
+.eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  color: var(--accent);
 }
-.kicker::before {
+.eyebrow::before {
   content: "";
-  width: 26px;
+  width: 24px;
   height: 1px;
-  background: var(--color-blue);
+  background: var(--accent);
 }
+.eyebrow.muted { color: var(--fg-muted); }
 
-/* brand dot */
-.brand-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: var(--color-blue);
-  position: relative;
-  flex: none;
-  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35);
-}
-.brand-dot::after {
-  content: "";
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-lemon-deep);
-  border: 2px solid var(--color-paper);
-}
-.brand-dot.on-dark::after {
-  border-color: var(--color-blue-ink);
-}
-
-/* buttons */
-.btn {
-  font-weight: 700;
-  font-size: 15px;
-  padding: 13px 22px;
-  border-radius: 999px;
-  text-decoration: none;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-  cursor: pointer;
-  border: none;
-}
-.btn:hover {
-  transform: translateY(-2px);
-}
-.btn:focus-visible {
-  outline: 3px solid var(--color-lemon);
-  outline-offset: 2px;
-}
+/* ── Buttons ── */
 .btn-primary {
-  background: var(--color-lemon);
-  color: var(--color-blue-deep);
-  box-shadow: 0 12px 30px -14px rgba(240, 189, 0, 0.7);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  background: var(--pullim-blue);
+  color: var(--pullim-white);
+  border: none;
+  border-radius: var(--r-sm);
+  font-family: var(--f-brand);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
-.btn-primary:hover {
-  box-shadow: 0 16px 36px -14px rgba(240, 189, 0, 0.8);
+.btn-primary:hover { background: #0254bf; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  font-family: var(--f-brand);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease;
 }
-.btn-ink {
-  background: var(--color-ink);
-  color: #fff;
-}
+.btn-secondary:hover { border-color: var(--fg); background: var(--bg-raised); }
+.btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* On-ink ghost (for dark hero) */
 .btn-ghost-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--r-sm);
+  font-family: var(--f-brand);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
 }
-.btn-ghost-light:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-ghost-light:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-1px); }
 
-/* surface card */
-.surface {
-  background: #fff;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
+/* ── Cards ── */
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  box-shadow: var(--sh-1);
 }
+.card.flat { box-shadow: none; }
+.card-hover { transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
+.card-hover:hover { transform: translateY(-3px); box-shadow: var(--sh-2); border-color: var(--pb-3); }
 
-/* form controls */
+/* ── Chips ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: var(--pullim-paper2);
+  color: var(--pullim-ink3);
+}
+.chip.brand  { background: var(--pullim-paper3); color: var(--pullim-blue); }
+.chip.accent { background: var(--pullim-lemon);  color: var(--pullim-ink); }
+.chip.outline { background: #fff; border: 1px solid var(--hairline); color: var(--pullim-ink3); }
+.chip.ghost  { background: rgba(255,255,255,.12); color: #dfe7ff; }
+
+/* ── Badge (2-tone) ── */
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  font-family: var(--f-mono);
+  font-size: var(--fs-xxs);
+  font-weight: 600;
+  background: var(--pullim-blue);
+  color: #fff;
+}
+.badge.soft { background: var(--pb-1); color: var(--pullim-blue); }
+
+/* ── Glyph container (.sg — 30×30 r8) ── */
+.sg {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.sg.brand { background: var(--pullim-blue); color: #fff; }
+.sg.soft  { background: var(--pb-1); color: var(--pullim-blue); }
+
+/* ── Form controls ── */
 .field-label {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--color-ink-soft);
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--fg-muted);
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 .control {
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  padding: 11px 12px;
-  font-size: 14px;
-  background: #fff;
-  color: var(--color-ink);
   width: 100%;
-  font-family: var(--font-sans);
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: var(--f-kr);
+  background: #fff;
+  color: var(--fg);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .control:focus {
   outline: none;
-  border-color: var(--color-blue);
-  box-shadow: 0 0 0 3px rgba(27, 67, 214, 0.12);
+  border-color: var(--pullim-blue);
+  box-shadow: 0 0 0 3px rgba(3, 98, 218, 0.12);
 }
-textarea.control {
-  resize: vertical;
-  line-height: 1.6;
-}
+textarea.control { resize: vertical; line-height: 1.6; }
 
-/* chip */
-.chip {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #dfe4ff;
-}
-.chip.lemon {
-  background: var(--color-lemon);
-  color: var(--color-blue-deep);
-  font-weight: 600;
-}
-
-/* reveal motion */
+/* ==========================================================================
+   Motion
+   ========================================================================== */
 .rv {
   opacity: 0;
   transform: translateY(16px);
   animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
 }
-@keyframes rise {
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rv {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .ring-spin {
-    animation: none !important;
-  }
-  html {
-    scroll-behavior: auto;
-  }
-}
+@keyframes rise { to { opacity: 1; transform: none; } }
 
-/* spinner */
 .spinner {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid rgba(15, 31, 94, 0.25);
-  border-top-color: var(--color-blue-deep);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
   animation: spin 0.7s linear infinite;
 }
-.ring-spin {
-  animation: spin 60s linear infinite;
-  transform-origin: center;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+.ring-spin { animation: spin 60s linear infinite; transform-origin: center; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+  .rv { opacity: 1; transform: none; }
+  html { scroll-behavior: auto; }
 }
 
-/* shimmer for loading */
-.shimmer {
-  background: linear-gradient(
-    100deg,
-    var(--color-paper-2) 30%,
-    rgba(255, 255, 255, 0.7) 50%,
-    var(--color-paper-2) 70%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--pullim-blue);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
+button:focus-visible, a:focus-visible { outline-offset: 2px; }
