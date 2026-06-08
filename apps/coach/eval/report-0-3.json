@@ -1,0 +1,192 @@
+{
+  "generatedAt": "2026-06-08T18:18:27.128Z",
+  "baseUrl": "http://localhost:3031",
+  "baselineEnabled": true,
+  "aggregate": {
+    "perCriterion": {
+      "grounded": 5,
+      "weakness": 5,
+      "cohort": 4.5,
+      "legal": 5,
+      "actionable": 5,
+      "overreach": 5,
+      "diagnosis": 5
+    },
+    "overallMean": 4.93,
+    "passCount": 4,
+    "gradedCount": 4,
+    "passRate": 1,
+    "baselineWinRate": 1,
+    "judge": {
+      "cases": 6,
+      "totalOutcomes": 33,
+      "falsePositives": 0,
+      "falsePositiveRate": 0
+    }
+  },
+  "fixtures": [
+    {
+      "id": "humanities-2028-strong-metro",
+      "label": "인문/2028신체제/강함/수도권",
+      "ok": true,
+      "grade": {
+        "criteria": {
+          "grounded": 5,
+          "weakness": 5,
+          "cohort": 5,
+          "legal": 5,
+          "actionable": 5,
+          "overreach": 5,
+          "diagnosis": 5
+        },
+        "overallPass": true,
+        "issues": [],
+        "summary": "모든 evidence 인용이 생기부 원문에 그대로 등장하고(환각 0건), 각 처방이 진단된 약점(방법론 자각 부재, 교과 간 단절, 수용적 진로활동, 협업 조율 서술 부족)을 정조준하며 다음 학기 실행 단위로 구체화되어 있다. 2028 신체제·세특 가중·수도권을 정확히 반영했고 세특·정규 창체·행특만 다뤄 §6.2 무관용 기준도 완전 합법(legal=5)이다. 평균 5.0으로 PASS."
+      },
+      "avg": 5,
+      "compare": {
+        "winner": "ours",
+        "why": "B안은 소논문·추가 독서·소쉬르/촘스키 등 외부 독서를 명시적으로 권유해 §6.2 금지항목을 위반하여 무관용 FAIL이고, ours는 모든 evidence가 생기부 원문에 실재하며 세특·창체·행특 범위 내 약점 정조준 처방으로 구체적이다."
+      },
+      "note": "강한 인문 프로필. 세특 가중(신체제) 반영한 구체 처방 기대. 코호트=2028신체제."
+    },
+    {
+      "id": "humanities-2028-strong-nonmetro",
+      "label": "인문/2028신체제/강함/비수도권",
+      "ok": true,
+      "grade": {
+        "criteria": {
+          "grounded": 5,
+          "weakness": 5,
+          "cohort": 4,
+          "legal": 5,
+          "actionable": 5,
+          "overreach": 5,
+          "diagnosis": 5
+        },
+        "overallPass": true,
+        "issues": [
+          "코호트 식별(2028 신체제·세특 가중·비수도권)은 정확하나, 권역(비수도권) 차이가 실제 처방 내용에 구체적으로 드러나지 않아 (c)에서 만점에 약간 못 미침.",
+          "cohort.track이 'core'로 표기되어 프로필의 humanities와 표기상 불일치(다만 처방 내용은 인문계열 맥락에 부합)."
+        ],
+        "summary": "모든 evidence 인용이 생기부 원문에 그대로 등장하며 환각이 없고, 각 처방이 진단된 약점을 정확히 겨냥한 구체적·합법적 조언이다. 금지 항목·대필·합격보장 없이 세특 중심으로 잘 구성되어 PASS 기준을 충족한다."
+      },
+      "avg": 4.86,
+      "compare": {
+        "winner": "ours",
+        "why": "B안은 금지 항목인 독서(『언어본능』 등 독서 권유)를 처방에 명시해 (d)§6.2 합법성에서 무관용 FAIL이며, A안은 모든 evidence가 원문에 실재하고(근거실재성 5) 약점 정조준 처방이 다음 학기 구체 행동으로 제시되어(구체성 우수) 모든 기준에서 우월하다."
+      },
+      "note": "1번과 동일 내용, 권역만 비수도권. 권역 차이가 관련 처방에 드러나는지 본다."
+    },
+    {
+      "id": "social-2027-mixed-metro",
+      "label": "사회/2027구체제/혼합/수도권",
+      "ok": true,
+      "grade": {
+        "criteria": {
+          "grounded": 5,
+          "weakness": 5,
+          "cohort": 4,
+          "legal": 5,
+          "actionable": 5,
+          "overreach": 5,
+          "diagnosis": 5
+        },
+        "overallPass": true,
+        "issues": [],
+        "summary": "모든 evidence 인용이 생기부 원문에 정확히 등장하고(환각 0건), 처방이 진단된 약점(인과·상관 혼동, 표집 편향, 심화·연계 부족, 공동체 기여 부족)을 정조준하며 구체적·실행가능하다. 금지 항목 없이 세특·정규 창체·행특만 다루고 합격 보장·대필도 없어 합법성 만점. 코호트(2027 구체제·수도권)는 정확히 식별했으나 처방 내용이 체제 특화적이라기보다 다소 일반적이어서 적합성만 4점."
+      },
+      "avg": 4.86,
+      "compare": {
+        "winner": "ours",
+        "why": "A안은 모든 진단·처방에 생기부 원문 인용을 정확히 붙이고(근거실재성), 세특·정규창체·행특만 다루며 '학생 본인이 앞으로' 프레임을 지켜 §6.2 합법성이 명확하고, 과목·단원·탐구주제 단위로 구체적 실행을 제시한다. 반면 B안은 강점 진단이 타당하나 evidence 인용 구조가 없고 '보고서' 등 모호한 표현과 자소서/면접 언급으로 구체성·합법 추적성이 떨어진다."
+      },
+      "note": "구체제(막차) 고3. 강점(정책탐구)+약점(인과·표집)이 섞임. 약점 정조준 처방 기대."
+    },
+    {
+      "id": "natural-2029-strong-metro",
+      "label": "자연/2029신체제/강함/수도권",
+      "ok": true,
+      "grade": {
+        "criteria": {
+          "grounded": 5,
+          "weakness": 5,
+          "cohort": 5,
+          "legal": 5,
+          "actionable": 5,
+          "overreach": 5,
+          "diagnosis": 5
+        },
+        "overallPass": true,
+        "issues": [],
+        "summary": "모든 evidence quote가 생기부 원문에 그대로 등장(환각 0건)하고, 각 처방이 진단된 특정 약점을 명시적으로 겨냥하며 다음 학기 실행 가능한 구체적 활동으로 제시됨. 2029 신체제·metro·자연계 코호트를 정확히 반영해 세특을 우선했고, 처방은 모두 세특·정규 창체·행특 범위 내에서 '학생 본인이 앞으로' 프레임을 지키며 대필·합격보장·금지항목이 전무하다. 7기준 평균 5.0으로 PASS."
+      },
+      "avg": 5,
+      "compare": {
+        "winner": "ours",
+        "why": "A안은 모든 evidence가 생기부 원문에 그대로 등장하고(근거실재성 5), 처방이 세특·정규창체·행특만 다루며 '학생 본인이 앞으로' 프레임을 지켜 §6.2 합법성을 충족하고, 구체적 과목·탐구주제로 실행 가능하다. 반면 B안은 금지항목인 '독서·독서연계·전공서적/논문'을 명시적으로 권유해 §6.2 무관용 기준에서 즉시 FAIL이며 구체성도 표 형태의 일반론에 그친다."
+      },
+      "note": "신체제 고1. 세특 가중·실험 설계 강점. 통합형 수능 전제(선택과목 폐지) 어긋나면 감점."
+    }
+  ],
+  "judge": [
+    {
+      "id": "judge-unrelated-next-term",
+      "label": "판정/다음학기 무관활동",
+      "ok": true,
+      "total": 5,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "이전 학기 처방(경제·자료해석)과 무관한 예체능 활동만. landed 0 기대 → landed면 FP."
+    },
+    {
+      "id": "judge-distractor-keyword-overlap",
+      "label": "★판정/표면키워드 distractor",
+      "ok": true,
+      "total": 6,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "★핵심. 회귀분석·경제 키워드가 표면적으로 겹치지만 학생의 능동적 탐구 안착이 아님(수동 청취·어휘정리). landed면 false positive."
+    },
+    {
+      "id": "judge-plan-not-evidence",
+      "label": "판정/계획만 있고 실행없음",
+      "ok": true,
+      "total": 5,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "\"하고 싶다\"는 의지 표명만, 실제 오차 분석 실행 증거 없음. landed면 FP."
+    },
+    {
+      "id": "judge-same-subject-different-topic",
+      "label": "판정/같은과목 다른주제",
+      "ok": true,
+      "total": 6,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "같은 물리학이지만 단진동·오차 처방과 무관한 전자기 단원. landed면 FP."
+    },
+    {
+      "id": "judge-sparse-next-term",
+      "label": "판정/현재학기 sparse",
+      "ok": true,
+      "total": 6,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "현재 생기부에 비평·토론 안착 증거가 전혀 없음(빈약). landed면 FP."
+    },
+    {
+      "id": "judge-attempted-then-abandoned",
+      "label": "판정/시도후 중단",
+      "ok": true,
+      "total": 5,
+      "landed": 0,
+      "falsePositiveCandidates": [],
+      "note": "반대논거 검토를 시도했으나 포기·대체. 실제 안착 아님. landed면 FP."
+    }
+  ],
+  "topIssues": [
+    "[humanities-2028-strong-nonmetro] 코호트 식별(2028 신체제·세특 가중·비수도권)은 정확하나, 권역(비수도권) 차이가 실제 처방 내용에 구체적으로 드러나지 않아 (c)에서 만점에 약간 못 미침.",
+    "[humanities-2028-strong-nonmetro] cohort.track이 'core'로 표기되어 프로필의 humanities와 표기상 불일치(다만 처방 내용은 인문계열 맥락에 부합)."
+  ]
+}

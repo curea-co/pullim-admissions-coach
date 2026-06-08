@@ -91,7 +91,8 @@ async function main() {
   const client = new Anthropic() // standalone — server-only 미포함
 
   const limit = process.env.EVAL_LIMIT ? Number(process.env.EVAL_LIMIT) : FIXTURES.length
-  const fixtures = FIXTURES.slice(0, limit)
+  const offset = process.env.EVAL_OFFSET ? Number(process.env.EVAL_OFFSET) : 0
+  const fixtures = FIXTURES.slice(offset, offset + limit)
 
   console.log(`[eval] base=${BASE_URL} fixtures=${fixtures.length}/${FIXTURES.length} baseline=${DO_BASELINE}`)
   console.log('[eval] 주의: 실제 API 호출 비용이 발생합니다.\n')
@@ -131,9 +132,11 @@ async function main() {
   }
 
   // ── 적대 판정 스위트
-  console.log('\n[eval] 적대 판정(twin judge) 스위트 …')
   const judgeResults = []
-  for (const jc of JUDGE_CASES) {
+  const skipJudge = process.env.EVAL_SKIP_JUDGE === '1'
+  if (skipJudge) console.log('\n[eval] 적대 판정 스위트 건너뜀 (EVAL_SKIP_JUDGE=1)')
+  else console.log('\n[eval] 적대 판정(twin judge) 스위트 …')
+  for (const jc of skipJudge ? [] : JUDGE_CASES) {
     process.stdout.write(`• ${jc.id} … `)
     const resp = await postAnalyze(jc.body)
     if (!resp.ok) {
