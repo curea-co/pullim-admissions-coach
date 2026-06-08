@@ -26,6 +26,11 @@ const GRADES = [1, 2, 3]
 export default function IntakePage() {
   const router = useRouter()
   const [saengbu, setSaengbu] = useState('')
+  // 종단 트윈(학기 비교) — 옵션. priorSaengbu가 비어 있으면 단일 학기 경로(기존과 동일).
+  const [compare, setCompare] = useState(false)
+  const [priorSaengbu, setPriorSaengbu] = useState('')
+  const [priorTerm, setPriorTerm] = useState('이전 학기')
+  const [currentTerm, setCurrentTerm] = useState('이번 학기')
   const [admissionYear, setYear] = useState(2025)
   const [track5, setTrack] = useState('social')
   const [targetRegion, setRegion] = useState('metro')
@@ -75,6 +80,8 @@ export default function IntakePage() {
       return
     }
     setBusy(true)
+    // 학기 비교는 prior 생기부가 채워졌을 때만 보낸다 → 비어 있으면 단일 학기(기존과 동일).
+    const compareOn = compare && priorSaengbu.trim().length > 0
     const body = {
       admissionYear,
       track5,
@@ -83,6 +90,13 @@ export default function IntakePage() {
       grade,
       saengbu,
       consent: { sensitive: true, guardian: false },
+      ...(compareOn
+        ? {
+            priorSaengbu,
+            priorTerm: priorTerm.trim() || '이전 학기',
+            currentTerm: currentTerm.trim() || '이번 학기',
+          }
+        : {}),
     }
     try {
       const res = await fetch('/api/analyze', {
@@ -109,6 +123,9 @@ export default function IntakePage() {
       setBusy(false)
     }
   }
+
+  // 오버레이 카피용: 학기 비교가 켜졌으면 더 긴 처리(LLM 호출 증가)를 안내.
+  const comparing = compare && priorSaengbu.trim().length > 0
 
   return (
     <>
@@ -143,9 +160,12 @@ export default function IntakePage() {
             <div style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--pullim-blue)' }}>
               분석 중
             </div>
-            <p id="busy-title" className="mt-1" style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>생기부를 분석하는 중…</p>
+            <p id="busy-title" className="mt-1" style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>
+              {comparing ? '두 학기 생기부를 비교 분석하는 중…' : '생기부를 분석하는 중…'}
+            </p>
             <p id="busy-desc" className="mt-2" style={{ fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)' }}>
-              식별정보를 마스킹하고 코호트 규칙으로 합법 액션을 산출합니다. 결과는 저장하지 않고 처리 후 즉시 폐기합니다.
+              식별정보를 마스킹하고 코호트 규칙으로 합법 액션을 산출합니다.
+              {comparing && ' 두 학기를 대조하느라 평소보다 시간이 더 걸립니다.'} 결과는 저장하지 않고 처리 후 즉시 폐기합니다.
             </p>
           </div>
         </div>
@@ -189,6 +209,88 @@ export default function IntakePage() {
                 placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣으세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
               />
             </div>
+
+            {/* 종단 트윈(학기 비교) — 옵션 토글. 비어 있으면 단일 학기 경로로 동작. */}
+            <fieldset className="mb-4 border-0 p-0 m-0">
+              <legend className="sr-only">학기 비교 (선택)</legend>
+              <label
+                className="flex cursor-pointer items-start gap-3 px-4 py-3"
+                style={{
+                  border: `1.5px solid ${compare ? 'var(--pullim-blue)' : 'var(--hairline)'}`,
+                  borderRadius: 'var(--r-md)',
+                  background: compare ? 'var(--pb-1)' : 'var(--bg)',
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--pullim-ink2)',
+                  transition: 'border-color .15s ease, background .15s ease',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={compare}
+                  onChange={(e) => setCompare(e.target.checked)}
+                  aria-controls="prior-fields"
+                  aria-expanded={compare}
+                  className="mt-[2px] h-[18px] w-[18px] flex-none"
+                  style={{ accentColor: 'var(--pullim-blue)' }}
+                />
+                <span>
+                  <b>이전 학기 생기부도 넣기 (학기 비교)</b>
+                  <span className="mt-[2px] block" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+                    지난 학기 처방이 이번 학기 생기부에 실제 반영됐는지 ③ 추적에서 대조합니다.
+                  </span>
+                </span>
+              </label>
+
+              {compare && (
+                <div id="prior-fields" className="mt-3 flex flex-col gap-3">
+                  <div>
+                    <label htmlFor="prior-saengbu" className="field-label">
+                      이전 학기 생기부 붙여넣기{' '}
+                      <span style={{ color: 'var(--pullim-ink4)', fontWeight: 500 }}>(식별정보 자동 마스킹)</span>
+                    </label>
+                    <textarea
+                      id="prior-saengbu"
+                      className="control"
+                      style={{ height: 160, fontSize: 13, fontFamily: 'var(--f-mono)' }}
+                      value={priorSaengbu}
+                      onChange={(e) => setPriorSaengbu(e.target.value)}
+                      placeholder="이전 학기의 세특·창체·행특 텍스트를 붙여넣으세요. 식별정보는 이번 학기 생기부와 동일하게 분석 전 자동으로 가립니다."
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="prior-term" className="field-label">
+                        이전 학기 이름
+                      </label>
+                      <input
+                        id="prior-term"
+                        type="text"
+                        className="control"
+                        value={priorTerm}
+                        onChange={(e) => setPriorTerm(e.target.value)}
+                        placeholder="이전 학기"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="current-term" className="field-label">
+                        이번 학기 이름
+                      </label>
+                      <input
+                        id="current-term"
+                        type="text"
+                        className="control"
+                        value={currentTerm}
+                        onChange={(e) => setCurrentTerm(e.target.value)}
+                        placeholder="이번 학기"
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--pullim-ink4)' }}>
+                    학기 비교는 두 학기를 대조하느라 분석에 시간이 더 걸립니다.
+                  </p>
+                </div>
+              )}
+            </fieldset>
 
             <fieldset className="grid grid-cols-1 gap-3 border-0 p-0 m-0 sm:grid-cols-2">
               <legend className="field-label mb-2 p-0">코호트 정보</legend>

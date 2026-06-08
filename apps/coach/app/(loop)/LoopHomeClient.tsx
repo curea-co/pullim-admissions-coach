@@ -36,6 +36,10 @@ export function LoopHomeClient() {
         // when the shape LoopStages destructures is fully present.
         if (parsed?.cohort && parsed?.diagnosis?.criteria && parsed?.rubric?.items) {
           setData(parsed)
+          // 백엔드가 priorSaengbu 처리 시 채워 보내는 종단 트윈 → ③ 추적에 실데이터로 공급.
+          if (parsed?.twin?.outcomes && parsed?.twin?.summary) {
+            setTwin(parsed.twin as TwinDiff)
+          }
         }
       } catch {
         /* ignore malformed cache */
@@ -79,6 +83,14 @@ export function LoopHomeClient() {
           {isTwinDemo && (
             <p className="mt-2 inline-flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
               <span className="chip accent">학기 비교 예시: 고2-1 → 고2-2</span>
+              <span>③ 추적 단계에서 지난 학기 처방이 실제 생기부에 반영됐는지 대조합니다.</span>
+            </p>
+          )}
+          {!isDemo && twin && (
+            <p className="mt-2 inline-flex flex-wrap items-center gap-2" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+              <span className="chip accent">
+                학기 비교: {twin.from} → {twin.to}
+              </span>
               <span>③ 추적 단계에서 지난 학기 처방이 실제 생기부에 반영됐는지 대조합니다.</span>
             </p>
           )}
