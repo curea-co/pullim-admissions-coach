@@ -37,15 +37,63 @@ export interface TwinDiff {
 }
 
 /**
+ * 한국어 굴절 정규화용 휴리스틱 어미/조사 목록.
+ *
+ * ⚠️ 휴리스틱 스테머다 — 완전한 형태소 분석이 아니다(범위 밖). 굴절형이 같은
+ * 어간으로 수렴하도록(예: 회귀분석을 / 회귀분석으로 / 회귀분석 → 회귀분석) 토큰의
+ * "가장 긴 매칭 후행 조사/어미"를 1겹만 벗긴다. 향후 의미적 안착 판정은 LLM judge로 확장.
+ *
+ * 보수성 규칙(false merge 방지):
+ *  - 토큰 길이 ≥3(한글)일 때만 시도 → 벗긴 뒤 어간이 ≥2 한글 글자로 남는 경우만 적용.
+ *  - latin/digit가 섞인 토큰은 손대지 않는다(전부 한글일 때만).
+ *  - 가장 긴 접미만 1겹 벗긴다(재귀 박리 없음). '으로' 같은 2자가 '로'보다 우선.
+ */
+const KO_SUFFIXES: readonly string[] = [
+  // 조사(particles)
+  '에게서', '에서', '에게', '한테', '으로', '라도', '처럼', '마다', '조차', '밖에',
+  '부터', '까지', '보다',
+  '을', '를', '은', '는', '이', '가', '와', '과', '도', '만', '에', '로', '의', '께',
+  // 어미/명사화·접미(verb/adj endings & nominalizers) — 흔한 것만 실용적으로
+  '되었다', '습니다', 'ㅂ니다', '입니다', '하였다', '하면서',
+  '되어', '되며', '하고', '하며', '하여', '해서', '했다', '했음', '했고', '하기',
+  '하는', '하게', '였다', '이다', '한다',
+  '한', '할', '함', '임', '됨',
+]
+// 길이 내림차순 정렬 → "가장 긴 매칭" 보장(예: '으로' > '로', '에서' > '에').
+const KO_SUFFIXES_SORTED = [...KO_SUFFIXES].sort((a, b) => b.length - a.length)
+
+const HANGUL_RE = /^[가-힣]+$/
+
+/**
+ * 단일 토큰 정규화: 전부 한글이고 길이 ≥3인 경우에 한해, 가장 긴 매칭 후행
+ * 조사/어미를 1겹 벗긴다. 단, 벗긴 어간이 ≥2 한글 글자일 때만 적용한다.
+ * 그 외(latin/digit 포함, 길이<3, 어간이 너무 짧아짐)는 토큰을 그대로 둔다.
+ */
+function normalizeToken(t: string): string {
+  if (t.length < 3 || !HANGUL_RE.test(t)) return t
+  for (const suf of KO_SUFFIXES_SORTED) {
+    if (suf.length >= t.length) continue // 어간이 비거나 음수가 되는 접미는 건너뜀
+    if (t.endsWith(suf)) {
+      const stem = t.slice(0, t.length - suf.length)
+      if (stem.length >= 2) return stem // 어간 ≥2 한글 글자일 때만 박리
+      return t // 어간이 1글자면 박리하지 않음(과박리 방지)
+    }
+  }
+  return t
+}
+
+/**
  * 토큰화: 한국어는 대소문자가 무의미하나 latin 토큰을 위해 lowercase 적용.
- * 공백/구두점 등 non-word 문자로 분할하고, 길이 ≥2 토큰만 유지(1-char 토큰은 드롭).
- * 한국어는 부분 어절이 그대로 토큰이 되고, latin 단어도 그대로 토큰이 된다.
+ * 공백/구두점 등 non-word 문자로 분할하고, 각 토큰에 한국어 형태소 정규화(normalizeToken)를
+ * 적용한 뒤, 최종 길이 ≥2 토큰만 유지(1-char 토큰은 드롭).
+ * 한국어는 굴절 어미/조사가 벗겨진 어간이 토큰이 되고, latin/digit 단어는 그대로 토큰이 된다.
  */
 export function tokenize(s: string): string[] {
   return s
     .toLowerCase()
     // 한글/영문/숫자가 아닌 문자를 구분자로 사용
     .split(/[^0-9a-z가-힣㄰-㆏]+/)
+    .map(normalizeToken)
     .filter((t) => t.length >= 2)
 }
 

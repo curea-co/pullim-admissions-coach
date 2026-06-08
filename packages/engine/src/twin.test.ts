@@ -20,10 +20,11 @@ const snap = (term: string, actions: PrescribedAction[], evidence: EvidenceRef[]
 
 describe('tokenize', () => {
   it('드롭 1-char tokens, splits on non-word, keeps length≥2', () => {
+    // 형태소 정규화로 조사 '을'/'로'가 탈락 → 어간 토큰만 남는다.
     const toks = tokenize('미적분 회귀분석을, 경제로!')
     expect(toks).toContain('미적분')
-    expect(toks).toContain('회귀분석을')
-    expect(toks).toContain('경제로')
+    expect(toks).toContain('회귀분석')
+    expect(toks).toContain('경제')
     expect(toks.every((t) => t.length >= 2)).toBe(true)
   })
   it('keeps latin words length≥2, drops 1-char', () => {
@@ -32,6 +33,46 @@ describe('tokenize', () => {
     expect(toks).toContain('study')
     expect(toks).not.toContain('r')
     expect(toks).not.toContain('a')
+  })
+
+  it('strips longest matching Korean particle (조사), keeps ≥2-char stem', () => {
+    // 을/를/은/는/이/가 → 어간으로 정규화
+    expect(tokenize('통계를')).toContain('통계')
+    expect(tokenize('통계')).toContain('통계')
+    expect(tokenize('회귀분석을')).toContain('회귀분석')
+    expect(tokenize('회귀분석으로')).toContain('회귀분석') // 2자 조사 '으로' (가장 긴 매칭)
+    expect(tokenize('탐구보고서를')).toContain('탐구보고서')
+    expect(tokenize('경제로')).toContain('경제') // 1자 조사 '로'
+  })
+
+  it('strips common verb/adj endings & nominalizers', () => {
+    expect(tokenize('분석함')).toContain('분석')
+    expect(tokenize('분석했다')).toContain('분석')
+    expect(tokenize('발표하고')).toContain('발표')
+    expect(tokenize('진행하는')).toContain('진행')
+    expect(tokenize('연계되어')).toContain('연계')
+  })
+
+  it('does NOT touch latin/digit tokens', () => {
+    expect(tokenize('study2024')).toContain('study2024')
+    expect(tokenize('regression')).toContain('regression')
+    expect(tokenize('2025')).toContain('2025')
+  })
+
+  it('does NOT over-strip: stem must remain ≥2 한글 chars', () => {
+    // '가가' (len 2) < 3 → 조사 분리 시도 안 함, 그대로 유지
+    expect(tokenize('가가')).toContain('가가')
+    // '통계' (len 2) — '계'가 조사 목록에 없지만, 애초에 len<3이라 미시도
+    expect(tokenize('통계')).toContain('통계')
+  })
+
+  it('GUARD against false merges: distinct tokens stay distinct', () => {
+    // 독서/독자, 수상/수학 — 끝 글자가 다르고 조사가 아니므로 병합되면 안 됨
+    expect(tokenize('독서')).toEqual(['독서'])
+    expect(tokenize('독자')).toEqual(['독자'])
+    expect(tokenize('수상')).toEqual(['수상'])
+    expect(tokenize('수학')).toEqual(['수학'])
+    expect(tokenize('독서')).not.toEqual(tokenize('독자'))
   })
 })
 
@@ -108,6 +149,29 @@ describe('diffSnapshots', () => {
     expect(d.newEvidence.map((e) => e.quote)).toEqual(['제타 새 활동', '감마 다른 활동'])
     expect(d.from).toBe('고2-1')
     expect(d.to).toBe('고2-2')
+  })
+
+  it('7) inflected forms now match: 회귀분석을 lands against 회귀분석으로/회귀분석', () => {
+    // 형태소 정규화 전이라면 회귀분석을 ≠ 회귀분석으로 ≠ 회귀분석 으로 pending이었음.
+    const prev = snap('고2-1', [action('회귀분석을 경제로 확장', '회귀분석을')], [])
+    const next = snap('고2-2', [], [ev('경제 물가지수를 회귀분석으로 분석함')])
+    const d = diffSnapshots(prev, next)
+    expect(d.outcomes[0].status).toBe('landed')
+    expect(d.outcomes[0].matchedQuote).toBe('경제 물가지수를 회귀분석으로 분석함')
+  })
+
+  it('8) 탐구보고서를 matches bare 탐구보고서 (particle stripped)', () => {
+    const prev = snap('고2-1', [action('탐구보고서를 작성', '탐구보고서를')], [])
+    const next = snap('고2-2', [], [ev('탐구보고서 작성을 완료함')])
+    const d = diffSnapshots(prev, next)
+    expect(d.outcomes[0].status).toBe('landed')
+  })
+
+  it('9) 통계를 ↔ 통계 unify via particle stripping', () => {
+    const prev = snap('고2-1', [action('통계를 활용한 분석', '통계를')], [])
+    const next = snap('고2-2', [], [ev('통계 기법을 활용해 분석함')])
+    const d = diffSnapshots(prev, next)
+    expect(d.outcomes[0].status).toBe('landed')
   })
 
   it('action evidence.quote tokens also contribute to matching', () => {
