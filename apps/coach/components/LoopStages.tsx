@@ -197,7 +197,7 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
         <span className="chip ghost">{SYS_LABEL[cohort.system] ?? cohort.system}</span>
         {cohort.emphasizeSetuk && <span className="chip accent">세특 정성평가 가중</span>}
         <span className="chip ghost">{REGION_LABEL[cohort.region] ?? cohort.region}</span>
-        <span className="chip ghost">{cohort.track === 'core' ? '코어 트랙 · 연중' : '비치헤드 · 시즌'}</span>
+        <span className="chip ghost">{cohort.track === 'core' ? '연중 코칭' : '시즌 집중'}</span>
       </div>
 
       {/* 01 진단 */}
