@@ -1,9 +1,27 @@
 import type { ReactNode } from 'react'
-import type { TwinDiff } from '@pullim/engine'
+import type { TwinDiff, Roadmap } from '@pullim/engine'
 import type { AnalyzeResult } from '@/lib/analyze'
+import type { FitAssessment } from '@/lib/fit'
+import type { InterviewPack } from '@/lib/ai/schemas'
 import { reportMetrics } from '@/lib/report-metrics'
 import { RadarChart, DonutRing, MiniBars, LegalityBar, HONEST_CAPTION } from './charts'
-import { IconDiagnose, IconPrescribe, IconTrack, IconProve, IconCheck } from './icons'
+import {
+  IconDiagnose,
+  IconPrescribe,
+  IconTrack,
+  IconProve,
+  IconCheck,
+  IconRoadmap,
+  IconInterview,
+  IconFit,
+} from './icons'
+
+/** 적합도 수준 → 상태 토큰(색). %·점수 없음, 정성 레벨만. */
+const FIT_LEVEL_STYLE: Record<FitAssessment['competencyFit'][number]['level'], { fg: string; bg: string }> = {
+  강함: { fg: 'var(--ok)', bg: 'var(--ok-bg)' },
+  적정: { fg: 'var(--pullim-blue)', bg: 'var(--pullim-paper3)' },
+  보완필요: { fg: 'var(--warn)', bg: 'var(--warn-bg)' },
+}
 
 const AREA_LABEL: Record<string, string> = {
   SETUK: '세특',
@@ -197,9 +215,217 @@ function TwinTrack({ twin }: { twin: TwinDiff }) {
   )
 }
 
+/** 입시 로드맵 — 결과 상단(코호트 배너 직후). 가로 페이즈 타임라인, 활성 단계 강조. */
+function RoadmapTimeline({ roadmap }: { roadmap: Roadmap }) {
+  return (
+    <div className="rv card mt-[14px]" style={{ animationDelay: '0.02s' }}>
+      <div className="mb-[14px] flex flex-wrap items-center gap-2">
+        <span className="sg soft"><IconRoadmap size={18} /></span>
+        <h2 style={{ fontSize: 'var(--fs-base)', fontWeight: 700, letterSpacing: '-0.02em' }}>입시 로드맵</h2>
+        <span className="chip brand">{roadmap.admissionYear}학년도 대입</span>
+        <span className="basis-full md:ml-auto md:basis-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
+          지금 어디쯤 · 학종 타임라인
+        </span>
+      </div>
+
+      {/* 모바일: 가로 스크롤 / 데스크톱: 균등 그리드 */}
+      <ol
+        className="-mx-1 flex list-none gap-3 overflow-x-auto px-1 pb-1 md:mx-0 md:grid md:gap-3 md:overflow-visible md:px-0"
+        style={{ gridTemplateColumns: `repeat(${roadmap.phases.length}, minmax(0, 1fr))` }}
+      >
+        {roadmap.phases.map((ph, i) => {
+          const active = ph.active
+          return (
+            <li
+              key={ph.key}
+              className="rv flex w-[230px] flex-none flex-col md:w-auto"
+              aria-current={active ? 'step' : undefined}
+              style={{
+                animationDelay: `${0.04 + i * 0.05}s`,
+                borderRadius: 'var(--r-md)',
+                border: active ? '1px solid var(--pullim-blue)' : '1px dashed var(--hairline)',
+                background: active ? 'linear-gradient(120% 140% at 0 0,rgba(230,255,76,.30),#fff)' : 'var(--bg)',
+                boxShadow: active ? '0 0 0 3px rgba(3,98,218,.08)' : 'none',
+                padding: '13px 14px',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex flex-none items-center rounded-full px-2 py-[2px]"
+                  style={{
+                    fontFamily: 'var(--f-mono)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: active ? 'var(--pullim-blue)' : 'transparent',
+                    color: active ? '#fff' : 'var(--pullim-ink4)',
+                    border: active ? 'none' : '1px solid var(--hairline)',
+                  }}
+                >
+                  {active ? '지금 단계' : `0${i + 1}`}
+                </span>
+                <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: active ? 'var(--pullim-ink)' : 'var(--pullim-ink4)' }}>
+                  {ph.label}
+                </span>
+              </div>
+              <span className="mt-[6px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 10.5, color: 'var(--fg-muted)' }}>
+                {ph.window}
+              </span>
+              <ul className="mt-[9px] flex list-none flex-col gap-[6px] p-0">
+                {ph.focus.map((f, j) => (
+                  <li key={j} className="flex gap-[6px]" style={{ fontSize: 'var(--fs-xs)', lineHeight: 1.5, color: active ? 'var(--pullim-ink2)' : 'var(--pullim-ink4)' }}>
+                    <span aria-hidden className="flex-none" style={{ color: active ? 'var(--pullim-blue)' : 'var(--pullim-ink5)' }}>·</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )
+        })}
+      </ol>
+
+      <p className="mt-[14px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+        {roadmap.note}
+      </p>
+    </div>
+  )
+}
+
+/** 전형 적합도 / 전공 적합성 — 정성 레벨 칩만(%·점수 없음), caveat 항상 표시. */
+function FitPanel({ fit }: { fit: FitAssessment }) {
+  return (
+    <div className="rv card mt-[14px]" style={{ animationDelay: '0.04s' }}>
+      <div className="mb-[14px] flex flex-wrap items-center gap-2">
+        <span className="sg soft"><IconFit size={18} /></span>
+        <h2 style={{ fontSize: 'var(--fs-base)', fontWeight: 700, letterSpacing: '-0.02em' }}>전형 적합도 · 전공 적합성</h2>
+        <span className="chip brand">{fit.label}</span>
+        <span className="basis-full md:ml-auto md:basis-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
+          정성 수준 · 점수·% 아님
+        </span>
+      </div>
+
+      {/* 역량별 정성 수준 */}
+      <div className="grid grid-cols-1 gap-[10px] md:grid-cols-3">
+        {fit.competencyFit.map((c) => {
+          const st = FIT_LEVEL_STYLE[c.level]
+          return (
+            <div key={c.key} className="flex flex-col gap-2 p-[13px]" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)' }}>
+              <div className="flex items-center justify-between gap-2">
+                <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>{COMP_LABEL[c.key] ?? c.key}</span>
+                <span
+                  className="inline-flex flex-none items-center rounded-full px-2 py-[2px]"
+                  style={{ fontFamily: 'var(--f-mono)', fontSize: 10, fontWeight: 700, background: st.bg, color: st.fg }}
+                >
+                  {c.level}
+                </span>
+              </div>
+              <p style={{ fontSize: 'var(--fs-xs)', lineHeight: 1.55, color: 'var(--pullim-ink2)' }}>{c.reason}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 권장 과목 칩 */}
+      {fit.recommendedSubjects.length > 0 && (
+        <div className="mt-[14px]">
+          <span className="mb-[8px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+            권장 과목
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {fit.recommendedSubjects.map((s, i) => (
+              <span key={i} className="chip outline">{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 진로 일관성 한 줄 */}
+      <p className="mt-[14px]" style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.6, color: 'var(--pullim-ink2)' }}>
+        {fit.consistencyNote}
+      </p>
+
+      {/* caveat — 항상 표시(정직성). muted mono. */}
+      <p className="mt-[10px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+        {fit.caveat}
+      </p>
+    </div>
+  )
+}
+
+/** 면접 준비 — 예상질문 + 근거 인용 + 답변 방향(대본 아님) + 꼬리질문. */
+function InterviewPrep({ interview }: { interview: InterviewPack }) {
+  return (
+    <>
+      <StageHead n="면접" title="면접 준비" meta="답변 방향만 · 대본 아님" icon={<IconInterview size={18} />} />
+      <div className="rv mb-3 flex flex-wrap items-center gap-2 px-4 py-[10px]" style={{ border: '1px dashed var(--hairline)', borderRadius: 'var(--r-md)', background: 'var(--bg)' }}>
+        <span className="chip accent">대본 아님</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+          제출한 생기부 근거에서 나올 법한 예상 질문과 “답변 방향”만 제공합니다. 외워서 말하는 완성 답안이 아니라, 본인 경험으로 직접 답하기 위한 길잡이입니다.
+        </span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {interview.questions.map((q, i) => (
+          <div key={i} className="rv card" style={{ animationDelay: `${i * 0.06}s`, padding: '16px 18px' }}>
+            <div className="flex gap-2">
+              <span className="flex-none" style={{ fontFamily: 'var(--f-brand)', fontSize: 20, fontWeight: 700, color: 'var(--pullim-blue)', lineHeight: 1.2 }}>Q{i + 1}</span>
+              <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 700, lineHeight: 1.45 }}>{q.question}</h3>
+            </div>
+
+            {/* 근거 인용 — lemon border, 다른 근거 블록과 동일 스타일 */}
+            <p
+              className="mt-[11px] py-[6px] pl-[11px]"
+              style={{
+                borderLeft: '3px solid var(--pullim-lemon)',
+                background: 'rgba(230,255,76,.14)',
+                borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                fontFamily: 'var(--f-mono)',
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--fg-muted)',
+              }}
+            >
+              <span className="mb-[3px] block" style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--pullim-blue)' }}>
+                근거 · {q.basis.section}
+              </span>
+              “{q.basis.quote}”
+            </p>
+
+            {/* 답변 방향 — 대본 아님 명시 */}
+            <div
+              className="mt-[11px] p-3"
+              style={{ background: 'var(--bg)', border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)' }}
+            >
+              <span className="mb-[5px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-ink4)' }}>
+                답변 방향 — 대본 아님
+              </span>
+              <p style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.6, color: 'var(--pullim-ink2)' }}>{q.answerDirection}</p>
+            </div>
+
+            {/* 꼬리질문 */}
+            {q.followups.length > 0 && (
+              <div className="mt-[11px]">
+                <span className="mb-[6px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+                  꼬리질문
+                </span>
+                <ul className="flex list-none flex-col gap-[6px] p-0">
+                  {q.followups.map((f, j) => (
+                    <li key={j} className="flex gap-[6px]" style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.5, color: 'var(--pullim-ink2)' }}>
+                      <span aria-hidden className="flex-none" style={{ color: 'var(--pullim-blue)' }}>↳</span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDiff }) {
-  const { cohort, diagnosis, rubric } = data
+  const { cohort, diagnosis, rubric, roadmap, fit, interview } = data
   const metrics = reportMetrics(data, twin)
+  const activePhase = roadmap?.phases.find((p) => p.active)
 
   return (
     <div>
@@ -211,6 +437,9 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
         <span className="chip ghost">{REGION_LABEL[cohort.region] ?? cohort.region}</span>
         <span className="chip ghost">{cohort.track === 'core' ? '연중 코칭' : '시즌 집중'}</span>
       </div>
+
+      {/* 입시 로드맵 — 지금 입시 여정의 어디쯤인지 (orientation) */}
+      {roadmap && <RoadmapTimeline roadmap={roadmap} />}
 
       {/* 리포트 한눈에 — 평가기준(학종 3역량) 시각 요약 */}
       <div className="rv card mt-[14px]" style={{ animationDelay: '0.03s' }}>
@@ -258,6 +487,9 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
           {HONEST_CAPTION}
         </p>
       </div>
+
+      {/* 전형 적합도 / 전공 적합성 — 정성 수준만(%·점수 없음) */}
+      {fit && <FitPanel fit={fit} />}
 
       {/* 01 진단 */}
       <StageHead n="01" title="진단" meta="학종 3역량 · 근거 100%" icon={<IconDiagnose size={18} />} />
@@ -382,6 +614,9 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
         </>
       )}
 
+      {/* 면접 준비 — 예상질문·근거·답변 방향(대본 아님)·꼬리질문 */}
+      {interview && interview.questions.length > 0 && <InterviewPrep interview={interview} />}
+
       {/* 04 증명 */}
       <StageHead n="04" title="증명 · 학부모 리포트" meta="증거 기반" icon={<IconProve size={18} />} />
       <div className="overflow-hidden" style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)' }}>
@@ -402,6 +637,34 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
               ))}
             </ol>
           ) : null}
+
+          {/* orientation — 한눈에: 지금 입시 단계 + 적합도 요약 */}
+          {(activePhase || fit) && (
+            <div className="mb-[10px] flex flex-col gap-2">
+              {activePhase && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="chip brand">지금 입시 단계</span>
+                  <span style={{ fontSize: 'var(--fs-sm)' }}>
+                    <b>{activePhase.label}</b>
+                    <span style={{ color: 'var(--fg-muted)' }}> · {activePhase.window}{roadmap ? ` · ${roadmap.admissionYear}학년도 대입` : ''}</span>
+                  </span>
+                </div>
+              )}
+              {fit && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="chip brand">적합도 요약</span>
+                  <span style={{ fontSize: 'var(--fs-sm)' }}>
+                    <b>{fit.label}</b>
+                    <span style={{ color: 'var(--fg-muted)' }}>
+                      {' · '}
+                      {fit.competencyFit.map((c) => `${COMP_LABEL[c.key] ?? c.key} ${c.level}`).join(' · ')}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="p-3" style={{ background: 'var(--bg)', borderRadius: 'var(--r-md)', fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
             {rubric.uncertaintyNote}
           </div>

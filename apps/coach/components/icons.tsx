@@ -144,6 +144,44 @@ export function IconLoop({ accent, ...p }: IconProps) {
   )
 }
 
+/** 로드맵 — 입시 여정의 현재 위치 핀 (filled 경로 노드 + lemon 활성 핀) */
+export function IconRoadmap({ accent, ...p }: IconProps) {
+  return (
+    <svg {...filled(p)}>
+      <rect x="3" y="11" width="18" height="2.4" rx="1.2" opacity={0.5} />
+      <circle cx="5.5" cy="12.2" r="2.1" opacity={0.7} />
+      <circle cx="18.5" cy="12.2" r="2.1" opacity={0.7} />
+      <path d="M12 3.2c-2.5 0-4.5 2-4.5 4.5 0 3.2 4.5 8 4.5 8s4.5-4.8 4.5-8c0-2.5-2-4.5-4.5-4.5Z" fill={accent ? LEMON : 'currentColor'} />
+      <circle cx="12" cy="7.7" r="1.8" fill="#fff" />
+    </svg>
+  )
+}
+
+/** 면접 — 예상 질문/문답 말풍선 (filled 말풍선 + lemon 물음표) */
+export function IconInterview({ accent, ...p }: IconProps) {
+  return (
+    <svg {...filled(p)}>
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 20 4.5v8A2.5 2.5 0 0 1 17.5 15H10l-4.2 3.7A1 1 0 0 1 4 17.95V4.5Z" />
+      <path d="M10 6.6c0-1.2 1-2.1 2.2-2.1s2.2.9 2.2 2.1c0 1.4-1.6 1.5-1.9 2.7" stroke={accent ? LEMON : '#fff'} strokeWidth="1.7" strokeLinecap="round" fill="none" />
+      <circle cx="12.3" cy="11.4" r="1" fill={accent ? LEMON : '#fff'} />
+    </svg>
+  )
+}
+
+/** 적합도 — 전공·역량 정렬 (filled 타겟 + lemon 핵심 정렬) */
+export function IconFit({ accent, ...p }: IconProps) {
+  return (
+    <svg {...filled(p)}>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2.5A9.5 9.5 0 1 0 21.5 12 9.51 9.51 0 0 0 12 2.5Zm0 3A6.5 6.5 0 1 1 5.5 12 6.5 6.5 0 0 1 12 5.5Z"
+      />
+      <circle cx="12" cy="12" r="3" fill={accent ? LEMON : 'currentColor'} />
+    </svg>
+  )
+}
+
 /* ───────────────────────── 대형 제품 글리프 ───────────────────────── */
 
 /**
