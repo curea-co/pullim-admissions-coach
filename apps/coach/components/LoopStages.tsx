@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { TwinDiff } from '@pullim/engine'
 import type { AnalyzeResult } from '@/lib/analyze'
+import { reportMetrics } from '@/lib/report-metrics'
+import { RadarChart, DonutRing, MiniBars, LegalityBar, HONEST_CAPTION } from './charts'
 import { IconDiagnose, IconPrescribe, IconTrack, IconProve, IconCheck } from './icons'
 
 const AREA_LABEL: Record<string, string> = {
@@ -40,10 +42,16 @@ function StageHead({ n, title, meta, icon }: { n: string; title: string; meta: s
 /** ③ 추적 — 종단 트윈 학기 비교 뷰(twin 제공 시). */
 function TwinTrack({ twin }: { twin: TwinDiff }) {
   const pct = Math.round(twin.summary.landedRate * 100)
+  const reflection = {
+    rate: twin.summary.landedRate,
+    landed: twin.summary.landed,
+    pending: twin.summary.pending,
+    newEvidence: twin.summary.newEvidence,
+  }
   return (
     <div>
-      {/* header: from → to + 반영률 chip */}
-      <div className="mb-4 flex flex-wrap items-center gap-[10px]">
+      {/* header: from → to + 반영률 chip + 반영률 도넛 */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-[14px] gap-y-3">
         <span
           className="inline-flex items-center gap-2"
           style={{ fontFamily: 'var(--f-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700 }}
@@ -56,6 +64,9 @@ function TwinTrack({ twin }: { twin: TwinDiff }) {
         <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, color: 'var(--fg-muted)' }}>
           반영 {twin.summary.landed} · 대기 {twin.summary.pending}
         </span>
+        <div className="ml-auto" aria-hidden>
+          <DonutRing reflection={reflection} size={104} />
+        </div>
       </div>
 
       {/* per-action outcomes */}
@@ -188,6 +199,7 @@ function TwinTrack({ twin }: { twin: TwinDiff }) {
 
 export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDiff }) {
   const { cohort, diagnosis, rubric } = data
+  const metrics = reportMetrics(data, twin)
 
   return (
     <div>
@@ -198,6 +210,53 @@ export function LoopStages({ data, twin }: { data: AnalyzeResult; twin?: TwinDif
         {cohort.emphasizeSetuk && <span className="chip accent">세특 정성평가 가중</span>}
         <span className="chip ghost">{REGION_LABEL[cohort.region] ?? cohort.region}</span>
         <span className="chip ghost">{cohort.track === 'core' ? '연중 코칭' : '시즌 집중'}</span>
+      </div>
+
+      {/* 리포트 한눈에 — 평가기준(학종 3역량) 시각 요약 */}
+      <div className="rv card mt-[14px]" style={{ animationDelay: '0.03s' }}>
+        <div className="mb-[14px] flex flex-wrap items-center gap-2">
+          <span className="sg soft"><IconDiagnose size={18} /></span>
+          <h2 style={{ fontSize: 'var(--fs-base)', fontWeight: 700, letterSpacing: '-0.02em' }}>리포트 한눈에</h2>
+          <span className="basis-full md:ml-auto md:basis-auto" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--fg-muted)' }}>
+            학종 3역량 · 근거·활동량 기반
+          </span>
+        </div>
+        <div className={`grid grid-cols-1 gap-x-6 gap-y-5 ${metrics.reflection ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {/* 역량별 근거 수(radar) */}
+          <div className="flex flex-col items-center gap-2 md:items-start">
+            <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+              역량별 근거 수 · 총 {metrics.totalEvidence}건
+            </span>
+            <div className="self-center"><RadarChart data={metrics.evidenceByCompetency} /></div>
+          </div>
+          {/* 합법 vs 자동제외 + 영역 분포 */}
+          <div className="flex flex-col gap-[18px]">
+            <div>
+              <span className="mb-[8px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+                합법 처방 vs 자동 제외
+              </span>
+              <LegalityBar legality={metrics.legality} />
+            </div>
+            <div>
+              <span className="mb-[8px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+                처방 영역 분포
+              </span>
+              <MiniBars data={metrics.prescriptionsByArea} />
+            </div>
+          </div>
+          {/* 반영률(twin 있을 때만) */}
+          {metrics.reflection && (
+            <div className="flex flex-col items-center gap-2 md:items-start">
+              <span style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+                반영률 · 반영 {metrics.reflection.landed} · 대기 {metrics.reflection.pending}
+              </span>
+              <div className="self-center"><DonutRing reflection={metrics.reflection} /></div>
+            </div>
+          )}
+        </div>
+        <p className="mt-[14px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+          {HONEST_CAPTION}
+        </p>
       </div>
 
       {/* 01 진단 */}

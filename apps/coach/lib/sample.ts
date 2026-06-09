@@ -26,6 +26,10 @@ export const SAMPLE_RESULT: AnalyzeResult = {
             quote: '지역 소득격차를 회귀분석하고 정책 대안을 발표함',
             section: '세특(사회문화)',
           },
+          {
+            quote: '통계 표본설계 개념을 적용해 설문 결과의 신뢰구간을 해석함',
+            section: '세특(확률과통계)',
+          },
         ],
       },
       {
