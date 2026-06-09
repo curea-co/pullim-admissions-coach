@@ -38,24 +38,16 @@ const COHORT_NOTE: Record<CohortSystem, string> = {
     '2029 신체제: 통합형 수능·내신 5등급제로 정량 변별이 줄어, 세특 중심 정성평가의 가중이 커지는 구조입니다.',
 }
 
-/** 학년 → 대입(졸업) 연도까지 남은 햇수. 고1=+2, 고2=+1, 고3=0 */
-function yearsToAdmission(grade: number): number {
-  if (grade <= 1) return 2
-  if (grade === 2) return 1
-  return 0
-}
-
 export function buildRoadmap(cohort: CohortResult, grade: number, monthHint?: number): Roadmap {
   // monthHint는 시그니처 안정성을 위해 받되 active 판정에는 사용하지 않는다
   // (학년이 시기를 결정 — Date 미사용·완전 결정적). 향후 학년 내 미세 강조에 활용 여지.
   void monthHint
 
   const isGrade3 = grade >= 3
-  // 기준 대입연도는 외부 monthHint와 무관하게 학년만으로 도출(결정적).
-  // 입학연도(체제 결정) → 통상 3년제 → 졸업/대입연도. grade로 남은 햇수 차감.
-  const cohortBaseGradYear = baseGradYear(cohort.system)
-  // 학년이 낮을수록 졸업/대입은 더 나중(연도 ↑): 고3=base, 고2=base+1, 고1=base+2
-  const admissionYear = cohortBaseGradYear + yearsToAdmission(grade)
+  // 대입 학년도는 입학연도(=cohort)가 고정한다. cohort.system 자체가 입학연도+3(대입 학년도)을
+  // 인코딩하므로(2025입학→2028_new→대입 2028) 학년으로 다시 가산하지 않는다.
+  // grade는 '연도'가 아니라 '현재 강조 단계(active)'만 결정한다.
+  const admissionYear = baseGradYear(cohort.system)
 
   const phases: RoadmapPhase[] = [
     {

@@ -50,13 +50,13 @@ describe('buildRoadmap', () => {
     expect(r.note).toMatch(/통합형|5등급|정성/)
   })
 
-  it('admissionYear는 고1=+2, 고2=+1, 고3=당해 졸업 기준으로 계산', () => {
-    const cohort = resolveCohort(2026, 'metro')
-    // monthHint 없이도 결정적: 학년만으로 졸업/대입연도 계산
-    const g3 = buildRoadmap(cohort, 3)
-    const g1 = buildRoadmap(cohort, 1)
-    expect(g3.admissionYear).toBeLessThan(g1.admissionYear)
-    expect(g1.admissionYear - g3.admissionYear).toBe(2)
+  it('admissionYear는 입학연도(코호트)가 고정 — 학년과 무관하게 대입 학년도', () => {
+    const cohort = resolveCohort(2025, 'metro') // 2025 입학 → 2028_new → 대입 2028
+    expect(buildRoadmap(cohort, 1).admissionYear).toBe(2028)
+    expect(buildRoadmap(cohort, 2).admissionYear).toBe(2028)
+    expect(buildRoadmap(cohort, 3).admissionYear).toBe(2028)
+    expect(buildRoadmap(resolveCohort(2024, 'metro'), 3).admissionYear).toBe(2027)
+    expect(buildRoadmap(resolveCohort(2026, 'metro'), 1).admissionYear).toBe(2029)
   })
 
   it('focus에 금지영역(자소서/학원/소논문) 키워드가 없다', () => {
