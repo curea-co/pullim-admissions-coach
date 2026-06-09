@@ -6,13 +6,20 @@ vi.mock('./ai/prescribe', () => ({ prescribe: vi.fn().mockResolvedValue([
   { recordArea: 'AWARD', competency: 'ACADEMIC', text: '수상 추천', rationale: 'r', evidence: { quote: 'x', section: '세특' } },
 ]) }))
 vi.mock('./ai/twin-judge', () => ({ judgeLanded: vi.fn() }))
+vi.mock('./ai/interview', () => ({ interviewPack: vi.fn().mockResolvedValue({ questions: [
+  { question: '미적분 탐구 질문', basis: { quote: '미적분', section: '세특' }, answerDirection: '방향만', followups: [] },
+  { question: 'q2', basis: { quote: '미적분', section: '세특' }, answerDirection: 'd2', followups: [] },
+  { question: 'q3', basis: { quote: '미적분', section: '세특' }, answerDirection: 'd3', followups: [] },
+] }) }))
 
 import { analyze } from './analyze'
 import { judgeLanded } from './ai/twin-judge'
+import { interviewPack } from './ai/interview'
 
 const input = { admissionYear: 2024, track5: 'natural', targetRegion: 'metro', schoolType: 'general', grade: 3, saengbu: '연락처 010-1234-5678 세특 미적분', consent: { sensitive: true, guardian: false } }
 
 describe('analyze pipeline (single-term — 기존 동작 불변)', () => {
+  beforeEach(() => (interviewPack as any).mockClear())
   it('end-to-end: 진단+코호트+게이트 통과 루브릭 반환, 금지항목 0', async () => {
     const out = await analyze(input)
     expect(out.cohort.system).toBe('2027_old')
@@ -21,11 +28,25 @@ describe('analyze pipeline (single-term — 기존 동작 불변)', () => {
     expect(out.diagnosis.criteria.length).toBeGreaterThan(0)
     expect(out.twin).toBeUndefined() // priorSaengbu 없음 → twin 미생성
   })
-  it('마스킹이 적용되어 LLM 입력 생기부에 전화번호가 없다', async () => {
+  it('단일 학기 결과에 roadmap·fit·interview가 부착된다(additive)', async () => {
+    const out = await analyze(input)
+    expect(out.roadmap).toBeDefined()
+    expect(out.roadmap!.phases.length).toBeGreaterThan(0)
+    expect(out.fit).toBeDefined()
+    expect(out.fit!.track).toBe('natural')
+    expect(out.fit!.caveat.length).toBeGreaterThan(0)
+    expect(out.interview).toBeDefined()
+    expect(out.interview!.questions.length).toBeGreaterThanOrEqual(3)
+    expect(interviewPack).toHaveBeenCalledOnce() // +1 LLM 호출만 추가
+  })
+  it('마스킹이 적용되어 LLM 입력 생기부에 전화번호가 없다(면접 팩 포함)', async () => {
     const { diagnose } = await import('./ai/diagnose')
     await analyze(input)
     const passedProfile = (diagnose as any).mock.calls[0][0]
     expect(passedProfile.saengbu).not.toContain('010-1234-5678')
+    // 면접 팩에도 마스킹된 생기부가 전달된다.
+    const interviewProfile = (interviewPack as any).mock.calls[0][0]
+    expect(interviewProfile.saengbu).not.toContain('010-1234-5678')
   })
   it('동의 누락 시 throw', async () => {
     await expect(analyze({ ...input, consent: { sensitive: false, guardian: false } } as any)).rejects.toThrow()

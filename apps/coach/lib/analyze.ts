@@ -4,17 +4,21 @@ import {
   resolveCohort,
   assembleRubric,
   diffSnapshots,
+  buildRoadmap,
   type Rubric,
   type CohortResult,
   type TwinDiff,
   type ActionOutcome,
+  type Roadmap,
 } from '@pullim/engine'
 import { maskPII } from './mask'
 import { diagnose } from './ai/diagnose'
 import { prescribe } from './ai/prescribe'
+import { interviewPack } from './ai/interview'
+import { assessFit, type FitAssessment } from './fit'
 import { toSnapshot } from './twin'
 import { judgeLanded } from './ai/twin-judge'
-import type { Diagnosis } from './ai/schemas'
+import type { Diagnosis, InterviewPack } from './ai/schemas'
 
 export interface AnalyzeResult {
   cohort: CohortResult
@@ -22,6 +26,12 @@ export interface AnalyzeResult {
   rubric: Rubric
   /** 종단 트윈(선택) — priorSaengbu가 있을 때만 채워진다(결정론적 baseline + LLM judge 병합). */
   twin?: TwinDiff
+  /** 입시 로드맵(결정론) — cohort+학년 기반 학종 타임라인. */
+  roadmap?: Roadmap
+  /** 정성 적합도(결정론, no LLM) — 합격%·점수 없음. */
+  fit?: FitAssessment
+  /** 면접 준비 팩(1 LLM call) — 답변 방향만, 근거 인용 기반. */
+  interview?: InterviewPack
 }
 
 /**
@@ -31,11 +41,21 @@ export interface AnalyzeResult {
 async function diagnosePrescribe(
   profile: StudentProfile,
   cohort: CohortResult,
+  withIdentity: boolean,
 ): Promise<AnalyzeResult> {
   const diagnosis = await diagnose(profile, cohort)
   const candidates = await prescribe(profile, cohort, diagnosis)
   const rubric = assembleRubric(cohort, candidates)
-  return { cohort, diagnosis, rubric }
+  if (!withIdentity) {
+    // 종단 트윈의 "이전 학기" 재구성에는 identity 산출물을 붙이지 않는다(불필요한 LLM 호출 회피).
+    return { cohort, diagnosis, rubric }
+  }
+  // ── 입시 코치 identity 산출물(현재 학기에만 부착).
+  // 로드맵·적합도는 결정론(저렴). 면접 팩만 1 LLM 호출 추가.
+  const roadmap = buildRoadmap(cohort, profile.grade)
+  const fit = assessFit(profile.track5, diagnosis)
+  const interview = await interviewPack(profile, cohort, diagnosis)
+  return { cohort, diagnosis, rubric, roadmap, fit, interview }
 }
 
 export async function analyze(raw: unknown): Promise<AnalyzeResult> {
@@ -48,7 +68,7 @@ export async function analyze(raw: unknown): Promise<AnalyzeResult> {
   const cohort = resolveCohort(profile.admissionYear, profile.targetRegion)
 
   // ── 단일 학기 경로(기존과 100% 동일): twin은 undefined로 둔다.
-  const current = await diagnosePrescribe(profile, cohort)
+  const current = await diagnosePrescribe(profile, cohort, true)
   if (!parsed.priorSaengbu) {
     return current // 영속화 없음 = 무학습/즉시삭제
   }
@@ -62,7 +82,7 @@ export async function analyze(raw: unknown): Promise<AnalyzeResult> {
   const priorProfile: StudentProfile = { ...profile, saengbu: priorMaskedSaengbu }
 
   // 이전 학기: 그때 "냈을" 처방.
-  const prior = await diagnosePrescribe(priorProfile, cohort)
+  const prior = await diagnosePrescribe(priorProfile, cohort, false)
 
   const prevSnapshot = toSnapshot(priorTerm, prior)
   const nextSnapshot = toSnapshot(currentTerm, current)
