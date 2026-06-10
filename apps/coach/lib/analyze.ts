@@ -53,7 +53,7 @@ async function diagnosePrescribe(
   // ── 입시 코치 identity 산출물(현재 학기에만 부착).
   // 로드맵·적합도는 결정론(저렴). 면접 팩만 1 LLM 호출 추가.
   const roadmap = buildRoadmap(cohort, profile.grade)
-  const fit = assessFit(profile.track5, diagnosis)
+  const fit = assessFit(profile.track5, diagnosis, profile.targetUniversities)
   const interview = await interviewPack(profile, cohort, diagnosis)
   return { cohort, diagnosis, rubric, roadmap, fit, interview }
 }

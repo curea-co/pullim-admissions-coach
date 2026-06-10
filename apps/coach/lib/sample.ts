@@ -174,7 +174,8 @@ const SAMPLE_RESULT_BASE: AnalyzeResult = {
 export const SAMPLE_RESULT: AnalyzeResult = {
   ...SAMPLE_RESULT_BASE,
   roadmap: buildRoadmap(SAMPLE_RESULT_BASE.cohort, 2),
-  fit: assessFit('social', SAMPLE_RESULT_BASE.diagnosis),
+  // 목표 대학 데모: KB 수록(연세대 = 검증 평가기준) + 미수록(한국교원대 = 정직 폴백) 둘 다 보여준다.
+  fit: assessFit('social', SAMPLE_RESULT_BASE.diagnosis, ['연세대', '한국교원대학교']),
   interview: SAMPLE_INTERVIEW,
 }
 

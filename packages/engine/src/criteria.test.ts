@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   criteriaForTrack,
   universityCriteria,
+  matchUniversity,
   UNIVERSITY_CRITERIA,
   SOURCE_CAVEAT,
   COMMON_EVALUATION_FRAMEWORK,
@@ -152,5 +153,32 @@ describe('universityCriteria (verified registry)', () => {
     for (const u of UNIVERSITY_CRITERIA) {
       expect(universityCriteria(u.id)).toEqual(u)
     }
+  })
+})
+
+describe('matchUniversity (사용자 입력 → KB, 정확 일치만)', () => {
+  it('정식 명칭과 통용 약칭을 모두 매칭한다', () => {
+    expect(matchUniversity('서울대학교')?.id).toBe('snu')
+    expect(matchUniversity('서울대')?.id).toBe('snu')
+    expect(matchUniversity('연세대')?.id).toBe('yonsei')
+    expect(matchUniversity('고려대')?.id).toBe('korea')
+    expect(matchUniversity('성균관대')?.id).toBe('skku')
+    expect(matchUniversity('한양대')?.id).toBe('hanyang')
+  })
+
+  it('공백은 무시한다', () => {
+    expect(matchUniversity(' 서울 대학교 ')?.id).toBe('snu')
+  })
+
+  it('부분일치 오매칭을 하지 않는다(서울대입구·서울시립대 등)', () => {
+    expect(matchUniversity('서울대입구')).toBeNull()
+    expect(matchUniversity('서울시립대')).toBeNull()
+    expect(matchUniversity('한양사이버대')).toBeNull()
+  })
+
+  it('미수록 대학·빈 입력 → null(정직 폴백)', () => {
+    expect(matchUniversity('한국교원대학교')).toBeNull()
+    expect(matchUniversity('')).toBeNull()
+    expect(matchUniversity('   ')).toBeNull()
   })
 })

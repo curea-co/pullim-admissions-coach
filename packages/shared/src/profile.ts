@@ -6,6 +6,8 @@ export const StudentProfileSchema = z.object({
   targetRegion: z.enum(['metro', 'non_metro', 'unknown']),
   schoolType: z.enum(['general', 'autonomous', 'special_purpose', 'vocational']),
   grade: z.number().int().min(1).max(3),
+  // 목표 대학(선택, 최대 3) — KB 수록 대학은 검증된 평가기준을, 미수록은 정직 폴백을 받는다.
+  targetUniversities: z.array(z.string().trim().min(1).max(40)).max(3).optional(),
   saengbu: z.string().min(1, '생기부 내용이 필요합니다'),
   consent: z.object({
     sensitive: z.literal(true), // §23 민감정보 별도 동의 필수

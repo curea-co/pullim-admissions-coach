@@ -6,6 +6,7 @@ import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { SaengbuInput } from '@/components/SaengbuInput'
 import { IconArrow, IconShield, IconLegal } from '@/components/icons'
 import { saveRun } from '@/lib/history'
+import { UNIVERSITY_CRITERIA } from '@pullim/engine'
 
 const YEARS = [
   { v: 2024, label: '2024 입학 · 현 고3', sys: '2027 구체제' },
@@ -25,6 +26,9 @@ const REGIONS: { v: string; label: string }[] = [
   { v: 'unknown', label: '미정' },
 ]
 const GRADES = [1, 2, 3]
+// 평가기준 KB 수록 대학(검증 데이터) — 선택 시 대학별 평가기준이 결과에 표시된다.
+const KB_UNIVERSITIES = UNIVERSITY_CRITERIA.map((u) => u.name)
+const MAX_UNIS = 3
 
 export default function IntakePage() {
   const router = useRouter()
@@ -38,6 +42,9 @@ export default function IntakePage() {
   const [track5, setTrack] = useState('social')
   const [targetRegion, setRegion] = useState('metro')
   const [grade, setGrade] = useState(2)
+  // 목표 대학(선택, 최대 3) — KB 수록 대학 칩 토글 + 직접 입력.
+  const [targetUnis, setTargetUnis] = useState<string[]>([])
+  const [customUni, setCustomUni] = useState('')
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -93,6 +100,7 @@ export default function IntakePage() {
       grade,
       saengbu,
       consent: { sensitive: true, guardian: false },
+      ...(targetUnis.length > 0 ? { targetUniversities: targetUnis } : {}),
       ...(compareOn
         ? {
             priorSaengbu,
@@ -144,6 +152,21 @@ export default function IntakePage() {
 
   // 오버레이 카피용: 학기 비교가 켜졌으면 더 긴 처리(LLM 호출 증가)를 안내.
   const comparing = compare && priorSaengbu.trim().length > 0
+
+  function toggleUni(name: string) {
+    setTargetUnis((prev) =>
+      prev.includes(name) ? prev.filter((u) => u !== name) : prev.length < MAX_UNIS ? [...prev, name] : prev,
+    )
+  }
+
+  function addCustomUni() {
+    const name = customUni.trim()
+    if (!name || targetUnis.includes(name) || targetUnis.length >= MAX_UNIS) return
+    setTargetUnis((prev) => [...prev, name])
+    setCustomUni('')
+  }
+
+  const customUnis = targetUnis.filter((u) => !KB_UNIVERSITIES.includes(u))
 
   return (
     <>
@@ -410,6 +433,89 @@ export default function IntakePage() {
                   ))}
                 </select>
               </div>
+            </fieldset>
+
+            {/* 목표 대학(선택, 최대 3) — KB 수록 대학은 검증된 평가기준, 그 외는 정직 폴백. */}
+            <fieldset className="border-0 p-0 m-0">
+              <legend className="field-label mb-2 p-0">
+                목표 대학{' '}
+                <span style={{ color: 'var(--pullim-ink4)', fontWeight: 500 }}>(선택 · 최대 {MAX_UNIS}곳)</span>
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {KB_UNIVERSITIES.map((name) => {
+                  const on = targetUnis.includes(name)
+                  const full = !on && targetUnis.length >= MAX_UNIS
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => toggleUni(name)}
+                      aria-pressed={on}
+                      disabled={full}
+                      className="px-3 py-2"
+                      style={{
+                        border: `1.5px solid ${on ? 'var(--pullim-blue)' : 'var(--hairline)'}`,
+                        borderRadius: 'var(--r-sm)',
+                        background: on ? 'var(--pb-1)' : '#fff',
+                        color: on ? 'var(--pullim-blue)' : 'var(--fg)',
+                        fontSize: 'var(--fs-xs)',
+                        fontWeight: 600,
+                        cursor: full ? 'not-allowed' : 'pointer',
+                        opacity: full ? 0.45 : 1,
+                      }}
+                    >
+                      {name.replace(/학교$/, '')}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  className="control"
+                  value={customUni}
+                  onChange={(e) => setCustomUni(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addCustomUni()
+                    }
+                  }}
+                  maxLength={40}
+                  placeholder="다른 대학 직접 입력 (예: 부산대학교)"
+                  aria-label="목표 대학 직접 입력"
+                  disabled={targetUnis.length >= MAX_UNIS}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomUni}
+                  className="btn-mini flex-none"
+                  disabled={!customUni.trim() || targetUnis.length >= MAX_UNIS}
+                >
+                  추가
+                </button>
+              </div>
+              {customUnis.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {customUnis.map((name) => (
+                    <span key={name} className="chip outline inline-flex items-center gap-1">
+                      {name}
+                      <button
+                        type="button"
+                        onClick={() => toggleUni(name)}
+                        aria-label={`${name} 제거`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', fontWeight: 700, padding: 0 }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+                수록 대학(서울·연세·고려·성균관·한양)은 공개 출처로 검증된 평가기준이 결과에 표시됩니다. 그 외 대학은
+                계열 일반 기준으로 진단하고 모집요강 확인을 안내합니다 — 미수록 기준을 지어내지 않습니다.
+              </p>
             </fieldset>
 
             {error && (

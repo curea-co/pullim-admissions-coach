@@ -1,4 +1,11 @@
-import { criteriaForTrack, SOURCE_CAVEAT, type TrackKey, type Competency } from '@pullim/engine'
+import {
+  criteriaForTrack,
+  matchUniversity,
+  SOURCE_CAVEAT,
+  UNIVERSITY_WEIGHT_CAVEAT,
+  type TrackKey,
+  type Competency,
+} from '@pullim/engine'
 import type { Diagnosis } from './ai/schemas'
 
 /**
@@ -25,6 +32,27 @@ export interface FitAssessment {
   }[]
   consistencyNote: string
   caveat: string
+  /** 목표 대학별 평가기준(입력 시에만) — KB 검증 데이터 or 미수록 정직 폴백. */
+  universityFit?: UniversityFitNote[]
+}
+
+/**
+ * 목표 대학 1곳에 대한 평가기준 노트.
+ * matched=true 필드는 전부 엔진 KB의 검증(verified) 데이터 그대로이며,
+ * matched=false면 사실 필드 없이 미수록 안내만 담는다 — 날조 금지.
+ */
+export interface UniversityFitNote {
+  /** 사용자가 입력한 이름 */
+  input: string
+  matched: boolean
+  /** KB 정식 명칭(매칭 시) */
+  name?: string
+  evaluationFraming?: string
+  evaluationItems?: string[]
+  recommendedNote?: string
+  source?: string
+  /** 매칭 시 가중치 caveat, 미수록 시 모집요강 확인 안내 */
+  note: string
 }
 
 const KEY_LABEL: Record<Competency, string> = {
@@ -33,7 +61,45 @@ const KEY_LABEL: Record<Competency, string> = {
   COMMUNITY: '공동체역량',
 }
 
-export function assessFit(track: TrackKey, diagnosis: Diagnosis): FitAssessment {
+/** 목표 대학 입력 → 대학별 노트(중복 제거·최대 3). 미수록은 정직 폴백. */
+function assessUniversities(inputs: string[], trackLabel: string): UniversityFitNote[] {
+  const notes: UniversityFitNote[] = []
+  const seen = new Set<string>()
+  for (const input of inputs) {
+    const trimmed = input.trim()
+    if (!trimmed) continue
+    const kb = matchUniversity(trimmed)
+    const dedupeKey = kb ? `kb:${kb.id}` : `raw:${trimmed.replace(/\s+/g, '')}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    if (kb) {
+      notes.push({
+        input: trimmed,
+        matched: true,
+        name: kb.name,
+        evaluationFraming: kb.evaluationFraming,
+        evaluationItems: kb.evaluationItems,
+        recommendedNote: kb.recommendedNote,
+        source: kb.source,
+        note: UNIVERSITY_WEIGHT_CAVEAT,
+      })
+    } else {
+      notes.push({
+        input: trimmed,
+        matched: false,
+        note: `'${trimmed}'의 평가기준은 아직 수록되지 않았습니다. ${trackLabel} 일반 기준으로 진단했으니, 정확한 평가요소·전형 방식은 해당 대학 모집요강을 직접 확인하세요.`,
+      })
+    }
+    if (notes.length >= 3) break
+  }
+  return notes
+}
+
+export function assessFit(
+  track: TrackKey,
+  diagnosis: Diagnosis,
+  targetUniversities?: string[],
+): FitAssessment {
   const criteria = criteriaForTrack(track)
   const byKey = new Map(diagnosis.criteria.map((c) => [c.key, c]))
 
@@ -70,6 +136,11 @@ export function assessFit(track: TrackKey, diagnosis: Diagnosis): FitAssessment 
     consistencyNote = `${criteria.label} 핵심 역량 전반에서 진로와 직결되는 생기부 근거를 더 축적할 필요가 있습니다.`
   }
 
+  const universityFit =
+    targetUniversities && targetUniversities.length > 0
+      ? assessUniversities(targetUniversities, criteria.label)
+      : undefined
+
   return {
     track,
     label: criteria.label,
@@ -77,5 +148,6 @@ export function assessFit(track: TrackKey, diagnosis: Diagnosis): FitAssessment 
     competencyFit,
     consistencyNote,
     caveat: SOURCE_CAVEAT,
+    ...(universityFit && universityFit.length > 0 ? { universityFit } : {}),
   }
 }

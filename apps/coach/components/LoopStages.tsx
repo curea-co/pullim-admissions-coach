@@ -338,6 +338,65 @@ function FitPanel({ fit }: { fit: FitAssessment }) {
         </div>
       )}
 
+      {/* 목표 대학별 평가기준 — KB 검증 데이터만 표시, 미수록은 정직 폴백. */}
+      {fit.universityFit && fit.universityFit.length > 0 && (
+        <div className="mt-[14px]">
+          <span className="mb-[8px] block" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--pullim-blue)' }}>
+            목표 대학 평가기준
+          </span>
+          <div className="grid grid-cols-1 gap-[10px] md:grid-cols-2">
+            {fit.universityFit.map((u) => (
+              <div
+                key={u.name ?? u.input}
+                className="flex flex-col gap-2 p-[13px]"
+                style={{ background: '#fff', border: '1px solid var(--hairline)', borderRadius: 'var(--r-md)' }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>{u.name ?? u.input}</span>
+                  {u.matched ? (
+                    <span className="chip brand" style={{ fontSize: 10 }}>검증 출처</span>
+                  ) : (
+                    <span className="chip outline" style={{ fontSize: 10 }}>미수록</span>
+                  )}
+                </div>
+                {u.matched ? (
+                  <>
+                    <p style={{ fontSize: 'var(--fs-xs)', lineHeight: 1.55, color: 'var(--pullim-ink2)' }}>{u.evaluationFraming}</p>
+                    {u.evaluationItems && u.evaluationItems.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {u.evaluationItems.map((it, i) => (
+                          <span key={i} className="chip outline" style={{ fontSize: 10 }}>{it}</span>
+                        ))}
+                      </div>
+                    )}
+                    {u.recommendedNote && (
+                      <p style={{ fontSize: 'var(--fs-xs)', lineHeight: 1.55, color: 'var(--pullim-ink2)' }}>{u.recommendedNote}</p>
+                    )}
+                    {u.source && (
+                      <a
+                        href={u.source}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontFamily: 'var(--f-mono)', fontSize: 10, color: 'var(--pullim-ink4)', wordBreak: 'break-all' }}
+                      >
+                        출처: {u.source}
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <p style={{ fontSize: 'var(--fs-xs)', lineHeight: 1.55, color: 'var(--pullim-ink2)' }}>{u.note}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          {fit.universityFit.some((u) => u.matched) && (
+            <p className="mt-[8px]" style={{ fontFamily: 'var(--f-mono)', fontSize: 11, lineHeight: 1.6, color: 'var(--pullim-ink4)' }}>
+              {fit.universityFit.find((u) => u.matched)!.note}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* 진로 일관성 한 줄 */}
       <p className="mt-[14px]" style={{ fontSize: 'var(--fs-sm)', lineHeight: 1.6, color: 'var(--pullim-ink2)' }}>
         {fit.consistencyNote}

@@ -258,3 +258,29 @@ export const UNIVERSITY_CRITERIA: UniversityCriteria[] = [
 export function universityCriteria(id: string): UniversityCriteria | null {
   return UNIVERSITY_CRITERIA.find((u) => u.id === id) ?? null
 }
+
+/**
+ * 통용 약칭 → KB id. 정확 일치(공백 제거 후)만 허용 — 부분일치는
+ * 오매칭(예: '서울대' ⊂ '서울대입구', '서울시립대') 위험이 있어 금지.
+ */
+const UNIVERSITY_ALIASES: Record<string, string[]> = {
+  snu: ['서울대학교', '서울대'],
+  yonsei: ['연세대학교', '연세대'],
+  korea: ['고려대학교', '고려대'],
+  skku: ['성균관대학교', '성균관대'],
+  hanyang: ['한양대학교', '한양대'],
+}
+
+/**
+ * 사용자 입력 대학명 → KB 항목. 미수록이면 null — caller는 정직 폴백
+ * (미수록 안내 + 모집요강 확인)으로 처리해야 하며, 날조 금지.
+ */
+export function matchUniversity(name: string): UniversityCriteria | null {
+  const n = name.replace(/\s+/g, '')
+  if (!n) return null
+  for (const u of UNIVERSITY_CRITERIA) {
+    const aliases = UNIVERSITY_ALIASES[u.id] ?? [u.name]
+    if (aliases.includes(n)) return u
+  }
+  return null
+}
