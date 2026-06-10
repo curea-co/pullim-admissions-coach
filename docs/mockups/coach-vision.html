@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>풀림 입시코치 — 우리가 만드는 것</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<style>
+:root{
+  --ink:#14130f; --paper:#faf7ef; --paper2:#f1 ead9; --paper-2:#f1ecdd;
+  --blue:#1b43d6; --blue-deep:#0f1f5e; --lemon:#ffd83a; --lemon-deep:#f0bd00;
+  --muted:#6c6859; --line:rgba(20,19,15,.13); --good:#147a4d; --bad:#b23b3b;
+  --serif:"Fraunces",Georgia,serif; --mono:"DM Mono",monospace;
+  --sans:"Pretendard Variable",Pretendard,system-ui,sans-serif;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+body::after{content:"";position:fixed;inset:0;z-index:999;pointer-events:none;opacity:.045;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+.wrap{max-width:1060px;margin:0 auto;padding:0 26px}
+.mono{font-family:var(--mono)} .serif{font-family:var(--serif)}
+.lemonmark{background:linear-gradient(transparent 58%,var(--lemon) 0)}
+
+/* nav */
+nav{position:sticky;top:0;z-index:40;background:rgba(250,247,239,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{height:60px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:9px;align-items:center;font-weight:800}
+.dot{width:20px;height:20px;border-radius:6px;background:var(--blue);position:relative}
+.dot::after{content:"";position:absolute;right:-3px;bottom:-3px;width:10px;height:10px;border-radius:50%;background:var(--lemon-deep);border:2px solid var(--paper)}
+nav .tag{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* hero */
+.hero{padding:96px 0 64px;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;right:-120px;top:-80px;width:520px;height:520px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,rgba(255,216,58,.55),transparent 62%);filter:blur(8px);z-index:0}
+.hero .wrap{position:relative;z-index:1}
+.tagline{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--blue)}
+.hero h1{font-family:var(--serif);font-weight:600;font-size:clamp(40px,7vw,86px);line-height:1.0;margin:20px 0 0;letter-spacing:-.02em}
+.hero h1 i{font-style:italic;color:var(--blue)}
+.hero .sub{font-size:19px;color:var(--muted);max-width:660px;margin:26px 0 0;line-height:1.65}
+.hero .sub b{color:var(--ink)}
+.defn{margin-top:34px;border-left:3px solid var(--lemon-deep);padding:6px 0 6px 18px;max-width:680px}
+.defn .l{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+.defn p{margin:6px 0 0;font-size:17px;font-weight:600}
+
+/* section */
+section{padding:72px 0;border-bottom:1px solid var(--line)}
+.snum{font-family:var(--mono);font-size:12px;color:var(--blue);letter-spacing:.12em}
+.stitle{font-family:var(--serif);font-weight:600;font-size:clamp(26px,3.6vw,40px);line-height:1.1;margin:8px 0 0;letter-spacing:-.015em}
+.sintro{color:var(--muted);max-width:640px;margin:14px 0 0;font-size:16px}
+
+/* problem stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:40px}
+@media(max-width:780px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat .big{font-family:var(--serif);font-size:clamp(34px,5vw,52px);font-weight:600;line-height:1;color:var(--blue)}
+.stat .lbl{font-size:13px;color:var(--muted);margin-top:8px}
+.stat .lbl b{color:var(--ink)}
+
+/* trap vs gold */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:38px}
+@media(max-width:780px){.split{grid-template-columns:1fr}}
+.panel{border:1px solid var(--line);border-radius:18px;padding:26px;background:#fff}
+.panel.trap{background:#fff}
+.panel.gold{background:var(--blue-deep);color:#eef1ff;border-color:transparent;position:relative;overflow:hidden}
+.panel.gold::before{content:"";position:absolute;right:-60px;bottom:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,216,58,.3),transparent 65%)}
+.panel .ph{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.panel.gold .ph{color:var(--lemon)}
+.panel h3{font-family:var(--serif);font-weight:600;font-size:24px;margin:10px 0 8px}
+.panel p{margin:0;font-size:15px;color:var(--muted)}
+.panel.gold p{color:#c4ccf0}
+.panel .pp{font-size:13px;color:var(--muted);margin-top:14px}
+.panel.gold .pp{color:#aab6ee}
+.panel .stamp{display:inline-block;margin-top:16px;font-family:var(--mono);font-size:11px;padding:5px 11px;border-radius:999px}
+.trap .stamp{background:rgba(178,59,59,.1);color:var(--bad)}
+.gold .stamp{background:var(--lemon);color:var(--blue-deep);font-weight:600}
+
+/* loop diagram */
+.loop{margin-top:42px}
+.loopflow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+.lstep{flex:1 1 200px;padding:26px 22px;border-right:1px solid var(--line);position:relative;min-width:180px}
+.lstep:last-child{border-right:none}
+.lstep .ph{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--muted)}
+.lstep .n{font-family:var(--serif);font-size:40px;font-weight:600;color:var(--blue);line-height:1;margin-top:4px}
+.lstep h4{margin:8px 0 5px;font-size:17px;font-weight:800}
+.lstep p{margin:0;font-size:13px;color:var(--muted)}
+.lstep.write{background:var(--blue-deep);color:#fff}
+.lstep.write .ph{color:var(--lemon)} .lstep.write .n{color:var(--lemon)} .lstep.write p{color:#bcc6ef}
+.loopcap{display:flex;justify-content:space-between;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-wrap:wrap;gap:8px}
+.loopcap .a{color:var(--bad)} .loopcap .b{color:var(--good)}
+
+/* moats */
+.moats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:38px}
+@media(max-width:820px){.moats{grid-template-columns:1fr}}
+.moat{border:1px solid var(--line);border-radius:18px;padding:24px;background:#fff;position:relative}
+.moat .mn{font-family:var(--mono);font-size:11px;color:var(--blue)}
+.moat h4{font-family:var(--serif);font-weight:600;font-size:21px;margin:8px 0 8px;line-height:1.15}
+.moat p{margin:0;font-size:13.5px;color:var(--muted)}
+.moat .why{margin-top:14px;font-size:12px;color:var(--ink);border-top:1px dashed var(--line);padding-top:12px}
+.moat .why b{color:var(--blue)}
+.moat .badge{position:absolute;top:20px;right:20px;font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:999px;background:var(--paper-2);color:var(--muted)}
+.moat.live .badge{background:rgba(20,122,77,.12);color:var(--good)}
+
+/* two-speed */
+.speed{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:36px}
+@media(max-width:780px){.speed{grid-template-columns:1fr}}
+.spd{border:1px solid var(--line);border-radius:18px;padding:24px;background:#fff}
+.spd.core{border-color:var(--blue);box-shadow:0 0 0 3px rgba(27,67,214,.08)}
+.spd .tt{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue)}
+.spd h4{font-family:var(--serif);font-weight:600;font-size:22px;margin:8px 0 6px}
+.spd .meta{font-size:13px;color:var(--muted)}
+.spd ul{margin:14px 0 0;padding-left:0;list-style:none;font-size:13.5px}
+.spd li{padding:5px 0 5px 20px;position:relative;color:var(--ink)}
+.spd li::before{content:"→";position:absolute;left:0;color:var(--lemon-deep);font-weight:700}
+
+/* competitive table */
+.tbl{margin-top:36px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;font-size:13.5px}
+.trow{display:grid;grid-template-columns:1.1fr 1.4fr 1.4fr;gap:0}
+.trow>div{padding:14px 18px;border-bottom:1px solid var(--line)}
+.trow>div:not(:last-child){border-right:1px solid var(--line)}
+.trow.head{background:var(--blue-deep);color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.trow.head>div{border-color:rgba(255,255,255,.12)}
+.trow.us{background:rgba(255,216,58,.12)}
+.trow .who{font-weight:700}
+.trow .x{color:var(--bad)} .trow .o{color:var(--good);font-weight:600}
+.trow:last-child>div{border-bottom:none}
+
+/* guardrails strip */
+.guard{display:flex;gap:10px;flex-wrap:wrap;margin-top:30px}
+.gpill{border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-size:13px;background:#fff}
+.gpill b{color:var(--blue)}
+
+/* status */
+.status{background:var(--blue-deep);color:#eef1ff;border-radius:22px;padding:34px;margin-top:38px;position:relative;overflow:hidden}
+.status::before{content:"";position:absolute;left:-40px;top:-40px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,216,58,.22),transparent 65%)}
+.status .wrapx{position:relative;z-index:1}
+.status .sh{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--lemon)}
+.status h3{font-family:var(--serif);font-weight:600;font-size:26px;margin:8px 0 18px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:780px){.steps{grid-template-columns:repeat(2,1fr)}}
+.st{border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:16px}
+.st.done{background:rgba(255,216,58,.1);border-color:rgba(255,216,58,.4)}
+.st .k{font-family:var(--mono);font-size:11px;color:#aab6ee}
+.st .v{font-weight:700;font-size:14px;margin-top:6px}
+.st.done .v::before{content:"✓ ";color:var(--lemon)}
+.st .d{font-size:11.5px;color:#9fa9d6;margin-top:5px}
+
+footer{padding:46px 0;background:var(--ink);color:#9b978a}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+footer .brand{color:#fff}
+footer small{font-size:12px}
+
+.rv{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <div class="brand"><span class="dot"></span> 풀림 입시코치</div>
+  <div class="tag">VISION · 우리가 만드는 것</div>
+</div></nav>
+
+<!-- HERO -->
+<header class="hero"><div class="wrap">
+  <div class="tagline">생기부 실행 루프 · admissions coach</div>
+  <h1 class="rv">생기부를 <i>진단</i>하는 곳은 많다.<br>우리는 <i>실행</i>시킨다.</h1>
+  <p class="sub rv" style="animation-delay:.1s">고1·고2 학생과 학부모를 위한 학종 코치. 경쟁 서비스가 "이미 쓰인 생기부를 읽고 점수를 매기는" 데서 멈출 때, 풀림은 <b>지금 무엇을 해야 생기부가 채워지는지</b>를 코호트별 합법 활동으로 처방하고, 학기마다 추적·증명합니다.</p>
+  <div class="defn rv" style="animation-delay:.18s">
+    <span class="l">한 줄 정의</span>
+    <p>"지금 무엇을 해서 생기부를 어떻게 채울지"를 합법 액션으로 받고, 그 실행을 학기마다 추적·증명하는 <span class="lemonmark">종단 생기부 실행 루프.</span></p>
+  </div>
+</div></header>
+
+<!-- 01 PROBLEM -->
+<section><div class="wrap">
+  <div class="snum">01 — 문제</div>
+  <h2 class="stitle">학종은 가장 큰 시장이자, 가장 막막한 시장.</h2>
+  <p class="sintro">수시가 정원의 80%, 그중 학종은 핵심. 그러나 고1·2 학생과 학부모는 "뭘 채워야 할지" 막막하고, 무료 정보는 하나같이 <b>"내 아이"라는 개인화</b>에서 깨진다. 그 공백을 인간 컨설팅이 수백만 원에 메운다.</p>
+  <div class="stats">
+    <div class="stat rv"><div class="big">80%</div><div class="lbl"><b>수시 비중</b> · 학종 23.7% (2027 기준)</div></div>
+    <div class="stat rv" style="animation-delay:.07s"><div class="big">29.2조</div><div class="lbl"><b>연 사교육비</b> · '진로·진학 상담' 포함</div></div>
+    <div class="stat rv" style="animation-delay:.14s"><div class="big">240–400<span style="font-size:.5em">만원</span></div><div class="lbl"><b>대치동 생기부 관리</b> · 상위 소득만 접근</div></div>
+    <div class="stat rv" style="animation-delay:.21s"><div class="big">100×</div><div class="lbl"><b>가격 공백</b> · AI 앱(수만원) ↔ 컨설팅(수백만원)</div></div>
+  </div>
+</div></section>
+
+<!-- 02 TRAP / GOLD -->
+<section><div class="wrap">
+  <div class="snum">02 — 통찰</div>
+  <h2 class="stitle">같은 진단기를 또 만들면 진다.</h2>
+  <p class="sintro">시장 리서치 3개 에이전트가 독립적으로 같은 결론에 수렴했습니다. 진단 시장은 이미 거인이 점유했고, 진짜 금맥은 반대쪽 끝에 있습니다.</p>
+  <div class="split">
+    <div class="panel trap rv">
+      <div class="ph">함정 — 미투</div>
+      <h3>"또 하나의 생기부 진단 PDF"</h3>
+      <p>바이브온/생기부ON은 누적 가입 20만+, 고3 7명 중 1명이 쓴 거인. 생기부를 한 번 읽고 정적 리포트를 준다. 같은 제품으로 들어가면 후발 미투로 패배.</p>
+      <p class="pp">read-only · 1회성 · 고3 진단 최적화 · 학부모 레이어 없음</p>
+      <span class="stamp">✗ 전장이 불리</span>
+    </div>
+    <div class="panel gold rv" style="animation-delay:.08s">
+      <div class="ph">금맥 — 직교 wedge</div>
+      <h3>고1·2 "어떻게 채울지"의 연중 실행</h3>
+      <p>인간 시장에서 수백만 원이 도는 곳. 학부모가 먼저, 연중 결제하는 곳. 무료 정보가 개인화에서 깨지는 곳. AI가 1/100 가격으로 "내 아이 맞춤"을 줄 수 있는 곳.</p>
+      <p class="pp">write-side · 연중 구독 · 학부모 결제 · 종단 추적</p>
+      <span class="stamp">✓ 우리가 이기는 자리</span>
+    </div>
+  </div>
+</div></section>
+
+<!-- 03 WHAT WE BUILD: LOOP -->
+<section><div class="wrap">
+  <div class="snum">03 — 우리가 만드는 것</div>
+  <h2 class="stitle">읽기에서 멈추지 않고, 쓰기로 돌아오는 루프.</h2>
+  <p class="sintro">진단을 <b>입구</b>로 두고, 학생이 앞으로 할 합법 활동을 처방하고, 학기마다 실행을 추적해 증명합니다. 경쟁사는 ①에서 멈추고, 그들의 BM·데이터 위치상 ②~④로 못 옵니다.</p>
+  <div class="loop">
+    <div class="loopflow">
+      <div class="lstep"><div class="ph">READ</div><div class="n serif">01</div><h4>진단</h4><p>학종 3역량으로 강·약점 매핑. 모든 판단에 생기부 원문 인용.</p></div>
+      <div class="lstep write"><div class="ph">WRITE ★</div><div class="n serif">02</div><h4>처방</h4><p>코호트·전공별 합법 액션. 세특·정규창체·행특만.</p></div>
+      <div class="lstep"><div class="ph">TRACK</div><div class="n serif">03</div><h4>추적</h4><p>학기별 생기부 변화를 비교해 실행 여부를 확인.</p></div>
+      <div class="lstep"><div class="ph">PROVE</div><div class="n serif">04</div><h4>증명</h4><p>학부모가 읽는 증거 리포트. 고3 시즌엔 면접 노드로.</p></div>
+    </div>
+    <div class="loopcap">
+      <span class="a">◀ 경쟁사는 여기서 멈춘다 (read-only)</span>
+      <span class="b">우리는 학기마다 ①→④를 돈다 (closed loop) ▶</span>
+    </div>
+  </div>
+</div></section>
+
+<!-- 04 MOATS -->
+<section><div class="wrap">
+  <div class="snum">04 — 해자 3</div>
+  <h2 class="stitle">모델이 아니라, 모델을 감싼 구조가 해자다.</h2>
+  <p class="sintro">생기부에 Claude를 한 번 호출하는 건 누구나 한다. 방어선은 그 위에 있습니다.</p>
+  <div class="moats">
+    <div class="moat live rv"><span class="badge">구현됨</span><div class="mn">해자 #1</div><h4>합법 액션 루브릭 엔진</h4><p>평가기준 → 코호트(2028 신체제) × 전공 권장과목 → 대입-반영 항목만 산출하는 결정적 도메인 엔진.</p><div class="why"><b>왜 못 따라오나</b> · 일반 GPT 래퍼는 코호트 규칙을 틀린다. 골든 회귀가 금지항목 산출 0건을 강제.</div></div>
+    <div class="moat rv" style="animation-delay:.08s"><span class="badge">설계됨</span><div class="mn">해자 #2</div><h4>종단 디지털 트윈 · 무학습</h4><p>학기별 변화 비교·증거인용·불확실성 + 데이터 미학습·즉시삭제.</p><div class="why"><b>왜 못 따라오나</b> · 경쟁사는 "비식별 데이터 학습" 논란을 안고 있어 무학습 포지션을 못 흉내낸다. 종단 데이터=전환비용.</div></div>
+    <div class="moat rv" style="animation-delay:.16s"><span class="badge">로드맵</span><div class="mn">해자 #3</div><h4>풀림 OS 상류 활동데이터</h4><p>수행평가·학습·리딩 → 활동 → 기록 → 입시로 잇는 폐쇄루프.</p><div class="why"><b>왜 못 따라오나</b> · 독립 앱은 완성된 생기부만 본다. 풀림만 상류 활동을 안다. 시간이 갈수록 복리.</div></div>
+  </div>
+</div></section>
+
+<!-- 05 TWO-SPEED -->
+<section><div class="wrap">
+  <div class="snum">05 — 전략</div>
+  <h2 class="stitle">두 속도로 간다.</h2>
+  <p class="sintro">정체성은 고1·2 연중 코어. 8/1 출시는 고3 시즌의 급성 통증으로 사용자를 얻는 비치헤드 — 코어 구독으로 흐르는 깔때기입니다.</p>
+  <div class="speed">
+    <div class="spd core rv"><div class="tt">코어 · 전략 본진</div><h4>고1·2 연중 실행 코치</h4><div class="meta">학부모 결제 · 월 구독 · 종단 루프</div>
+      <ul><li>최고 통증·최고 지불, 부모가 먼저 결제</li><li>디지털 트윈으로 학기마다 재방문</li><li>OS 상류 데이터가 복리로 축적</li></ul></div>
+    <div class="spd rv" style="animation-delay:.08s"><div class="tt">비치헤드 · 8/1 출시</div><h4>고3 수시·면접 시즌</h4><div class="meta">시간한정 캠페인 · 단건 → 구독 전환</div>
+      <ul><li>급성 피크 통증으로 신규 획득</li><li>면접은 간판이 아니라 루프의 한 노드</li><li>획득 사용자를 코어 연중 구독으로 전환</li></ul></div>
+  </div>
+</div></section>
+
+<!-- 06 POSITIONING -->
+<section><div class="wrap">
+  <div class="snum">06 — 경쟁 포지셔닝</div>
+  <h2 class="stitle">정면승부 대신 직교.</h2>
+  <div class="tbl">
+    <div class="trow head"><div>서비스</div><div>그들이 잘하는 것</div><div>우리가 직교로 이기는 축</div></div>
+    <div class="trow"><div class="who">바이브온 / 생기부ON</div><div>생기부 진단 데이터·브랜드(20만 가입)</div><div class="o">종단 실행 루프 + 무학습 신뢰 + 학부모 레이어</div></div>
+    <div class="trow"><div class="who">진학사 합격예측</div><div>실합격자 빅데이터(연 20만)</div><div class="o">정면 회피 — 인용·해석하는 정성 레이어</div></div>
+    <div class="trow"><div class="who">면접왕 등</div><div>AI 모의면접</div><div class="o">면접을 루프의 한 노드로 흡수</div></div>
+    <div class="trow"><div class="who">대치동 컨설팅</div><div>사정관 출신 인적 신뢰</div><div class="o">1/100 가격 · 확장가능 · 합법·투명</div></div>
+    <div class="trow us"><div class="who">풀림 입시코치</div><div>—</div><div class="o">진단(commodity)이 아니라 합법 실행+증명+부모 소통</div></div>
+  </div>
+</div></section>
+
+<!-- 07 GUARDRAILS -->
+<section><div class="wrap">
+  <div class="snum">07 — 가드레일 (법적·윤리)</div>
+  <h2 class="stitle">선을 지키는 것이 곧 신뢰다.</h2>
+  <p class="sintro">미성년 민감정보를 다루는 제품이라, 아래는 마케팅·구현 전 단계에서 강제됩니다.</p>
+  <div class="guard">
+    <div class="gpill"><b>진단</b> (설계·대필 아님)</div>
+    <div class="gpill"><b>대입-반영 항목만</b> 처방 (세특·정규창체·행특)</div>
+    <div class="gpill"><b>무학습 · 즉시삭제</b></div>
+    <div class="gpill"><b>면접 준비</b> (대본 아님)</div>
+    <div class="gpill"><b>§23 민감정보 동의</b> · 미성년 보호</div>
+    <div class="gpill">"공교육 정규과정 보완" 포지셔닝 (사교육 조장 회피)</div>
+  </div>
+</div></section>
+
+<!-- 08 STATUS -->
+<section style="border-bottom:none"><div class="wrap">
+  <div class="snum">08 — 지금 어디까지</div>
+  <h2 class="stitle">기획은 끝, 핵심은 이미 작동한다.</h2>
+  <div class="status"><div class="wrapx">
+    <div class="sh">build status · feat/revamp-closed-loop · PR #16</div>
+    <h3>수직 슬라이스 — 실제 Claude 연동까지 완성</h3>
+    <div class="steps">
+      <div class="st done"><div class="k">전략·설계</div><div class="v">정의 v0.4 + 9 specs</div><div class="d">리서치 → 폐쇄루프 재정의</div></div>
+      <div class="st done"><div class="k">해자 #1 엔진</div><div class="v">50 테스트 그린</div><div class="d">합법성 게이트·골든회귀, 누출 1건 적대적 리뷰로 폐쇄</div></div>
+      <div class="st done"><div class="k">앱 (apps/coach)</div><div class="v">루프 4단계 + API</div><div class="d">Next16·마스킹·미영속·9 테스트·빌드 OK</div></div>
+      <div class="st"><div class="k">다음</div><div class="v">라이브 스모크 → 코어</div><div class="d">API키 검증 → 트윈·구독·OS 연동</div></div>
+    </div>
+  </div></div>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="brand" style="display:flex;gap:9px;align-items:center;font-weight:800"><span class="dot"></span> 풀림 입시코치</div>
+  <small>생기부 실행 루프 · 고1–2 연중 코어 + 고3 시즌 비치헤드 · 2026 · 비전 시안</small>
+</div></footer>
+
+</body>
+</html>
