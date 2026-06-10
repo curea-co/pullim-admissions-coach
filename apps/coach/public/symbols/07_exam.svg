@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Pullim Exam Coach">
+  <title>풀림 입시코치</title>
+  <rect x="4" y="4" width="92" height="92" rx="18" fill="#0362DA"/>
+  <!-- 5 ascending bars (left → right) -->
+  <rect x="30" y="62" width="8" height="8" fill="#FFFFFF"/>
+  <rect x="38" y="54" width="8" height="16" fill="#FFFFFF"/>
+  <rect x="46" y="46" width="8" height="24" fill="#FFFFFF"/>
+  <rect x="54" y="38" width="8" height="32" fill="#FFFFFF"/>
+  <rect x="62" y="30" width="8" height="40" fill="#FFFFFF"/>
+  <!-- summit flag accent -->
+  <rect x="62" y="22" width="8" height="8" fill="#E6FF4C"/>
+</svg>
