@@ -9,6 +9,7 @@ import { Landing } from '@/components/Landing'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { IconArrow } from '@/components/icons'
 import { SAMPLE_RESULT, SAMPLE_TWIN_DIFF } from '@/lib/sample'
+import { latestRun } from '@/lib/history'
 
 export function LoopHomeClient() {
   const params = useSearchParams()
@@ -28,23 +29,31 @@ export function LoopHomeClient() {
       setData(SAMPLE_RESULT)
       return
     }
+    const apply = (parsed: AnalyzeResult | null) => {
+      // Defend against stale/truncated cache: only swap to the result view
+      // when the shape LoopStages destructures is fully present.
+      if (parsed?.cohort && parsed?.diagnosis?.criteria && parsed?.rubric?.items) {
+        setData(parsed)
+        // 종단 트윈(priorSaengbu 처리 시 채워짐) → ③ 추적에 실데이터로 공급.
+        if (parsed?.twin?.outcomes && parsed?.twin?.summary) {
+          setTwin(parsed.twin as TwinDiff)
+        }
+        return true
+      }
+      return false
+    }
+
     const raw = sessionStorage.getItem('coach:result')
     if (raw) {
       try {
-        const parsed = JSON.parse(raw)
-        // Defend against stale/truncated cache: only swap to the result view
-        // when the shape LoopStages destructures is fully present.
-        if (parsed?.cohort && parsed?.diagnosis?.criteria && parsed?.rubric?.items) {
-          setData(parsed)
-          // 백엔드가 priorSaengbu 처리 시 채워 보내는 종단 트윈 → ③ 추적에 실데이터로 공급.
-          if (parsed?.twin?.outcomes && parsed?.twin?.summary) {
-            setTwin(parsed.twin as TwinDiff)
-          }
-        }
+        if (apply(JSON.parse(raw) as AnalyzeResult)) return
       } catch {
         /* ignore malformed cache */
       }
     }
+    // 세션에 현재 결과가 없으면(새 탭·재방문) 본인 기기에 저장된 가장 최근 결과를 복원.
+    const last = latestRun()
+    if (last) apply(last.result)
   }, [isDemo, isTwinDemo])
 
   // Result swap depends on ?demo=1 / sessionStorage; the prerender fallback
@@ -55,8 +64,23 @@ export function LoopHomeClient() {
     <>
       <SiteNav
         cta={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {isDemo && <span className="chip accent">예시 데이터</span>}
+            {!isDemo && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="btn-mini"
+                  title="이 결과를 PDF로 저장하거나 인쇄합니다"
+                >
+                  PDF 저장
+                </button>
+                <Link href="/runs" className="btn-mini">
+                  내 기록
+                </Link>
+              </>
+            )}
             <Link href="/intake" className="btn-primary">
               새로 분석 <IconArrow size={16} />
             </Link>

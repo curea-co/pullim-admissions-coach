@@ -420,3 +420,39 @@ textarea.control { resize: vertical; line-height: 1.6; }
   border-radius: 2px;
 }
 button:focus-visible, a:focus-visible { outline-offset: 2px; }
+
+/* ── Compact secondary button (nav actions: PDF 저장 / 내 기록) ── */
+.btn-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  font-family: var(--f-brand);
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+.btn-mini:hover { border-color: var(--fg); background: var(--bg-raised); }
+
+/* ── Print / PDF export — keepable artifact from the result view ── */
+@media print {
+  nav, footer, .no-print, .ring-spin, .spinner { display: none !important; }
+  :root { --nav-h: 0px; }
+  html, body { background: #fff !important; }
+  main { padding-top: 12px !important; }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #d8e0e6 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  a { text-decoration: none !important; color: inherit !important; }
+  /* 차트/색 배경을 인쇄 시에도 보이도록 */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}

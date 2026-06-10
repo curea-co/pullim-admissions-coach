@@ -1,9 +1,11 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { SiteNav, SiteFooter } from '@/components/SiteChrome'
 import { SaengbuInput } from '@/components/SaengbuInput'
 import { IconArrow, IconShield, IconLegal } from '@/components/icons'
+import { saveRun } from '@/lib/history'
 
 const YEARS = [
   { v: 2024, label: '2024 입학 · 현 고3', sys: '2027 구체제' },
@@ -117,7 +119,22 @@ export default function IntakePage() {
         setBusy(false)
         return
       }
-      sessionStorage.setItem('coach:result', await res.text())
+      const text = await res.text()
+      sessionStorage.setItem('coach:result', text)
+      // 본인 기기에 결과를 영속화 → 새로고침/재방문에도 남고, "내 기록"에서 다시 열람.
+      // (원문 생기부는 결과에 포함되지 않으므로 저장 대상 아님 — 서버는 무학습/즉시삭제 유지.)
+      try {
+        const result = JSON.parse(text)
+        saveRun(result, {
+          admissionYear,
+          grade,
+          track5,
+          system: result?.cohort?.system ?? '',
+          compared: compareOn,
+        })
+      } catch {
+        /* 저장 실패해도 현재 결과는 표시됨 */
+      }
       router.push('/')
     } catch {
       setError('네트워크 오류로 분석하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.')
@@ -208,6 +225,38 @@ export default function IntakePage() {
                 ariaDescribedby={invalid === 'saengbu' ? 'intake-error' : undefined}
                 placeholder="세특·창체·행특 등 생기부 텍스트를 붙여넣거나 위에서 PDF를 올리세요. 이름·연락처·이메일 등 식별정보는 분석 전 자동으로 가립니다."
               />
+
+              {/* 입력 마찰 완화 — 전체 PDF가 없어도 시작할 수 있게 안내 + 예시 우회. */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" style={{ fontSize: 'var(--fs-xs)', color: 'var(--fg-muted)' }}>
+                <span>
+                  전체 생기부가 없어도 <b style={{ color: 'var(--pullim-ink2)' }}>한 과목 세특만</b> 넣어도 시작할 수 있어요.
+                </span>
+                <Link href="/?demo=1" style={{ color: 'var(--pullim-blue)', fontWeight: 700 }}>
+                  예시 결과 먼저 보기 →
+                </Link>
+              </div>
+
+              <details className="mt-2" style={{ fontSize: 'var(--fs-xs)' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--pullim-blue)', fontWeight: 700 }}>
+                  생기부 텍스트 받는 법 (PDF가 없을 때)
+                </summary>
+                <ol
+                  className="mt-2 flex list-decimal flex-col gap-1 pl-5"
+                  style={{ color: 'var(--fg-muted)', lineHeight: 1.6 }}
+                >
+                  <li>
+                    <b style={{ color: 'var(--pullim-ink2)' }}>정부24·나이스 대국민서비스</b>에서 “학교생활기록부” 발급(본인/보호자
+                    인증) → PDF 저장 후 위에 올리기.
+                  </li>
+                  <li>
+                    학교에서 받은 <b style={{ color: 'var(--pullim-ink2)' }}>생기부 출력본/가정통신용 PDF</b>가 있으면 그대로 업로드.
+                  </li>
+                  <li>
+                    둘 다 없으면 — 지금 보이는 <b style={{ color: 'var(--pullim-ink2)' }}>세특·창체·행특 문장 일부만</b> 붙여넣어도
+                    진단이 시작됩니다. 더 많이 넣을수록 정확해져요.
+                  </li>
+                </ol>
+              </details>
             </div>
 
             {/* 종단 트윈(학기 비교) — 옵션 토글. 비어 있으면 단일 학기 경로로 동작. */}
