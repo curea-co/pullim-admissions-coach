@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://curea.co/schemas/pullim/admissions-coach/student_profile_v0.1.json",
+  "title": "Pullim Admissions Coach — Student Profile Input v0.1",
+  "description": "학생이 제출하는 입력값 스키마. 정의 v0.3 §3(입력 5항목) + §6.3(미성년자 데이터 가드레일) 기준. SSOT: docs/002_Admissions_Coach_definition_v.3.md",
+  "$comment": "v0.1 — 2026-05-26. 미성년자 동의(consent)와 마스킹 확인(record.maskingApplied)은 출시 차단 조건(P0)이므로 required. 실제 PII 탐지는 앱 계층 책임이며, 본 스키마는 확인 플래그와 구조만 강제한다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "record",
+    "targetTrack",
+    "currentStanding",
+    "consent"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "스키마 버전 고정값.",
+      "const": "0.1"
+    },
+
+    "record": {
+      "description": "정의 §3-1. 생기부 입력. PDF 업로드 또는 텍스트 붙여넣기 중 정확히 하나. 개인 식별정보 마스킹 필수(§6.3).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputType", "maskingApplied"],
+      "properties": {
+        "inputType": {
+          "description": "생기부 입력 방식.",
+          "enum": ["pdf_upload", "text_paste"]
+        },
+        "fileRef": {
+          "description": "inputType=pdf_upload 일 때, 업로드된 파일의 스토리지 참조 ID.",
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "description": "inputType=text_paste 일 때, 마스킹된 생기부 본문.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200000
+        },
+        "maskingApplied": {
+          "description": "성명·학교명·생년월일 등 개인 식별정보 마스킹 적용 확인(§6.3). 출시 차단 조건이므로 true만 허용.",
+          "const": true
+        },
+        "maskedFields": {
+          "description": "마스킹 처리한 식별정보 유형 체크리스트(감사 추적용).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "student_name",
+              "school_name",
+              "birth_date",
+              "resident_registration_no",
+              "phone",
+              "address",
+              "teacher_name",
+              "other"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "inputType": { "const": "pdf_upload" } } },
+          "then": { "required": ["fileRef"] }
+        },
+        {
+          "if": { "properties": { "inputType": { "const": "text_paste" } } },
+          "then": { "required": ["text"] }
+        }
+      ]
+    },
+
+    "targetTrack": {
+      "description": "정의 §3-2 (v0.3.1). 지원 학부 5계열 중 택 1.",
+      "enum": ["humanities", "science_engineering", "medical", "arts_athletics", "other"],
+      "$comment": "humanities=인문, science_engineering=이공(자연과학+공학), medical=의치한, arts_athletics=예체능, other=기타"
+    },
+
+    "targetUniversities": {
+      "description": "정의 §3-3. 목표 대학 3순위(선택). 순위는 배열 순서(0=1순위).",
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "department": { "type": "string", "maxLength": 100 }
+        }
+      }
+    },
+
+    "currentStanding": {
+      "description": "정의 §3-4. 현재 학년·학기 + 학교 유형. 평가 기준이 학교 유형별로 달라지므로 필수.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grade", "semester", "schoolType"],
+      "properties": {
+        "grade": {
+          "description": "현재 학년 (고1~고3).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "semester": {
+          "description": "현재 학기 (1학기/2학기).",
+          "type": "integer",
+          "enum": [1, 2]
+        },
+        "schoolType": {
+          "description": "학교 유형 (정의 §3-4 v0.3.1). general=일반고, special_purpose=특목고, autonomous=자사고·자율고, ged=검정고시.",
+          "enum": ["general", "special_purpose", "autonomous", "ged"]
+        }
+      }
+    },
+
+    "selfReportedWeakAreas": {
+      "description": "정의 §3-5. 본인이 부족하다고 생각하는 영역(자유 텍스트, 선택).",
+      "type": "string",
+      "maxLength": 2000
+    },
+
+    "consent": {
+      "description": "정의 §6.3. 미성년자 데이터 동의 — 출시 차단 조건(P0). 법정대리인 동의와 약관·개인정보 동의는 required.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "isMinor",
+        "termsAgreed",
+        "privacyPolicyAgreed",
+        "guardianConsentObtained",
+        "consentTimestamp"
+      ],
+      "properties": {
+        "isMinor": {
+          "description": "제출자가 미성년자인지 여부. true이면 법정대리인 동의 필수.",
+          "type": "boolean"
+        },
+        "termsAgreed": {
+          "description": "서비스 이용약관 동의. true만 허용.",
+          "const": true
+        },
+        "privacyPolicyAgreed": {
+          "description": "개인정보 수집·이용 동의(민감정보 포함). true만 허용.",
+          "const": true
+        },
+        "guardianConsentObtained": {
+          "description": "법정대리인 동의 획득 여부. isMinor=true이면 true여야 한다(아래 allOf).",
+          "type": "boolean"
+        },
+        "guardianContactRef": {
+          "description": "법정대리인 동의 확인 채널 참조(예: 동의 토큰/세션 ID). 식별정보 원문 저장 금지.",
+          "type": "string"
+        },
+        "consentTimestamp": {
+          "description": "동의 시각(ISO 8601, UTC).",
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "isMinor": { "const": true } } },
+          "then": { "properties": { "guardianConsentObtained": { "const": true } } }
+        }
+      ]
+    },
+
+    "dataRetention": {
+      "description": "정의 §6.3. 생기부 보관·삭제 정책 메타데이터. 출시 정책 확정 후 채워짐.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retentionPolicyVersion": { "type": "string" },
+        "deleteAfter": {
+          "description": "보관 만료 시각(ISO 8601). 도달 시 생기부 원문 파기.",
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
