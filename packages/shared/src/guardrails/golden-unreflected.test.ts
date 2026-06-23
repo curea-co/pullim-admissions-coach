@@ -27,7 +27,9 @@ describe('golden 출력③ — 미반영 항목 신설 추천 0건 (#20 회귀)'
         fileURLToPath(new URL(`../../../../docs/golden/${f}`, import.meta.url)),
         'utf8'
       );
-      expect(findUnreflectedRecommendations(output3(md))).toEqual([]);
+      const body = output3(md);
+      expect(body.trim().length).toBeGreaterThan(0); // 출력③ 섹션 실제 추출 보장(가짜 통과 방지)
+      expect(findUnreflectedRecommendations(body)).toEqual([]);
     });
   }
 });
