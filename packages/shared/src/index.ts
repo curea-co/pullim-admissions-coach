@@ -3,3 +3,4 @@
 // Phase D: AI output DTOs synced with definition v0.3 §4.
 
 export * from './schemas';
+export * from './diagnosis';
