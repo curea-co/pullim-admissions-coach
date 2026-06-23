@@ -17,10 +17,24 @@ function summarize(matches: PiiMatch[]) {
 export function PiiScanPanel({
   matches,
   onAutoRedact,
+  hasText,
+  scanned,
 }: {
   matches: PiiMatch[];
   onAutoRedact: () => void;
+  hasText: boolean;
+  scanned: boolean;
 }) {
+  if (!hasText) {
+    return null;
+  }
+  if (!scanned) {
+    return (
+      <div className="mt-3 rounded-xl border border-ink-100 bg-ink-100/40 px-4 py-3 text-sm text-ink-500">
+        식별정보 검사 중…
+      </div>
+    );
+  }
   if (matches.length === 0) {
     return (
       <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3 text-sm text-emerald-800">

@@ -67,6 +67,7 @@ export default function SubmitPage() {
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
   const [piiMatches, setPiiMatches] = useState<PiiMatch[]>([]);
   const [warnAck, setWarnAck] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
   const [targetTrack, setTargetTrack] = useState<TargetTrack>(
     parkJunho.profile.targetTrack
@@ -89,7 +90,11 @@ export default function SubmitPage() {
   // recordText 변경 시 300ms 디바운스로 PII 스캔. 변경되면 warn 확인은 초기화.
   useEffect(() => {
     setWarnAck(false);
-    const id = setTimeout(() => setPiiMatches(detectPii(recordText)), 300);
+    setScanned(false);
+    const id = setTimeout(() => {
+      setPiiMatches(detectPii(recordText));
+      setScanned(true);
+    }, 300);
     return () => clearTimeout(id);
   }, [recordText]);
 
@@ -301,7 +306,7 @@ export default function SubmitPage() {
             )}
             <FieldError msg={errors['record.text']} />
 
-            <PiiScanPanel matches={piiMatches} onAutoRedact={handleAutoRedact} />
+            <PiiScanPanel matches={piiMatches} onAutoRedact={handleAutoRedact} hasText={recordText.trim().length > 0} scanned={scanned} />
 
             {warnMatches.length > 0 && blockMatches.length === 0 && (
               <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3">
