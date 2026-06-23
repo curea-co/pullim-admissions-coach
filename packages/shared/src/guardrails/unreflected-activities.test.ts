@@ -15,6 +15,8 @@ describe('flagsUnreflectedRecommendation — 양성(미반영 신설 추천)', (
     expect(flagsUnreflectedRecommendation('개인 봉사활동 실적을 더 쌓아 둘 것')).toBe(true));
   it('영재교육 참가', () =>
     expect(flagsUnreflectedRecommendation('영재교육원에 참가해보면 좋겠습니다')).toBe(true));
+  it('발명교육 만들기 추천', () =>
+    expect(flagsUnreflectedRecommendation('발명 아이디어를 만들어 교내 대회에 출품해보세요')).toBe(true));
 });
 
 describe('flagsUnreflectedRecommendation — 음성(근거 인용·반영 항목)', () => {
@@ -37,7 +39,7 @@ describe('flagsUnreflectedRecommendation — 음성(근거 인용·반영 항목
 describe('findUnreflectedRecommendations', () => {
   it('매치 스니펫을 반환', () => {
     const hits = findUnreflectedRecommendations('관심 분야 독서 1~2권 추가하고 봉사 실적도 쌓을 것');
-    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits).toEqual(['독서 1~2권 추가']);
   });
   it('깨끗한 텍스트는 빈 배열', () => {
     expect(findUnreflectedRecommendations('세특 탐구를 본인이 정리할 것')).toEqual([]);

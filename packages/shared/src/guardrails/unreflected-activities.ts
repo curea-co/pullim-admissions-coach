@@ -11,9 +11,9 @@ const VERB =
   '(?:추가|더\\s*읽|읽어|신설|새로\\s*만들|만들|참가|참여|준비|쌓|해\\s*보|시작)';
 
 // 미반영 항목 토큰과 추천 동사가 한 줄에서 15자 이내로 근접하면(어느 순서든) 신설 추천으로 본다.
+// 'g' 미부착 — 직접 .test() 호출이 안전하도록. matchAll용 global 인스턴스는 find 내부에서 생성.
 export const UNREFLECTED_RECOMMENDATION_RE = new RegExp(
-  `${TERM}[^.\\n]{0,15}${VERB}|${VERB}[^.\\n]{0,15}${TERM}`,
-  'g'
+  `${TERM}[^.\\n]{0,15}${VERB}|${VERB}[^.\\n]{0,15}${TERM}`
 );
 
 export function findUnreflectedRecommendations(text: string): string[] {
