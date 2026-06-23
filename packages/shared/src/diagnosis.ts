@@ -30,11 +30,9 @@ export const itemFlagEnum = z.enum(['strength', 'gap']); // ◎강점 / △보�
 export type ItemFlag = z.infer<typeof itemFlagEnum>;
 
 // 근거(evidence) 섹션 prefix — prompt §6.2 근거 가시화 규칙과 동일 소스.
+// 자기정리: 검정고시(ged) 케이스(예: 자기정리-학습이력) 지원.
 export const SECTION_PREFIX_RE =
-  /^(세특|창체|진로활동|독서활동|행특|교과|자율활동|봉사활동|동아리|수행평가)/;
-
-// §6 가드: 등급 라벨 출력 금지(축이 제거됐어도 산문에 새어나오지 않게 방어).
-const FORBIDDEN_GRADE_RE = /(강함|보통|약함)/;
+  /^(세특|창체|진로활동|독서활동|행특|교과|자율활동|봉사활동|동아리|수행평가|자기정리)/;
 
 const highlightSchema = z.object({
   item: z.string().min(1),
@@ -53,10 +51,9 @@ const highlightSchema = z.object({
 export const diagnosisCompetencySchema = z
   .object({
     competency: competencyEnum,
-    summary: z
-      .string()
-      .min(1)
-      .refine((s) => !FORBIDDEN_GRADE_RE.test(s), '등급 표현(강함/보통/약함)은 사용하지 않습니다'),
+    // 등급 라벨 방어는 구조적으로(score 필드 없음, flag는 strength|gap 열거형만)
+    // + prompt §4.6 스캐너 수준에서 처리. 산문 regex는 정상 술어(의지가 강함 등) 오탐 문제로 제거.
+    summary: z.string().min(1),
     highlights: z
       .array(highlightSchema)
       .min(1, '역량별 강점·보완 하이라이트를 1건 이상 제시해주세요'),

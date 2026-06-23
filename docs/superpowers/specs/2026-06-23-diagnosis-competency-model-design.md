@@ -175,3 +175,15 @@ DiagnosisGuide = { criteria: DiagnosisCompetency[] }   // 정확히 3건
   - 출력 schema_version bump(0.2) → Phase D 골든 회귀 재실행 필요(아직 Phase D 코드 없음, 문서 정합만 확보).
   - mock 진단부 전면 교체 → result 페이지 회귀 확인 필요(렌더 테스트로 커버).
 - **하위호환**: 입력 스키마 불변이라 submit/consent/processing 흐름 영향 없음.
+
+---
+
+## 11. 구현 중 보정 (검증 기반, 2026-06-23)
+
+구현 후 적대적 전체 리뷰(workflow `w0b0n40re`, 42 에이전트)에서 확인된 결함을 반영한 2건의 설계 보정:
+
+1. **`자기정리` 근거 prefix 추가 (critical 수정).** 원 설계의 `SECTION_PREFIX_RE`에 검정고시(`ged`) 경로의 본인 정리 문서 prefix(`자기정리-학습이력` 등)가 빠져 golden case-05 진단 evidence가 전부 Zod 검증 실패 → "골든 5건 통과" prod 게이트 위반. `SECTION_PREFIX_RE`와 prompt §6.2 prefix 목록에 `자기정리` 추가.
+
+2. **`FORBIDDEN_GRADE_RE` 산문 가드 제거.** 원 설계는 `summary`에 `/(강함|보통|약함)/` refine을 뒀으나, 한국어 술어("의지가 강함")·교육과정 용어("보통교과")를 오탐 거부하는 문제가 확인됨 — 산문에서 등급 *라벨*과 술어를 정규식으로 구분하는 것은 신뢰성 있게 불가능. 등급 라벨 차단의 실질 보장은 **구조적**(score 필드 부재 + `flag ∈ {strength,gap}`)이며, 프롬프트 §4.6 스캐너(따옴표/괄호로 감싼 등급값 형태로 타이트닝)가 소프트 보조한다. 따라서 schema의 산문 grade-refine은 제거.
+
+§4.4의 출력 `schema_version` 0.2 결정은 유지하되, prompt §2/§6의 출력 봉투 두 곳이 0.1로 남아있던 잔재를 0.2로 정정(입력 student_profile은 0.1 불변).

@@ -64,9 +64,22 @@ describe('diagnosisGuideSchema', () => {
     expect(diagnosisGuideSchema.safeParse(bad).success).toBe(false);
   });
 
-  it('summary에 등급 라벨(보통)이 있으면 실패한다', () => {
+  it('summary에 술어 형용사(강함/보통 등)가 포함된 정상 문장은 통과한다', () => {
+    // FORBIDDEN_GRADE_RE 제거 후 정상 술어가 오탐되지 않음을 검증
+    const ok = structuredClone(valid);
+    ok.criteria[0].summary = '학습 의지가 강함을 보이며 탐구가 활발합니다.';
+    expect(diagnosisGuideSchema.safeParse(ok).success).toBe(true);
+  });
+
+  it('검정고시(ged) 스타일 자기정리 prefix는 통과한다', () => {
+    const ged = structuredClone(valid);
+    ged.criteria[0].highlights[0].evidence = ['자기정리-학습이력(검정고시 합격)'];
+    expect(diagnosisGuideSchema.safeParse(ged).success).toBe(true);
+  });
+
+  it('알 수 없는 prefix(메모-아무거나)는 실패한다', () => {
     const bad = structuredClone(valid);
-    bad.criteria[0].summary = '학업역량 보통';
+    bad.criteria[0].highlights[0].evidence = ['메모-아무거나'];
     expect(diagnosisGuideSchema.safeParse(bad).success).toBe(false);
   });
 });
