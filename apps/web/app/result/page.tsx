@@ -7,6 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
+import { competencyLabel } from '@pullim/shared';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -145,43 +146,65 @@ function InterviewPanel() {
 }
 
 function DiagnosisPanel() {
-  const scoreStyle = {
-    강함: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    보통: 'bg-amber-50 text-amber-700 border-amber-200',
-    약함: 'bg-rose-50 text-rose-700 border-rose-200',
+  const flagStyle = {
+    strength: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    gap: 'border-amber-200 bg-amber-50 text-amber-700',
   } as const;
+  const flagLabel = { strength: '◎ 강점', gap: '△ 보완' } as const;
+
   return (
     <section className="space-y-4">
       {parkJunho.diagnosisGuide.criteria.map((c) => (
         <article
-          key={c.name}
+          key={c.competency}
           className="rounded-2xl border border-ink-100 bg-white p-5"
         >
-          <header className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-ink-900">{c.name}</h3>
-            <span
-              className={cn(
-                'rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-                scoreStyle[c.score]
-              )}
-            >
-              {c.score}
-            </span>
-          </header>
-          <dl className="mt-3 space-y-2 text-sm leading-relaxed">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                관찰
-              </dt>
-              <dd className="mt-0.5 text-ink-700">{c.observation}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                앞으로 할 활동 / 정리 방향
-              </dt>
-              <dd className="mt-0.5 text-ink-900">{c.nextSteps}</dd>
-            </div>
-          </dl>
+          <h3 className="text-base font-semibold text-ink-900">
+            {competencyLabel[c.competency]}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">{c.summary}</p>
+
+          <ul className="mt-4 space-y-3">
+            {c.highlights.map((h, idx) => (
+              <li key={idx} className="rounded-xl border border-ink-100 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-xs font-semibold',
+                      flagStyle[h.flag]
+                    )}
+                  >
+                    {flagLabel[h.flag]}
+                  </span>
+                  <span className="text-sm font-semibold text-ink-900">
+                    {h.item}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-700">
+                  {h.note}
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-1.5">
+                  {h.evidence.map((e) => (
+                    <li
+                      key={e}
+                      className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
+                    >
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 border-t border-ink-100 pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              앞으로 할 활동 / 정리 방향
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-ink-900">
+              {c.nextSteps}
+            </p>
+          </div>
         </article>
       ))}
     </section>
