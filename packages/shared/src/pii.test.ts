@@ -22,6 +22,9 @@ describe('detectPii — warn tier (문맥 앵커)', () => {
   it('생년월일', () => expect(cats('생년월일 2008.03.15')).toContain('birth_date'));
   it('주소', () => expect(cats('서울시 강남구 역삼동')).toContain('address'));
   it('warn은 hasBlockingPii=false', () => expect(hasBlockingPii('이름: 홍길동')).toBe(false));
+  it('○○ 군 (문장 끝)도 검출', () => {
+    expect(detectPii('상담 대상은 이몽룡 군').map((m) => m.category)).toContain('name');
+  });
 });
 
 describe('detectPii — 음성(false positive 방지)', () => {
@@ -33,6 +36,10 @@ describe('detectPii — 음성(false positive 방지)', () => {
   });
   it('이미 치환된 플레이스홀더는 재검출 안 함', () => {
     expect(detectPii('[이름]은 [학교]에서 [전화]로')).toHaveLength(0);
+  });
+  it('학생회 등 compound noun은 이름으로 오검출하지 않음', () => {
+    expect(detectPii('전교 학생회 회장으로 활동')).toHaveLength(0);
+    expect(detectPii('동아리 양성 프로그램 참여')).toHaveLength(0);
   });
 });
 

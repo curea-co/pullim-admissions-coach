@@ -39,7 +39,7 @@ const RULES: Rule[] = [
   { category: 'email',   re: /[\w.+-]+@[\w-]+\.[\w.-]+/gd, group: 0 },
   { category: 'school',  re: /[가-힣]{2,}(?:초등학교|중학교|고등학교|대학교)/gd, group: 0 },
   { category: 'name',    re: /(?:이름|성명)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
-  { category: 'name',    re: /([가-힣]{2,4})\s*(?:학생|군|양)(?![가-힣]{2,})/gd, group: 1 },
+  { category: 'name',    re: /([가-힣]{2,4})\s*(?:학생|군|양)(?:은|는|이|가|을|를|의|에|도|만|과|와|께)?(?![가-힣])/gd, group: 1 },
   { category: 'teacher', re: /(?:담임|교사)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
   { category: 'teacher', re: /([가-힣]{2,4})\s*선생님/gd, group: 1 },
   { category: 'birth_date', re: /\d{4}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*일?/gd, group: 0 },
