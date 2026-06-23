@@ -216,7 +216,7 @@ function ImprovementsPanel() {
     <section className="space-y-6">
       <article className="rounded-2xl border border-ink-100 bg-white p-5">
         <h3 className="text-base font-semibold text-ink-900">
-          생기부 키워드 & 학부 적합도
+          생기부 키워드 & 강점을 드러낼 방향
         </h3>
         <div className="mt-4 flex flex-wrap gap-2">
           {parkJunho.improvements.keywords.map((k) => (
