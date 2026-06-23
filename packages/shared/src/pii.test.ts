@@ -41,6 +41,10 @@ describe('detectPii — 음성(false positive 방지)', () => {
     expect(detectPii('전교 학생회 회장으로 활동')).toHaveLength(0);
     expect(detectPii('동아리 양성 프로그램 참여')).toHaveLength(0);
   });
+  it('대학교(목표/참조 대학)는 식별정보로 검출하지 않음', () => {
+    expect(detectPii('서울대학교 의예과를 목표로 한다')).toHaveLength(0);
+    expect(detectPii('고려대학교 진학을 희망한다')).toHaveLength(0);
+  });
 });
 
 describe('redactPii', () => {

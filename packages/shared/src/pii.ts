@@ -37,7 +37,7 @@ const RULES: Rule[] = [
   { category: 'phone',   re: /01[016789]-?\d{3,4}-?\d{4}/gd, group: 0 },
   { category: 'phone',   re: /0\d{1,2}-\d{3,4}-\d{4}/gd, group: 0 },
   { category: 'email',   re: /[\w.+-]+@[\w-]+\.[\w.-]+/gd, group: 0 },
-  { category: 'school',  re: /[가-힣]{2,}(?:초등학교|중학교|고등학교|대학교)/gd, group: 0 },
+  { category: 'school',  re: /[가-힣]{2,}(?:초등학교|중학교|고등학교)/gd, group: 0 }, // 대학교는 제외 — 고등학생 생기부에서 대학교는 목표/참조이지 본인 식별정보가 아님(#17 최종리뷰).
   { category: 'name',    re: /(?:이름|성명)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
   { category: 'name',    re: /([가-힣]{2,4})\s*(?:학생|군|양)(?:은|는|이|가|을|를|의|에|도|만|과|와|께)?(?![가-힣])/gd, group: 1 },
   { category: 'teacher', re: /(?:담임|교사)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
