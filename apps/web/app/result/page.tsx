@@ -52,7 +52,7 @@ export default function ResultPage() {
         </p>
         {profile && (() => {
           const cohort = cohortFromGrade(profile.grade);
-          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영 — AI는 세특 문구를 쓰지 않습니다' : '');
+          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영' : '');
           return (
             <p className="mb-2">
               <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">

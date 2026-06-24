@@ -196,7 +196,7 @@ function SignupForm() {
   // ── 렌더 ─────────────────────────────────────────────────────────────────
 
   return (
-    <main className="flex min-h-[80vh] items-center justify-center px-4 py-12">
+    <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="rounded-2xl border border-ink-100 bg-white p-8 shadow-sm">
           {/* 헤더 */}
@@ -404,7 +404,7 @@ function SignupForm() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -414,9 +414,9 @@ export default function SignupPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-[80vh] items-center justify-center px-4">
+        <div className="flex min-h-[80vh] items-center justify-center px-4">
           <p className="text-sm text-ink-400">불러오는 중…</p>
-        </main>
+        </div>
       }
     >
       <SignupForm />

@@ -182,6 +182,26 @@ export default function ConsentPage() {
           <BlockerNote />
         )}
 
+        {/* aria-live 안내: 버튼이 비활성 상태일 때 미충족 조건을 스크린리더에 전달 */}
+        <p
+          id="proceed-status"
+          role="status"
+          aria-live="polite"
+          className="sr-only"
+        >
+          {!canProceed
+            ? (() => {
+                const missing: string[] = [];
+                if (!checked.terms) missing.push('이용약관');
+                if (!checked.privacy) missing.push('개인정보');
+                if (isMinor && !checked.guardian) missing.push('법정대리인');
+                return missing.length > 0
+                  ? `필수 동의 ${missing.length}개(${missing.join(', ')})를 체크해야 진행할 수 있습니다.`
+                  : '';
+              })()
+            : ''}
+        </p>
+
         <div className="mt-8 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link
             href="/submit"
@@ -193,6 +213,7 @@ export default function ConsentPage() {
             type="button"
             onClick={() => { if (!canProceed || isPending) return; handleProceed(); }}
             aria-disabled={!canProceed || isPending}
+            aria-describedby={!canProceed ? 'proceed-status' : undefined}
             className={cn(
               'rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2',
               (!canProceed || isPending) && 'cursor-not-allowed opacity-50'
