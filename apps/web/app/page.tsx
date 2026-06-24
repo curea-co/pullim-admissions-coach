@@ -72,7 +72,7 @@ const promises = [
 const faqs = [
   {
     q: '비용이 드나요?',
-    a: '현재는 비공개 데모 단계입니다. 정식 출시(2026-08-01) 시 요금 정책을 안내합니다.',
+    a: '2026-07-01 베타 서비스 오픈 예정입니다. 요금 정책은 베타 오픈 시 안내합니다.',
   },
   {
     q: '제 개인정보는 어디에 저장되나요?',
@@ -100,13 +100,12 @@ export default function LandingPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
               <span className="size-1.5 rounded-full bg-brand-500" />
-              현재 비공개 데모 · 정식 출시 2026-08-01
+              베타 서비스 · 2026-07-01 오픈
             </span>
-            <h1 className="mt-6 text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-5xl sm:leading-[1.15]">
+            <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-[2.6rem] sm:leading-[1.18]">
               생기부를 넣으면
               <br />
-              <span className="text-brand-600">면접 준비·진단·보완</span>을
-              <br />한 번에
+              <span className="text-brand-600">면접 준비·진단·보완</span>을 한 번에
             </h1>
             <p className="mt-4 max-w-prose text-base leading-relaxed text-ink-500">
               학생부 종합 전형(생기부로 평가하는 대입 수시)을 준비하는 곳입니다. 고1~고3 학생과
