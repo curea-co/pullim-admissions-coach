@@ -68,6 +68,7 @@ function MyPageContent() {
   const { user, logout } = useAuth();
   const [diagnoses, setDiagnoses] = useState<DiagnosisSummary[]>([]);
   const [diagLoading, setDiagLoading] = useState(true);
+  const [diagError, setDiagError] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLogoutPending, startLogoutTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
@@ -76,6 +77,8 @@ function MyPageContent() {
     let cancelled = false;
     auth.listDiagnoses().then((list) => {
       if (!cancelled) { setDiagnoses(list); setDiagLoading(false); }
+    }).catch(() => {
+      if (!cancelled) { setDiagLoading(false); setDiagError(true); }
     });
     return () => { cancelled = true; };
   }, []);
@@ -181,6 +184,8 @@ function MyPageContent() {
 
         {diagLoading ? (
           <p className="py-8 text-sm text-ink-400">불러오는 중…</p>
+        ) : diagError ? (
+          <p className="py-8 text-sm text-rose-500">이력을 불러오지 못했어요</p>
         ) : diagnoses.length === 0 ? (
           <EmptyState
             title="아직 진단이 없어요"
@@ -242,6 +247,7 @@ function MyPageContent() {
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
+              disabled={isDeletePending}
               className="rounded-xl border border-rose-200 px-5 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
             >
               회원탈퇴
