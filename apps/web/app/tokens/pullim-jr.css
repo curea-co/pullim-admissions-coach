@@ -1,0 +1,70 @@
+/* PUDS theme · pullim-jr — rounded/playful. CUDS canonical vocabulary.
+ * Same token NAMES as pullim-os; overrides: larger radius, bounce ease,
+ * brighter action stop, slightly elevated shadow + longer duration.
+ * Selector: [data-theme="pullim-jr"]
+ * ===================================================================== */
+[data-theme="pullim-jr"] {
+  /* --- full primary ramp (hue 258, same as os) ----------------------- */
+  --color-primary-50:  oklch(0.972 0.024 258);
+  --color-primary-100: oklch(0.940 0.039 258);
+  --color-primary-200: oklch(0.890 0.069 258);
+  --color-primary-300: oklch(0.820 0.108 258);
+  --color-primary-400: oklch(0.730 0.154 258);
+  --color-primary-500: oklch(0.640 0.189 258);
+  --color-primary-600: oklch(0.524 0.197 258);
+  --color-primary-700: oklch(0.474 0.181 258);
+  --color-primary-800: oklch(0.414 0.154 258);
+  --color-primary-900: oklch(0.364 0.118 258);
+  --color-primary-950: oklch(0.264 0.083 258);
+
+  /* --- lemon accent -------------------------------------------------- */
+  --color-secondary-500: oklch(0.967 0.197 116);
+
+  /* --- semantic actions (brighter stop vs os) ------------------------ */
+  --color-action-primary:       var(--color-primary-500);
+  --color-action-primary-hover: var(--color-primary-600);
+  --color-action-primary-fg:    #ffffff;
+  --color-action-secondary:     var(--color-primary-100);
+  --color-action-secondary-fg:  var(--color-primary-700);
+
+  --focus-ring-color:  var(--color-primary-500);
+  --text-brand:        var(--color-primary-700);
+
+  /* --- semantic surfaces & text -------------------------------------- */
+  --surface-raised:  #ffffff;
+  --surface-sunken:  var(--color-gray-100);
+  --text-primary:    var(--color-gray-950);
+  --text-secondary:  var(--color-gray-700);
+  --text-tertiary:   var(--color-gray-500);
+  --border-default:  var(--color-gray-300);
+
+  /* --- PLAYFUL radius scale (all larger than os) --------------------- */
+  --radius-xs: 8px; --radius-sm: 12px; --radius-md: 18px; --radius-lg: 24px;
+  --radius-xl: 32px; --radius-2xl: 40px; --radius-full: 999px;
+
+  /* --- density metrics (same as os) ---------------------------------- */
+  --row-h-compact: 44px;
+  --row-h-default: 52px;
+  --row-h-large:   64px;
+  --input-h:       48px;
+  --button-h-sm:   36px;
+  --button-h:      48px;
+  --button-h-lg:   56px;
+
+  /* --- shadows (slightly softer + warmer than os) -------------------- */
+  --shadow-sm: 0 2px 6px rgba(13,26,31,.07);
+  --shadow-md: 0 6px 16px rgba(13,26,31,.10);
+  --shadow-lg: 0 16px 44px rgba(3,98,218,.16);
+  --shadow-xl: 0 24px 64px rgba(3,98,218,.22);
+
+  /* --- font weights -------------------------------------------------- */
+  --font-weight-body:   400;
+  --font-weight-medium: 500;
+  --font-weight-bold:   700;
+  --font-weight-h:      700;
+
+  /* --- brand font ---------------------------------------------------- */
+  --font-display:    var(--font-sans-kr);
+  --duration-normal: 360ms;
+  --ease-emphasized: cubic-bezier(.34,1.56,.64,1); /* overshoot/bounce */
+}

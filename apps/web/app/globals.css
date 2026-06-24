@@ -1,16 +1,72 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  html {
-    -webkit-text-size-adjust: 100%;
-  }
-  body {
-    @apply bg-white font-sans text-ink-900 antialiased;
-    font-feature-settings: 'ss06';
-  }
-  ::selection {
-    @apply bg-brand-100 text-brand-900;
-  }
+/* Tailwind v4 content sources (app/components/lib) */
+@source "../app";
+@source "../components";
+@source "../lib";
+
+/* PUDS 토큰 + 테마 (pullim-os). 출처: pullim-design-system/packages/tokens */
+@import "./tokens/_base.css";
+@import "./tokens/pullim-os.css";
+@import "./tokens/pullim-jr.css";
+
+@theme {
+  /* 본문 폰트 → PUDS 한국어 스택(Pretendard) */
+  --font-sans: var(--font-sans-kr);
+
+  /* brand → pullim-os primary (Pullim Blue, hue 258) — 기존 brand-* 유틸이 PUDS 색을 채택 */
+  --color-brand-50:  oklch(0.972 0.024 258);
+  --color-brand-100: oklch(0.940 0.039 258);
+  --color-brand-200: oklch(0.890 0.069 258);
+  --color-brand-300: oklch(0.820 0.108 258);
+  --color-brand-400: oklch(0.730 0.154 258);
+  --color-brand-500: #2f7be6;
+  --color-brand-600: #0362da; /* 풀림 가이드 BLUE — CTA·active·rule line */
+  --color-brand-700: #024fb0;
+  --color-brand-800: oklch(0.414 0.154 258);
+  --color-brand-900: oklch(0.364 0.118 258);
+
+  /* 풀림 가이드 LEMON — 상태/강조 액센트 */
+  --color-lemon: #e6ff4c;
+
+  /* ink → PUDS neutral gray ramp */
+  --color-ink-900: oklch(0.141 0.008 286);
+  --color-ink-700: oklch(0.370 0.014 286);
+  --color-ink-500: oklch(0.552 0.013 286);
+  --color-ink-300: oklch(0.705 0.010 286);
+  --color-ink-100: oklch(0.920 0.003 286);
+}
+
+/* ::selection — PUDS brand */
+::selection {
+  background-color: var(--color-brand-100);
+  color: var(--color-brand-900);
+}
+
+/* ── Hero 3D 모션 — 서비스 흐름(입력→진단→면접) 카드 부유 ───────────────── */
+@keyframes heroFloatA {
+  0%, 100% { transform: rotateX(12deg) rotateY(-20deg) translate3d(0, 0, 0); }
+  50%      { transform: rotateX(8deg)  rotateY(-14deg) translate3d(0, -16px, 28px); }
+}
+@keyframes heroFloatB {
+  0%, 100% { transform: rotateX(10deg) rotateY(-16deg) translate3d(0, 0, 40px); }
+  50%      { transform: rotateX(14deg) rotateY(-22deg) translate3d(0, 14px, 60px); }
+}
+@keyframes heroFloatC {
+  0%, 100% { transform: rotateX(14deg) rotateY(-18deg) translate3d(0, 0, 80px); }
+  50%      { transform: rotateX(9deg)  rotateY(-12deg) translate3d(0, -10px, 100px); }
+}
+@keyframes heroGlow {
+  0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: .85; transform: translate(-50%, -50%) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero3d-a, .hero3d-b, .hero3d-c, .hero3d-glow { animation: none !important; }
+}
+
+@media print {
+  aside.sticky, header.sticky, nav[aria-label="모바일 탭 메뉴"], [data-no-print] { display: none !important; }
+  main { padding: 0 !important; }
+  article, section { break-inside: avoid; }
+  body { background: #fff !important; }
 }

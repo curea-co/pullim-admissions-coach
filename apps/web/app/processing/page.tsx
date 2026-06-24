@@ -7,6 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { SkeletonCard } from '@/components/loading-skeleton';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 // 24h SLA 상태머신 화면 (Phase B).
 // 정의 §8: 클럭 시작 = 입력 완료 + 동의 시점. 클럭 종료 = 결과 노출.
@@ -21,7 +22,6 @@ const stages: { key: SlaState; label: string; detail: string }[] = [
   { key: 'completed', label: '결과 도착', detail: '학생 화면 노출 + 학부모 리포트 큐잉' },
 ];
 
-const SLA_HOURS = 24;
 // 데모 가속: 실 24h 대신 90초 사이클로 시연. dev 전용.
 const DEMO_CYCLE_MS = 90_000;
 
@@ -42,16 +42,11 @@ export default function ProcessingPage() {
   const state: SlaState = stages[stageIdx].key;
   const isComplete = state === 'completed';
 
-  // SLA deadline 24h
-  const deadline = submittedAt + SLA_HOURS * 60 * 60 * 1000;
-  const remainingMs = Math.max(0, deadline - now);
-  const remainingH = Math.floor(remainingMs / (60 * 60 * 1000));
-  const remainingM = Math.floor((remainingMs / (60 * 1000)) % 60);
-
   return (
+    <RequireAuth>
     <>
       <PageHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 진행 중
@@ -67,8 +62,6 @@ export default function ProcessingPage() {
         <SlaStatusCard
           state={state}
           stageIdx={stageIdx}
-          remainingH={remainingH}
-          remainingM={remainingM}
           isComplete={isComplete}
         />
 
@@ -120,20 +113,17 @@ export default function ProcessingPage() {
         </div>
       </main>
     </>
+    </RequireAuth>
   );
 }
 
 function SlaStatusCard({
   state,
   stageIdx,
-  remainingH,
-  remainingM,
   isComplete,
 }: {
   state: SlaState;
   stageIdx: number;
-  remainingH: number;
-  remainingM: number;
   isComplete: boolean;
 }) {
   const pct = Math.round(((stageIdx + (isComplete ? 1 : 0.5)) / stages.length) * 100);
@@ -156,8 +146,7 @@ function SlaStatusCard({
           {labelFor(state)}
         </p>
         <p className="text-xs text-ink-500">
-          24h SLA · 남은 시간 {String(remainingH).padStart(2, '0')}시간{' '}
-          {String(remainingM).padStart(2, '0')}분
+          보통 몇 분 안에 1차 결과가 나와요. 늦어도 24시간 안에 끝나고, 완료되면 알려드릴게요.
         </p>
       </div>
       <div
@@ -176,7 +165,7 @@ function SlaStatusCard({
         />
       </div>
       <p className="mt-2 text-xs text-ink-500">
-        진척 {pct}% · 클럭 시작 = 동의 완료 시점, 클럭 종료 = 결과 노출
+        지금은 &ldquo;{labelFor(state)}&rdquo; 단계예요. 끝나면 결과 화면이 자동으로 열려요.
       </p>
     </div>
   );

@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
 import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 // Phase B: 클라이언트 차단 로직.
 // 실 발송 채널(카카오 알림톡 등)·세션·DB 저장은 Phase E.
@@ -113,9 +114,10 @@ export default function ConsentPage() {
   const canProceed = allRequiredMet();
 
   return (
+    <RequireAuth>
     <>
       <PageHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">동의</h1>
           <StepIndicator current="consent" />
@@ -198,6 +200,7 @@ export default function ConsentPage() {
         </div>
       </main>
     </>
+    </RequireAuth>
   );
 }
 

@@ -7,8 +7,11 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
+import { SelfAnswer } from '@/components/result/self-answer';
+import { ResultActions } from '@/components/result/result-actions';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -26,9 +29,10 @@ export default function ResultPage() {
   }, []);
 
   return (
+    <RequireAuth>
     <>
       <PageHeader />
-      <main className="mx-auto w-full max-w-4xl px-6 py-10">
+      <main className="w-full max-w-4xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 결과
@@ -99,6 +103,14 @@ export default function ResultPage() {
         {tab === 'diagnosis' && <DiagnosisPanel />}
         {tab === 'improvements' && <ImprovementsPanel />}
 
+        <div className="mt-10 mb-6">
+          <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
+          <ResultActions
+            track={profile ? formatStandingLabel(profile) : '공학계열'}
+            summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
+          />
+        </div>
+
         <div className="mt-10 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link
             href="/consent"
@@ -115,6 +127,7 @@ export default function ResultPage() {
         </div>
       </main>
     </>
+    </RequireAuth>
   );
 }
 
@@ -174,6 +187,7 @@ function InterviewPanel() {
               </dt>
               <dd className="mt-1 text-ink-700">{q.followUp}</dd>
             </div>
+            <SelfAnswer qid={`interview-${idx}`} />
           </dl>
         </article>
       ))}
