@@ -19,6 +19,7 @@ import { validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 type InputType = 'pdf_upload' | 'text_paste';
 
@@ -214,6 +215,7 @@ export default function SubmitPage() {
   }
 
   return (
+    <RequireAuth>
     <>
       <PageHeader />
       <main className="w-full max-w-3xl px-6 py-10">
@@ -425,6 +427,7 @@ export default function SubmitPage() {
         </form>
       </main>
     </>
+    </RequireAuth>
   );
 }
 

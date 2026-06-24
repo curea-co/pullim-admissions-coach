@@ -7,6 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -20,6 +21,7 @@ export default function ResultPage() {
   const [tab, setTab] = useState<Tab>('interview');
 
   return (
+    <RequireAuth>
     <>
       <PageHeader />
       <main className="w-full max-w-4xl px-6 py-10">
@@ -90,6 +92,7 @@ export default function ResultPage() {
         </div>
       </main>
     </>
+    </RequireAuth>
   );
 }
 

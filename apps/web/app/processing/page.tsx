@@ -7,6 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { SkeletonCard } from '@/components/loading-skeleton';
 import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 // 24h SLA 상태머신 화면 (Phase B).
 // 정의 §8: 클럭 시작 = 입력 완료 + 동의 시점. 클럭 종료 = 결과 노출.
@@ -49,6 +50,7 @@ export default function ProcessingPage() {
   const remainingM = Math.floor((remainingMs / (60 * 1000)) % 60);
 
   return (
+    <RequireAuth>
     <>
       <PageHeader />
       <main className="w-full max-w-3xl px-6 py-10">
@@ -120,6 +122,7 @@ export default function ProcessingPage() {
         </div>
       </main>
     </>
+    </RequireAuth>
   );
 }
 
