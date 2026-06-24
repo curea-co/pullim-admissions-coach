@@ -42,4 +42,17 @@ describe('데이터셋·라벨', () => {
       expect(v.formats.length).toBeGreaterThan(0);
     }
   });
+  it('주요 면접 대학 15개 이상 + 핵심 대학 포함', () => {
+    const keys = Object.keys(UNIVERSITY_INTERVIEW_FORMATS);
+    expect(keys.length).toBeGreaterThanOrEqual(15);
+    for (const must of ['서울대학교', '고려대학교', '연세대학교']) {
+      expect(keys).toContain(must);
+    }
+  });
+  it('formats 값은 알려진 InterviewFormat만', () => {
+    const allowed = new Set(['record_based', 'passage_based', 'mmi']);
+    for (const [, v] of Object.entries(UNIVERSITY_INTERVIEW_FORMATS)) {
+      for (const f of v.formats) expect(allowed.has(f)).toBe(true);
+    }
+  });
 });
