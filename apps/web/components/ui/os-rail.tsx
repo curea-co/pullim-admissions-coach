@@ -13,12 +13,10 @@ export interface OsRailProps {
   items: RailItem[];
   /** Icon-only collapsed mode. */
   collapsed?: boolean;
-  /** Collapse/expand toggle — renders a button at the top of the rail. */
-  onToggle?: () => void;
   className?: string;
 }
 
-export function OsRail({ head, items, collapsed = false, onToggle, className }: OsRailProps) {
+export function OsRail({ head, items, collapsed = false, className }: OsRailProps) {
   return (
     <nav
       aria-label={head}
@@ -32,23 +30,6 @@ export function OsRail({ head, items, collapsed = false, onToggle, className }: 
         <div className="px-3 pb-1.5 pt-2 font-[var(--font-mono)] text-[10px] uppercase tracking-[.16em] text-[var(--text-tertiary)]">
           {head}
         </div>
-      )}
-      {onToggle && (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-          aria-expanded={!collapsed}
-          className={cn(
-            "mb-0.5 flex items-center rounded-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] [&_svg]:h-[19px] [&_svg]:w-[19px]",
-            collapsed ? "h-[42px] w-[42px] justify-center" : "h-[42px] px-3",
-          )}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M9 4v16" />
-          </svg>
-        </button>
       )}
       {items.map((item) => (
         <a

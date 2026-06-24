@@ -42,3 +42,24 @@
   background-color: var(--color-brand-100);
   color: var(--color-brand-900);
 }
+
+/* ── Hero 3D 모션 — 서비스 흐름(입력→진단→면접) 카드 부유 ───────────────── */
+@keyframes heroFloatA {
+  0%, 100% { transform: rotateX(12deg) rotateY(-20deg) translate3d(0, 0, 0); }
+  50%      { transform: rotateX(8deg)  rotateY(-14deg) translate3d(0, -16px, 28px); }
+}
+@keyframes heroFloatB {
+  0%, 100% { transform: rotateX(10deg) rotateY(-16deg) translate3d(0, 0, 40px); }
+  50%      { transform: rotateX(14deg) rotateY(-22deg) translate3d(0, 14px, 60px); }
+}
+@keyframes heroFloatC {
+  0%, 100% { transform: rotateX(14deg) rotateY(-18deg) translate3d(0, 0, 80px); }
+  50%      { transform: rotateX(9deg)  rotateY(-12deg) translate3d(0, -10px, 100px); }
+}
+@keyframes heroGlow {
+  0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: .85; transform: translate(-50%, -50%) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero3d-a, .hero3d-b, .hero3d-c, .hero3d-glow { animation: none !important; }
+}
