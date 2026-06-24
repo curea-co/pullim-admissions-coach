@@ -17,6 +17,7 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
+import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 
@@ -207,7 +208,14 @@ export default function SubmitPage() {
     }
 
     setErrors({});
-    // Phase B: 다음 단계(/consent)로 이동. 실 저장은 Phase C에서 NestJS api에.
+    // #25: 결과 헤더 표시용 비-PII 프로필을 sessionStorage에 저장(생기부 text는 저장 안 함).
+    saveSubmittedProfile({
+      grade,
+      semester,
+      schoolType,
+      targetTrack,
+      targetUniversities: universities.filter((u) => u.name.trim().length > 0),
+    });
     startTransition(() => {
       router.push('/consent');
     });
