@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
+import { SelfAnswer } from '@/components/result/self-answer';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -177,6 +178,7 @@ function InterviewPanel() {
               </dt>
               <dd className="mt-1 text-ink-700">{q.followUp}</dd>
             </div>
+            <SelfAnswer qid={`interview-${idx}`} />
           </dl>
         </article>
       ))}
