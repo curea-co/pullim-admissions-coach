@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -21,9 +22,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // typedRoutes: next는 require-auth가 주입한 내부 경로이므로 StaticRoutes로 단언
-  type AppRoute = '/consent' | '/login' | '/parent' | '/processing' | '/' | '/signup' | '/result' | '/mypage' | '/submit';
-  const nextRoute = next as AppRoute;
+  // typedRoutes: next는 require-auth가 주입한 내부 경로이므로 Route로 단언
+  const nextRoute = (next ?? '/mypage') as unknown as Route;
 
   // 이미 로그인된 경우 즉시 이동
   useEffect(() => {
