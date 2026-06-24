@@ -63,3 +63,10 @@
 @media (prefers-reduced-motion: reduce) {
   .hero3d-a, .hero3d-b, .hero3d-c, .hero3d-glow { animation: none !important; }
 }
+
+@media print {
+  aside, header.sticky, nav[aria-label="모바일 탭 메뉴"], [data-no-print] { display: none !important; }
+  main { padding: 0 !important; }
+  article, section { break-inside: avoid; }
+  body { background: #fff !important; }
+}

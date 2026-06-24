@@ -11,6 +11,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { SelfAnswer } from '@/components/result/self-answer';
+import { ResultActions } from '@/components/result/result-actions';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -101,6 +102,14 @@ export default function ResultPage() {
         {tab === 'interview' && <InterviewPanel />}
         {tab === 'diagnosis' && <DiagnosisPanel />}
         {tab === 'improvements' && <ImprovementsPanel />}
+
+        <div className="mt-10 mb-6">
+          <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
+          <ResultActions
+            track={profile ? formatStandingLabel(profile) : '공학계열'}
+            summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
+          />
+        </div>
 
         <div className="mt-10 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link
