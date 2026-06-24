@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
-import { competencyLabel } from '@pullim/shared';
+import { competencyLabel, formatStandingLabel } from '@pullim/shared';
+import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -19,6 +20,10 @@ const tabs: { id: Tab; label: string }[] = [
 
 export default function ResultPage() {
   const [tab, setTab] = useState<Tab>('interview');
+  const [profile, setProfile] = useState<SubmittedProfile | null>(null);
+  useEffect(() => {
+    setProfile(loadSubmittedProfile());
+  }, []);
 
   return (
     <>
@@ -30,9 +35,19 @@ export default function ResultPage() {
           </h1>
           <StepIndicator current="result" />
         </div>
-        <p className="mb-6 text-ink-700">
-          {parkJunho.identity.displayLabel} · 고3 2학기 · 공학계열 · 24시간 안에 1차 결과 도착
+        <p className="mb-2 text-ink-700">
+          {profile
+            ? `${formatStandingLabel(profile)} · 24시간 안에 1차 결과 도착`
+            : '예시 학생 (데모) · 고3 2학기 · 이공 · 24시간 안에 1차 결과 도착'}
         </p>
+        {profile && profile.targetUniversities.length > 0 && (
+          <p className="mb-6 text-sm text-ink-500">
+            목표:{' '}
+            {profile.targetUniversities
+              .map((u, i) => `${i + 1}순위 ${u.name}${u.department ? ` ${u.department}` : ''}`)
+              .join(' · ')}
+          </p>
+        )}
 
         <GuardrailLabel
           variant={
@@ -44,6 +59,15 @@ export default function ResultPage() {
           }
           className="mb-6"
         />
+
+        <aside
+          role="note"
+          className="mb-6 rounded-2xl border border-ink-100 bg-ink-100/50 px-4 py-3 text-sm leading-relaxed text-ink-600"
+        >
+          아래 면접·진단·보완{' '}
+          <strong className="text-ink-900">본문은 예시 결과(데모)</strong>입니다. 실제 개인화
+          결과는 출시 버전에서 제공됩니다.
+        </aside>
 
         {/* Tabs */}
         <div
@@ -97,6 +121,9 @@ export default function ResultPage() {
 function InterviewPanel() {
   return (
     <section className="space-y-4">
+      <p className="text-sm text-ink-500">
+        데모 미리보기 3건 · 실서비스는 예상 질문 10종
+      </p>
       {parkJunho.interviewPack.questions.map((q, idx) => (
         <article
           key={idx}
