@@ -134,7 +134,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="hidden lg:block">
+          <div className="mt-2 lg:mt-0">
             <Hero3D />
           </div>
         </div>

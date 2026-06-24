@@ -13,13 +13,13 @@ function Chip({ n, label }: { n: string; label: string }) {
 }
 
 const cardBase =
-  'absolute w-[244px] rounded-2xl border border-ink-100 bg-white p-4 shadow-[0_24px_60px_-20px_rgba(3,98,218,.35)] [transform-style:preserve-3d]';
+  'absolute w-[clamp(170px,46vw,244px)] rounded-2xl border border-ink-100 bg-white p-4 shadow-[0_24px_60px_-20px_rgba(3,98,218,.35)] [transform-style:preserve-3d]';
 
 export function Hero3D() {
   return (
     <div
       aria-hidden
-      className="relative h-[380px] w-full select-none [perspective:1400px] sm:h-[440px]"
+      className="relative h-[300px] w-full select-none overflow-hidden [perspective:1400px] sm:h-[440px] sm:overflow-visible"
     >
       {/* 배경 글로우 */}
       <span
