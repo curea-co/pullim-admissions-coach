@@ -193,7 +193,7 @@ NestJS api에서 다음 형식으로 사용자 메시지를 구성한다.
 {record_text}
 
 # 응답 요건 재확인
-- 시스템 §6 규칙 8개 모두 통과 (v0.2 — evidence 비어있음 0건 포함)
+- 시스템 §6 자기검토 체크리스트 전부 통과 (진단 diagnosis_guide의 evidence 비어있음 0건 포함; 면접 질문 evidence는 record_based만 필수, passage_based·mmi는 빈 배열)
 - JSON 1건만 (마크다운 코드 펜스 없이)
 - 면접 질문 10건, 진단 3역량(academic·career·community 각 1건), 보완 제안 3건
 - 각 면접 질문의 `format`은 위 면접 유형 중 하나
