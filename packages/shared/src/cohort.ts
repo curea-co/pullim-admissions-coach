@@ -31,3 +31,11 @@ export function resolveCohort(admissionYear: number, region: Region): CohortResu
     emphasizeSetuk: isNew,
   };
 }
+
+/**
+ * 현재 학년(1=고1, 2=고2, 3=고3) → 대입 체제.
+ * 고등학교 1학년 기준 입학연도는 currentYear - (grade - 1).
+ */
+export function cohortFromGrade(grade: number, currentYear: number = new Date().getFullYear()): CohortResult {
+  return resolveCohort(currentYear - (grade - 1), 'unknown');
+}
