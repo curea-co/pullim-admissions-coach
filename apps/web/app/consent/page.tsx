@@ -138,7 +138,7 @@ export default function ConsentPage() {
           <button
             type="button"
             onClick={() => setIsMinor((v) => !v)}
-            className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200"
+            className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             {isMinor ? '미성년 · 변경' : '성인 · 변경'}
           </button>
@@ -184,7 +184,7 @@ export default function ConsentPage() {
         <div className="mt-8 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link
             href="/submit"
-            className="text-sm text-ink-500 hover:text-ink-900"
+            className="rounded text-sm text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             ← 입력으로
           </Link>
@@ -193,7 +193,7 @@ export default function ConsentPage() {
             onClick={handleProceed}
             disabled={!canProceed || isPending}
             aria-disabled={!canProceed || isPending}
-            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? '이동 중…' : '동의 후 진단 시작 →'}
           </button>

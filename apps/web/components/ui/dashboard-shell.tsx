@@ -96,7 +96,7 @@ export function DashboardShell({
             </svg>
           </button>
         )}
-        <main className="min-w-0 flex-1 px-6 py-8 pb-24 md:pb-8">{children}</main>
+        <main id="main-content" className="min-w-0 flex-1 px-6 py-8 pb-24 md:pb-8">{children}</main>
       </div>
       {tabbarNode}
     </div>
