@@ -13,10 +13,6 @@ export interface DashboardShellProps {
   /** Left navigation. Pass a labelled <nav> (e.g. OsRail) for landmark accessibility. */
   rail?: React.ReactNode;
   tabbar?: TabbarItem[] | React.ReactNode;
-  /** Sidebar collapsed (icon-only) state. */
-  collapsed?: boolean;
-  /** Toggle handler — when provided, a collapse button shows in the topbar. */
-  onToggleCollapsed?: () => void;
   children: React.ReactNode;
   className?: string;
 }
@@ -49,29 +45,13 @@ export function DashboardShell({
   actions,
   rail,
   tabbar,
-  collapsed = false,
-  onToggleCollapsed,
   children,
   className,
 }: DashboardShellProps) {
   const tabbarNode = Array.isArray(tabbar) ? <OsTabbar items={tabbar} /> : tabbar;
   return (
     <div className={cn("min-h-screen bg-[var(--surface-canvas)] text-[var(--text-primary)]", className)}>
-      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-3 border-b border-[var(--border-default)] bg-[var(--surface-raised)] px-4">
-        {onToggleCollapsed && (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-            aria-expanded={!collapsed}
-            className="hidden h-9 w-9 items-center justify-center rounded-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] md:inline-flex"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <path d="M9 4v16" />
-            </svg>
-          </button>
-        )}
+      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-4 border-b border-[var(--border-default)] bg-[var(--surface-raised)] px-4">
         <Brand brand={brand} />
         {switcher}
         <div className="flex-1" />
