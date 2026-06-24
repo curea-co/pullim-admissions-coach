@@ -19,7 +19,12 @@ export function setAnswer(qid: string, text: string): void {
   localStorage.setItem(ANSWERS_KEY, JSON.stringify(m));
 }
 export function listDiagnoses(): SavedDiagnosis[] {
-  return readJSON<SavedDiagnosis[]>(SAVED_KEY, []).slice().reverse();
+  // 최신순: createdAt 내림차순(주). 동일 ms 저장은 삽입 역순(=최신 먼저)을 유지하기 위해
+  // pre-reverse 후 stable sort(ES2019) 사용.
+  return readJSON<SavedDiagnosis[]>(SAVED_KEY, [])
+    .slice()
+    .reverse()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 export function saveDiagnosis(input: { track: string; summary: string }): SavedDiagnosis {
   const list = readJSON<SavedDiagnosis[]>(SAVED_KEY, []);
