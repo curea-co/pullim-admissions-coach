@@ -1,7 +1,7 @@
 import type {
   AuthAdapter, User, SignupInput, GuardianInput, DiagnosisSummary, SignupResult,
 } from './types';
-import { isMinorByBirth } from './types';
+import { isMinorByBirth, ageBandFromBirth } from './types';
 
 const SESSION_KEY = 'puds-auth-session'; // 현재 로그인 user id
 const USERS_KEY = 'puds-auth-users';     // id -> {user, password(검증용, 데모 한정)}
@@ -37,7 +37,7 @@ export const mockAuthAdapter: AuthAdapter = {
     const id = `user_${Object.keys(users).length + 1}`;
     const user: User = {
       id, email: input.email, displayName: input.displayName,
-      ageBand: minor ? 'under14' : 'over14', // 데모 단순화(실연동 시 서버 ageBand 사용)
+      ageBand: ageBandFromBirth(input.birthDate), // 만14 경계(개인정보 동의) — isMinor(만19)와 별개
       isMinor: minor, guardianConsent: minor ? 'pending' : 'none',
       package: 'home', tier: 'free',
     };

@@ -12,7 +12,15 @@ interface StartCtaProps {
 export function StartCta({ children, className }: StartCtaProps) {
   const { status } = useAuth();
 
-  // When loading, send to /signup (safe default — auth redirect handles the rest).
+  if (status === 'loading') {
+    // 인증 상태 확인 전 — 네비게이션 방지(비활성 span)
+    return (
+      <span aria-disabled="true" className={cn(className, 'cursor-wait opacity-60')}>
+        {children}
+      </span>
+    );
+  }
+
   const href = status === 'authed' ? ('/submit' as const) : ('/signup' as const);
 
   return (

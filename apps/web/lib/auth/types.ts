@@ -57,3 +57,12 @@ export function isMinorByBirth(birthDate: string, today = new Date()): boolean {
   if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
   return age < 19;
 }
+
+// 만 14세 경계로 ageBand 산출(개인정보 동의 경계) — isMinorByBirth(만19)와 별개
+export function ageBandFromBirth(birthDate: string, today = new Date()): AgeBand {
+  const b = new Date(birthDate);
+  let age = today.getFullYear() - b.getFullYear();
+  const m = today.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+  return age < 14 ? 'under14' : 'over14';
+}
