@@ -336,7 +336,7 @@ export default function SubmitPage() {
           {/* 2. 지원 학부 */}
           <Field label="2. 지원 학부 (택 1)" required>
             <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
               data-field-error="targetTrack"
             >
               {tracks.map((t) => (

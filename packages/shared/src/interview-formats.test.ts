@@ -35,6 +35,12 @@ describe('lookupInterviewFormats', () => {
   it('연세대+의대는 mmi 포함', () => {
     expect(lookupInterviewFormats([{ name: '연세대학교' }], 'medical')).toContain('mmi');
   });
+  it('무전공(undeclared)·미매칭은 학생부 기반만', () => {
+    expect(lookupInterviewFormats([], 'undeclared')).toEqual(['record_based']);
+  });
+  it('무전공(undeclared)·서울대도 mmi 미포함', () => {
+    expect(lookupInterviewFormats([{ name: '서울대학교' }], 'undeclared')).not.toContain('mmi');
+  });
 });
 
 describe('데이터셋·라벨', () => {

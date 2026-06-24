@@ -75,9 +75,9 @@
     },
 
     "targetTrack": {
-      "description": "정의 §3-2 (v0.3.1). 지원 학부 5계열 중 택 1.",
-      "enum": ["humanities", "science_engineering", "medical", "arts_athletics", "other"],
-      "$comment": "humanities=인문, science_engineering=이공(자연과학+공학), medical=의치한, arts_athletics=예체능, other=기타"
+      "description": "정의 §3-2 (v0.3.5). 지원 학부 6계열 중 택 1.",
+      "enum": ["humanities", "science_engineering", "medical", "arts_athletics", "undeclared", "other"],
+      "$comment": "humanities=인문, science_engineering=이공(자연과학+공학), medical=의치한, arts_athletics=예체능, undeclared=무전공(전공자율), other=기타. 2026-06-25: 5→6계열 확장(undeclared 추가)"
     },
 
     "targetUniversities": {

@@ -76,13 +76,14 @@ DB 설계용 5 엔티티. 데이터 분류(T1~T4)는 [보안 정책 v0.1 §2](00
 | `gradeLevel` | int (1~3) | ✅ | T4 | 고1·고2·고3 |
 | `semester` | int (1\|2) | ✅ | T4 | 1·2학기 |
 | `schoolType` | enum | ✅ | T4 | `general`(일반고) / `special_purpose`(특목고) / `autonomous`(자사고·자율고) / `ged`(검정고시) |
-| `targetTrack` | enum | ✅ | T4 | `humanities`(인문) / `science_engineering`(이공) / `medical`(의치한) / `arts_athletics`(예체능) / `other`(기타) |
+| `targetTrack` | enum | ✅ | T4 | `humanities`(인문) / `science_engineering`(이공) / `medical`(의치한) / `arts_athletics`(예체능) / `undeclared`(무전공·전공자율) / `other`(기타) |
 | `targetUniversities[]` | jsonb | ❌ | T4 | 최대 3 (선택) |
 | `weakAreas` | text | ❌ | T4 | 자유 텍스트 (선택) |
 | `status` | enum | ✅ | — | `pending` / `active` / `withdrawn` |
 | `createdAt` / `updatedAt` | timestamptz | ✅ | — | |
 
 > **enum 변경 이력 (2026-05-29):** targetTrack을 4계열에서 5계열로 확장. 변경 전 `engineering`(공학) + `medical_natural`(의학·자연) 분리에서 → `science_engineering`(이공, 자연과학 포함) + `medical`(의치한)로 재정의 + `other`(기타) 추가. 본 변경은 정의 v0.3 §3-2 / Zod 스키마 / JSON Schema 모두에 반영됨.
+> **enum 변경 이력 (2026-06-25):** targetTrack을 5계열에서 6계열로 확장. `undeclared`(무전공·전공자율) 추가. 본 변경은 정의 v0.3.5 §3-2 / Zod 스키마(schemas.ts) / JSON Schema(student_profile_schema_v0.1.json) 모두에 반영됨. (#23)
 
 ### ② Guardian (학부모)
 
@@ -181,3 +182,4 @@ DB 설계용 5 엔티티. 데이터 분류(T1~T4)는 [보안 정책 v0.1 §2](00
 | 버전 | 일자 | 변경 |
 |---|---|---|
 | v0.1 | 2026-05-29 | 초안. 5 엔티티(Student·Guardian·Household·Consent·AuthCredential) + 필수값 + 5계열 enum(인문/이공/의치한/예체능/기타) + 4 학교유형 enum(일반고/특목고/자사고·자율고/검정고시) 정의. Gate keeper Q1~Q4 응답으로 작성 |
+| v0.1.1 | 2026-06-25 | targetTrack enum 5→6계열 확장: `undeclared`(무전공·전공자율) 추가. 정의 v0.3.5 §3-2 동기화. (#23) |
