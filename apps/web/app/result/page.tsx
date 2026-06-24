@@ -35,7 +35,7 @@ export default function ResultPage() {
           </h1>
           <StepIndicator current="result" />
         </div>
-        <p className="mb-2 text-ink-700">
+        <p className={cn('text-ink-700', profile && profile.targetUniversities.length > 0 ? 'mb-2' : 'mb-6')}>
           {profile
             ? `${formatStandingLabel(profile)} · 24시간 안에 1차 결과 도착`
             : '예시 학생 (데모) · 고3 2학기 · 이공 · 24시간 안에 1차 결과 도착'}
