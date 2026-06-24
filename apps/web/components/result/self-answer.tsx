@@ -7,6 +7,7 @@ export function SelfAnswer({ qid }: { qid: string }) {
   const [saved, setSaved] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => { setValue(getAnswer(qid)); }, [qid]);
+  useEffect(() => () => clearTimeout(timer.current), []);
   function onChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const v = e.target.value;
     setValue(v); setSaved(false);

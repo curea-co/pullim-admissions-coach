@@ -23,4 +23,10 @@ describe('result-store', () => {
     expect(d.id).toMatch(/^dx_/);
     expect(Number.isNaN(Date.parse(d.createdAt))).toBe(false);
   });
+  it('동일 track+summary 중복 저장 방지', () => {
+    const first = store.saveDiagnosis({ track: '의학계열', summary: '중복테스트' });
+    const second = store.saveDiagnosis({ track: '의학계열', summary: '중복테스트' });
+    expect(store.listDiagnoses().length).toBe(1);
+    expect(first.id).toBe(second.id);
+  });
 });

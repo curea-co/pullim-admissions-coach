@@ -28,8 +28,10 @@ export function listDiagnoses(): SavedDiagnosis[] {
 }
 export function saveDiagnosis(input: { track: string; summary: string }): SavedDiagnosis {
   const list = readJSON<SavedDiagnosis[]>(SAVED_KEY, []);
+  const existing = list.find((d) => d.track === input.track && d.summary === input.summary);
+  if (existing) return existing;
   const d: SavedDiagnosis = {
-    id: `dx_${list.length + 1}_${Date.now()}`,
+    id: `dx_${crypto.randomUUID()}`,
     createdAt: new Date().toISOString(),
     track: input.track,
     summary: input.summary,

@@ -16,7 +16,15 @@ export function ResultActions({ track, summary }: { track: string; summary: stri
         내 결과 저장
       </button>
       <button type="button"
-        onClick={() => { void navigator.clipboard?.writeText(window.location.href); flash('링크를 복사했어요'); }}
+        onClick={() => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(window.location.href)
+              .then(() => flash('링크를 복사했어요'))
+              .catch(() => flash('복사에 실패했어요'));
+          } else {
+            flash('이 브라우저에서는 복사가 안 돼요');
+          }
+        }}
         className="rounded-xl border border-ink-100 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:border-brand-200 hover:text-brand-700">
         링크 복사
       </button>

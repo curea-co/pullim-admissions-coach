@@ -65,7 +65,7 @@
 }
 
 @media print {
-  aside, header.sticky, nav[aria-label="모바일 탭 메뉴"], [data-no-print] { display: none !important; }
+  aside.sticky, header.sticky, nav[aria-label="모바일 탭 메뉴"], [data-no-print] { display: none !important; }
   main { padding: 0 !important; }
   article, section { break-inside: avoid; }
   body { background: #fff !important; }
