@@ -10,8 +10,12 @@ import {
   schoolTypeLabel,
   type TargetTrack,
   type SchoolType,
+  detectPii,
+  redactPii,
+  type PiiMatch,
 } from '@pullim/shared';
 import { PageHeader } from '@/components/page-header';
+import { PiiScanPanel } from '@/components/pii-scan-panel';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
@@ -36,14 +40,6 @@ const tracks: { value: TargetTrack; label: string }[] = (
 const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
 ).map(([value, label]) => ({ value, label }));
-
-const maskedFieldOptions = [
-  { id: 'student_name', label: '학생 이름' },
-  { id: 'school_name', label: '학교명' },
-  { id: 'birth_date', label: '생년월일' },
-  { id: 'phone', label: '전화·주소' },
-  { id: 'teacher_name', label: '교사명' },
-] as const;
 
 export default function SubmitPage() {
   const router = useRouter();
@@ -70,6 +66,9 @@ export default function SubmitPage() {
   }, []);
   const [maskingApplied, setMaskingApplied] = useState(false);
   const [maskedFields, setMaskedFields] = useState<string[]>([]);
+  const [piiMatches, setPiiMatches] = useState<PiiMatch[]>([]);
+  const [warnAck, setWarnAck] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
   const [targetTrack, setTargetTrack] = useState<TargetTrack>(
     parkJunho.profile.targetTrack
@@ -89,10 +88,27 @@ export default function SubmitPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function toggleMaskedField(id: string) {
+  // recordText 변경 시 300ms 디바운스로 PII 스캔. 변경되면 warn 확인은 초기화.
+  useEffect(() => {
+    setWarnAck(false);
+    setScanned(false);
+    const id = setTimeout(() => {
+      setPiiMatches(detectPii(recordText));
+      setScanned(true);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [recordText]);
+
+  const blockMatches = piiMatches.filter((m) => m.tier === 'block');
+  const warnMatches = piiMatches.filter((m) => m.tier === 'warn');
+
+  function handleAutoRedact() {
+    const matches = detectPii(recordText);
+    setRecordText(redactPii(recordText, matches));
     setMaskedFields((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      Array.from(new Set([...prev, ...matches.map((m) => m.maskedField)]))
     );
+    setMaskingApplied(true);
   }
 
   async function handlePdfFile(file: File) {
@@ -190,6 +206,22 @@ export default function SubmitPage() {
     e.preventDefault();
     setSubmitError(null);
 
+    // 티어드 PII 게이트. block은 하드 차단, warn은 2차 확인.
+    const matches = detectPii(recordText);
+    const block = matches.filter((m) => m.tier === 'block');
+    const warn = matches.filter((m) => m.tier === 'warn');
+    if (block.length > 0) {
+      setSubmitError('전화·학교명 등 반드시 가려야 할 식별정보가 남아있어요. [자동 가림]을 눌러주세요.');
+      const node = document.querySelector('[data-field-error="record.text"]') as HTMLElement | null;
+      node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (warn.length > 0 && !warnAck) {
+      setSubmitError('이름·교사로 보이는 항목이 있어요. 자동 가림하거나, 식별정보가 아니면 확인란을 체크해주세요.');
+      return;
+    }
+    setMaskingApplied(true);
+
     const result = validate(studentProfileSchema, buildPayload());
     if (!result.ok) {
       setErrors(result.errors);
@@ -282,13 +314,21 @@ export default function SubmitPage() {
             )}
             <FieldError msg={errors['record.text']} />
 
-            <MaskingChecklist
-              checked={maskingApplied}
-              onCheckedChange={setMaskingApplied}
-              selected={maskedFields}
-              onToggle={toggleMaskedField}
-              errorMsg={errors['record.maskingApplied']}
-            />
+            <PiiScanPanel matches={piiMatches} onAutoRedact={handleAutoRedact} hasText={recordText.trim().length > 0} scanned={scanned} />
+
+            {warnMatches.length > 0 && blockMatches.length === 0 && (
+              <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={warnAck}
+                  onChange={(e) => setWarnAck(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 accent-brand-600"
+                />
+                <span className="text-sm text-ink-900">
+                  표시된 항목은 식별정보가 아님을 확인했고, 이대로 진행합니다.
+                </span>
+              </label>
+            )}
           </Field>
 
           {/* 2. 지원 학부 */}
@@ -722,66 +762,3 @@ function FieldError({ msg }: { msg?: string }) {
   );
 }
 
-function MaskingChecklist({
-  checked,
-  onCheckedChange,
-  selected,
-  onToggle,
-  errorMsg,
-}: {
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-  selected: string[];
-  onToggle: (id: string) => void;
-  errorMsg?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'mt-3 rounded-xl border px-4 py-3',
-        errorMsg ? 'border-rose-200 bg-rose-50/40' : 'border-ink-100 bg-ink-100/40'
-      )}
-    >
-      <label className="flex cursor-pointer items-start gap-2.5">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onCheckedChange(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-brand-600"
-          data-field-error="record.maskingApplied"
-        />
-        <span className="text-sm font-medium text-ink-900">
-          업로드 전에 다음 식별정보가 가려져 있는지 확인했습니다
-        </span>
-      </label>
-      <ul className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink-700 sm:grid-cols-5">
-        {maskedFieldOptions.map((opt) => {
-          const active = selected.includes(opt.id);
-          return (
-            <li key={opt.id}>
-              <button
-                type="button"
-                onClick={() => onToggle(opt.id)}
-                className={cn(
-                  'flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left transition',
-                  active
-                    ? 'border-brand-300 bg-brand-50 text-brand-700'
-                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-                )}
-              >
-                <span
-                  className={cn(
-                    'size-1.5 rounded-full',
-                    active ? 'bg-brand-500' : 'bg-ink-300'
-                  )}
-                />
-                {opt.label}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <FieldError msg={errorMsg} />
-    </div>
-  );
-}
