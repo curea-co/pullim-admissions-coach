@@ -35,6 +35,25 @@ export function resolveCohort(admissionYear: number, region: Region): CohortResu
 /**
  * 현재 학년(1=고1, 2=고2, 3=고3) → 대입 체제.
  * 고등학교 1학년 기준 입학연도는 currentYear - (grade - 1).
+ *
+ * @param grade      현재 학년 (1=고1, 2=고2, 3=고3)
+ * @param currentYear 기준 연도 (기본값: 실행 시점 연도)
+ *
+ * @remarks
+ * **제한사항 — region / track 필드는 placeholder 값입니다.**
+ * 이 함수는 `region: 'unknown'`을 고정으로 넘기므로 반환된
+ * `CohortResult.region`은 항상 `'unknown'`이고,
+ * `track`은 실제 지역 데이터가 아닌 신/구체제 여부만으로 결정됩니다.
+ * (`isNew === true` → `'core'`, `false` → `'beachhead'`는 의미론적으로
+ * 지역 기반 판단이 아닌 임시 값입니다.)
+ *
+ * UI 표시처럼 `system` · `emphasizeSetuk`만 사용하는 호출자에게는 안전합니다.
+ * 그러나 지역 민감 AI 파이프라인(처방/적합성 분기 등)에서 `region`이나
+ * `track`을 소비할 경우, 반드시 `resolveCohort(admissionYear, actualRegion)`을
+ * 직접 호출하여 실제 region을 전달해야 합니다.
+ *
+ * TODO: 실제 region을 알 수 있는 호출 경로에서는 `resolveCohort`를 직접 사용하거나
+ * 이 함수에 `region` 파라미터를 추가(기본값 `'unknown'`)하여 스레드를 완성할 것.
  */
 export function cohortFromGrade(grade: number, currentYear: number = new Date().getFullYear()): CohortResult {
   return resolveCohort(currentYear - (grade - 1), 'unknown');

@@ -45,14 +45,14 @@ export default function ResultPage() {
           </h1>
           <StepIndicator current="result" />
         </div>
-        <p className={cn('text-ink-700', profile && profile.targetUniversities.length > 0 ? 'mb-2' : 'mb-6')}>
+        <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
           {profile
             ? `${formatStandingLabel(profile)} · 24시간 안에 1차 결과 도착`
             : '예시 학생 (데모) · 고3 2학기 · 이공 · 24시간 안에 1차 결과 도착'}
         </p>
         {profile && (() => {
           const cohort = cohortFromGrade(profile.grade);
-          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 내신 5등급제로 세특(정성평가) 비중↑' : '');
+          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영 — AI는 세특 문구를 쓰지 않습니다' : '');
           return (
             <p className="mb-2">
               <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
