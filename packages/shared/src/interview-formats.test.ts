@@ -29,6 +29,12 @@ describe('lookupInterviewFormats', () => {
     const f = lookupInterviewFormats([{ name: '서울대학교' }, { name: '서울대학교' }], 'humanities');
     expect(new Set(f).size).toBe(f.length);
   });
+  it('mmi는 의대 한정 — 연세대+인문은 mmi 미포함', () => {
+    expect(lookupInterviewFormats([{ name: '연세대학교' }], 'humanities')).toEqual(['record_based', 'passage_based']);
+  });
+  it('연세대+의대는 mmi 포함', () => {
+    expect(lookupInterviewFormats([{ name: '연세대학교' }], 'medical')).toContain('mmi');
+  });
 });
 
 describe('데이터셋·라벨', () => {

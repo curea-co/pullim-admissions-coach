@@ -121,6 +121,8 @@ export function lookupInterviewFormats(
     const entry = byNorm.get(normalize(u.name));
     if (entry) for (const f of entry.formats) out.add(f);
   }
+  // mmi는 의대(medical) 한정 — 비의대 계열에는 대학 매칭으로도 부여하지 않는다(의예과 한정 제약).
+  if (track !== 'medical') out.delete('mmi');
   // 안정 순서: record_based → passage_based → mmi
   const order: InterviewFormat[] = ['record_based', 'passage_based', 'mmi'];
   return order.filter((f) => out.has(f));

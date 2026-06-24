@@ -152,14 +152,20 @@ function InterviewPanel() {
                 근거 생기부 항목
               </dt>
               <dd className="mt-1">
-                <ul className="space-y-1">
-                  {q.evidence.map((e) => (
-                    <li key={e} className="flex gap-2 text-ink-700">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
-                      <span>{e}</span>
-                    </li>
-                  ))}
-                </ul>
+                {q.evidence.length > 0 ? (
+                  <ul className="space-y-1">
+                    {q.evidence.map((e) => (
+                      <li key={e} className="flex gap-2 text-ink-700">
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
+                        <span>{e}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink-500">
+                    {(q.format as string) === 'mmi' ? '(가상 상황 면접 — 생기부 근거 없음)' : '(제시문 면접 — 생기부 근거 없음)'}
+                  </p>
+                )}
               </dd>
             </div>
             <div>
