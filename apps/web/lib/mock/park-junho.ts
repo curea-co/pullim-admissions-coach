@@ -2,10 +2,11 @@
 // 출처: docs/003_Admissions_Coach_personas_v.2.md (v0.1.2), 정의 v0.3 §4.
 // 실 사용자 데이터 아님. Phase D에서 실제 AI 응답으로 대체.
 
-import type { TargetTrack, SchoolType, DiagnosisGuide } from '@pullim/shared';
+import type { TargetTrack, SchoolType, DiagnosisGuide, InterviewFormat } from '@pullim/shared';
 
 export type InterviewQuestion = {
   question: string;
+  format: InterviewFormat;
   direction: string;
   evidence: string[];
   followUp: string;
@@ -38,6 +39,7 @@ export const parkJunho = {
       {
         question:
           '학교생활 중 가장 의미 있게 참여한 활동과 그 활동이 본인에게 어떤 영향을 주었는지 말해주세요.',
+        format: 'record_based',
         direction:
           '코딩 동아리 활동과 진로 탐색을 잇는 흐름으로 답변. 결과보다 *과정에서 배운 것*에 무게.',
         evidence: [
@@ -50,6 +52,7 @@ export const parkJunho = {
       {
         question:
           '본인이 지원한 학부의 적성과 본인의 활동이 어떻게 연결된다고 생각하나요?',
+        format: 'record_based',
         direction:
           '학업역량(정보·수학)과 진로 시도(동아리 산출물)를 두 축으로 두고, *왜 이 학부가 본인의 시도를 더 깊게 할 수 있는 장소인지* 본인 언어로 설명.',
         evidence: [
@@ -61,6 +64,7 @@ export const parkJunho = {
       },
       {
         question: '팀 안에서 의견이 갈렸을 때 어떻게 행동했는지 사례를 들어주세요.',
+        format: 'record_based',
         direction:
           '공동체역량 — *합의 과정*과 *본인의 역할 변화*를 시간 순으로 짧게. 누가 옳고 그른지가 아니라 *어떻게 같이 나아갔는지*.',
         evidence: ['수행평가 팀 과제', '동아리 발표 준비'],

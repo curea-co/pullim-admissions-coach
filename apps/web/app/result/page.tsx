@@ -7,7 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
-import { competencyLabel, formatStandingLabel } from '@pullim/shared';
+import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
@@ -129,9 +129,12 @@ function InterviewPanel() {
           key={idx}
           className="rounded-2xl border border-ink-100 bg-white p-5"
         >
-          <header className="flex items-baseline gap-3">
+          <header className="flex flex-wrap items-baseline gap-2">
             <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
               Q{idx + 1}
+            </span>
+            <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+              {INTERVIEW_FORMAT_LABEL[q.format]}
             </span>
             <h3 className="text-base font-semibold leading-snug text-ink-900">
               {q.question}
@@ -149,14 +152,20 @@ function InterviewPanel() {
                 근거 생기부 항목
               </dt>
               <dd className="mt-1">
-                <ul className="space-y-1">
-                  {q.evidence.map((e) => (
-                    <li key={e} className="flex gap-2 text-ink-700">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
-                      <span>{e}</span>
-                    </li>
-                  ))}
-                </ul>
+                {q.evidence.length > 0 ? (
+                  <ul className="space-y-1">
+                    {q.evidence.map((e) => (
+                      <li key={e} className="flex gap-2 text-ink-700">
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
+                        <span>{e}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink-500">
+                    {(q.format as string) === 'mmi' ? '(가상 상황 면접 — 생기부 근거 없음)' : '(제시문 면접 — 생기부 근거 없음)'}
+                  </p>
+                )}
               </dd>
             </div>
             <div>
