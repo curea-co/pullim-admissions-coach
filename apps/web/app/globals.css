@@ -20,11 +20,14 @@
   --color-brand-200: oklch(0.890 0.069 258);
   --color-brand-300: oklch(0.820 0.108 258);
   --color-brand-400: oklch(0.730 0.154 258);
-  --color-brand-500: oklch(0.640 0.189 258);
-  --color-brand-600: oklch(0.524 0.197 258);
-  --color-brand-700: oklch(0.474 0.181 258);
+  --color-brand-500: #2f7be6;
+  --color-brand-600: #0362da; /* 풀림 가이드 BLUE — CTA·active·rule line */
+  --color-brand-700: #024fb0;
   --color-brand-800: oklch(0.414 0.154 258);
   --color-brand-900: oklch(0.364 0.118 258);
+
+  /* 풀림 가이드 LEMON — 상태/강조 액센트 */
+  --color-lemon: #e6ff4c;
 
   /* ink → PUDS neutral gray ramp */
   --color-ink-900: oklch(0.141 0.008 286);
