@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
-import { auth, type DiagnosisSummary } from '@/lib/auth';
+import { auth } from '@/lib/auth';
+import { listDiagnoses, type SavedDiagnosis } from '@/lib/result-store';
 import { EmptyState } from '@/components/empty-state';
 import { cn } from '@/lib/utils';
 
@@ -66,22 +67,12 @@ function DeleteAccountModal({
 function MyPageContent() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [diagnoses, setDiagnoses] = useState<DiagnosisSummary[]>([]);
-  const [diagLoading, setDiagLoading] = useState(true);
-  const [diagError, setDiagError] = useState(false);
+  const [diagnoses, setDiagnoses] = useState<SavedDiagnosis[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLogoutPending, startLogoutTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
 
-  useEffect(() => {
-    let cancelled = false;
-    auth.listDiagnoses().then((list) => {
-      if (!cancelled) { setDiagnoses(list); setDiagLoading(false); }
-    }).catch(() => {
-      if (!cancelled) { setDiagLoading(false); setDiagError(true); }
-    });
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
 
   function handleLogout() {
     startLogoutTransition(async () => {
@@ -182,14 +173,10 @@ function MyPageContent() {
           진단 이력
         </h2>
 
-        {diagLoading ? (
-          <p className="py-8 text-sm text-ink-400">불러오는 중…</p>
-        ) : diagError ? (
-          <p className="py-8 text-sm text-rose-500">이력을 불러오지 못했어요</p>
-        ) : diagnoses.length === 0 ? (
+        {diagnoses.length === 0 ? (
           <EmptyState
-            title="아직 진단이 없어요"
-            description="생기부를 제출하면 24시간 내 진단 결과를 받아볼 수 있습니다."
+            title="아직 저장한 결과가 없어요"
+            description="생기부를 제출하고 진단 결과를 저장하면 여기서 다시 볼 수 있어요."
             action={
               <Link
                 href="/submit"
