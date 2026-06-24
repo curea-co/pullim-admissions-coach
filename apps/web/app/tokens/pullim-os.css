@@ -1,0 +1,69 @@
+/* PUDS theme · pullim-os — sharp/professional. CUDS canonical vocabulary.
+ * Merges: variant-b metrics + pullim brand primary ramp (hue-258).
+ * Selector: [data-theme="pullim-os"]
+ * ===================================================================== */
+[data-theme="pullim-os"] {
+  /* --- full primary ramp (hue 258, Pullim Blue seed at stop 600) ----- */
+  --color-primary-50:  oklch(0.972 0.024 258);
+  --color-primary-100: oklch(0.940 0.039 258);
+  --color-primary-200: oklch(0.890 0.069 258);
+  --color-primary-300: oklch(0.820 0.108 258);
+  --color-primary-400: oklch(0.730 0.154 258);
+  --color-primary-500: oklch(0.640 0.189 258);
+  --color-primary-600: oklch(0.524 0.197 258);
+  --color-primary-700: oklch(0.474 0.181 258);
+  --color-primary-800: oklch(0.414 0.154 258);
+  --color-primary-900: oklch(0.364 0.118 258);
+  --color-primary-950: oklch(0.264 0.083 258);
+
+  /* --- lemon accent (secondary-500 override) ------------------------- */
+  --color-secondary-500: oklch(0.967 0.197 116);
+
+  /* --- semantic actions (rebind variant-b to pullim brand ramp) ------ */
+  --color-action-primary:       var(--color-primary-600);
+  --color-action-primary-hover: var(--color-primary-700);
+  --color-action-primary-fg:    #ffffff;
+  --color-action-secondary:     var(--color-primary-50);
+  --color-action-secondary-fg:  var(--color-primary-700);
+
+  --focus-ring-color:  var(--color-primary-600);
+  --text-brand:        var(--color-primary-700);
+
+  /* --- semantic surfaces & text -------------------------------------- */
+  --surface-raised:  #ffffff;
+  --surface-sunken:  var(--color-gray-100);
+  --text-primary:    var(--color-gray-950);
+  --text-secondary:  var(--color-gray-700);
+  --text-tertiary:   var(--color-gray-500);
+  --border-default:  var(--color-gray-300);
+
+  /* --- SHARP radius scale -------------------------------------------- */
+  --radius-xs: 4px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
+  --radius-xl: 16px; --radius-2xl: 20px; --radius-full: 999px;
+
+  /* --- density metrics (from variant-b spacious scale) --------------- */
+  --row-h-compact: 44px;
+  --row-h-default: 52px;
+  --row-h-large:   64px;
+  --input-h:       48px;
+  --button-h-sm:   36px;
+  --button-h:      48px;
+  --button-h-lg:   56px;
+
+  /* --- shadows -------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(13,26,31,.06);
+  --shadow-md: 0 2px 8px rgba(13,26,31,.08);
+  --shadow-lg: 0 12px 40px rgba(3,98,218,.12);
+  --shadow-xl: 0 20px 60px rgba(3,98,218,.18);
+
+  /* --- font weights (from variant-b) --------------------------------- */
+  --font-weight-body:   400;
+  --font-weight-medium: 500;
+  --font-weight-bold:   700;
+  --font-weight-h:      700;
+
+  /* --- brand font ---------------------------------------------------- */
+  --font-display:    var(--font-sans-kr);
+  --duration-normal: 200ms;
+  --ease-emphasized: cubic-bezier(.32,.72,0,1);
+}

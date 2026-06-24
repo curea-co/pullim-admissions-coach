@@ -44,15 +44,7 @@ const seasons = [
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-brand-50 via-white to-white">
-      {/* Top nav */}
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <span className="text-lg font-bold tracking-tight text-ink-900">
-          Pullim<span className="text-brand-600"> Admissions</span>
-        </span>
-        <span className="text-sm text-ink-500">고1~고3 · 학생부 종합 전형 진학 코치</span>
-      </header>
-
+    <main className="bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Hero */}
       <section className="mx-auto w-full max-w-6xl px-6 pb-16 pt-8 sm:pt-12">
         <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">

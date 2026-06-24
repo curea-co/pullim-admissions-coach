@@ -1,0 +1,376 @@
+/* =====================================================================
+ * CUDS — Base CSS
+ *
+ * 1) Pretendard Variable 로드
+ * 2) 모든 변형이 공유하는 기본 토큰 (gray ramp, scale, motion, focus)
+ * 3) 한국어 가독성 강제 유틸리티 (.kr-*)
+ * 4) 리셋 (modern-normalize 스타일)
+ *
+ * 변형별 토큰은 variant-a.css, variant-b.css, variant-c.css 가 덮어씁니다.
+ * ===================================================================== */
+
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&display=swap");
+
+:root {
+  /* --- font stacks ----------------------------------------------------- */
+  --font-sans-kr:
+    "Pretendard Variable", Pretendard,
+    -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", "Helvetica Neue", "Segoe UI",
+    Roboto, system-ui, sans-serif;
+  --font-serif-kr:
+    "Noto Serif KR", "Nanum Myeongjo", Georgia, serif;
+  --font-mono:
+    "JetBrains Mono", "Pretendard Variable", ui-monospace,
+    SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* --- gray ramp (OKLCH, neutral) ------------------------------------- */
+  --color-gray-50:  oklch(0.985 0      0);
+  --color-gray-100: oklch(0.967 0.001 286);
+  --color-gray-200: oklch(0.920 0.003 286);
+  --color-gray-300: oklch(0.871 0.006 286);
+  --color-gray-400: oklch(0.705 0.010 286);
+  --color-gray-500: oklch(0.552 0.013 286);
+  --color-gray-600: oklch(0.442 0.015 286);
+  --color-gray-700: oklch(0.370 0.014 286);
+  --color-gray-800: oklch(0.274 0.012 286);
+  --color-gray-900: oklch(0.213 0.010 286);
+  --color-gray-950: oklch(0.141 0.008 286);
+
+  /* --- semantic status (OKLCH) ---------------------------------------- */
+  --color-success-50:  oklch(0.965 0.024 158);
+  --color-success-500: oklch(0.696 0.170 162);
+  --color-success-600: oklch(0.596 0.145 163);
+  --color-success-900: oklch(0.332 0.077 168);
+
+  --color-warning-50:  oklch(0.987 0.026 102);
+  --color-warning-500: oklch(0.795 0.184 86);
+  --color-warning-600: oklch(0.681 0.162 76);
+  --color-warning-900: oklch(0.421 0.095 58);
+
+  --color-danger-50:   oklch(0.971 0.013 17);
+  --color-danger-500:  oklch(0.637 0.237 25);
+  --color-danger-600:  oklch(0.577 0.245 27);
+  --color-danger-900:  oklch(0.396 0.141 25);
+
+  --color-info-50:     oklch(0.977 0.014 234);
+  --color-info-500:    oklch(0.685 0.169 237);
+  --color-info-600:    oklch(0.588 0.158 241);
+  --color-info-900:    oklch(0.379 0.146 265);
+
+  /* --- OAuth provider colors (frozen brand hex from each provider) -- */
+  --color-oauth-google:   #4285F4;
+  --color-oauth-apple:    #000000;
+  --color-oauth-kakao:    #FEE500;
+  --color-oauth-naver:    #03C75A;
+  --color-oauth-github:   #24292F;
+
+  /* --- font size ------------------------------------------------------- */
+  /* --text-2xs: 라틴/숫자 전용 마이크로 라벨(kbd 힌트, 카운트, ISO 날짜).
+     한국어 텍스트 최소 크기는 12px(--text-xs) — korean-typography.md 참조.
+     예외: 데이터 밀집 UI(캘린더 셀 보조 라벨, 차트 축)는 한국어도 11px 허용. */
+  --text-2xs:  11px;
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-4xl:  36px;
+  --text-5xl:  48px;
+  --text-6xl:  60px;
+  --text-7xl:  72px;
+
+  /* --- spacing --------------------------------------------------------- */
+  --space-0:  0;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  12px;
+  --space-6:  16px;
+  --space-7:  20px;
+  --space-8:  24px;
+  --space-9:  32px;
+  --space-10: 40px;
+  --space-11: 48px;
+  --space-12: 64px;
+  --space-13: 80px;
+  --space-14: 96px;
+
+  /* --- motion ---------------------------------------------------------- */
+  --duration-instant: 100ms;
+  --duration-fast:    200ms;
+  --duration-normal:  300ms;
+  --duration-slow:    500ms;
+  --ease-standard:    cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized:  cubic-bezier(0.3, 0, 0, 1);
+
+  /* --- focus ring ------------------------------------------------------ */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-action-primary, var(--color-gray-900));
+
+  /* --- semantic surface/text (defaults — variants override) ------------ */
+  --surface-canvas:  var(--color-gray-50);
+  --surface-raised:  #ffffff;
+  --surface-sunken:  var(--color-gray-100);
+  --surface-overlay: rgba(0, 0, 0, 0.5);
+
+  --text-primary:    var(--color-gray-950);
+  --text-secondary:  var(--color-gray-700);
+  --text-tertiary:   var(--color-gray-500);
+  --text-inverse:    var(--color-gray-50);
+  --text-brand:      var(--color-primary-600);
+  --text-danger:     var(--color-danger-600);
+  --text-success:    var(--color-success-600);
+
+  --border-subtle:   var(--color-gray-200);
+  --border-default:  var(--color-gray-300);
+  --border-strong:   var(--color-gray-400);
+
+  /* --- chart-specific semantic tokens ------------------------- */
+  --chart-grid:        var(--border-subtle);
+  --chart-axis:        var(--text-tertiary);
+  --chart-axis-label:  var(--text-secondary);
+  --chart-tooltip-bg:  var(--surface-raised);
+  --chart-tooltip-fg:  var(--text-primary);
+  --chart-tooltip-border: var(--border-default);
+  /* 8-color categorical palette for multi-series — distinct hues */
+  --chart-cat-1: var(--color-action-primary);
+  --chart-cat-2: oklch(0.66 0.18 200);  /* cyan */
+  --chart-cat-3: oklch(0.62 0.21 30);   /* orange */
+  --chart-cat-4: oklch(0.70 0.16 145);  /* green */
+  --chart-cat-5: oklch(0.60 0.20 305);  /* purple */
+  --chart-cat-6: oklch(0.72 0.17 85);   /* yellow */
+  --chart-cat-7: oklch(0.58 0.18 350);  /* magenta */
+  --chart-cat-8: oklch(0.55 0.15 250);  /* indigo */
+
+  /* --- secondary ramp (algorithmic — primary hue rotated +60°) ---- */
+  --color-secondary-50:  oklch(0.965 0.030 50);
+  --color-secondary-100: oklch(0.935 0.045 50);
+  --color-secondary-200: oklch(0.890 0.072 50);
+  --color-secondary-300: oklch(0.825 0.105 50);
+  --color-secondary-400: oklch(0.745 0.140 50);
+  --color-secondary-500: oklch(0.665 0.170 50);
+  --color-secondary-600: oklch(0.580 0.165 50);
+  --color-secondary-700: oklch(0.500 0.140 50);
+  --color-secondary-800: oklch(0.420 0.110 50);
+  --color-secondary-900: oklch(0.345 0.080 50);
+  --color-secondary-950: oklch(0.245 0.055 50);
+
+  /* --- tertiary ramp (hue rotated +180°) ------------------------- */
+  --color-tertiary-50:  oklch(0.967 0.025 220);
+  --color-tertiary-100: oklch(0.940 0.040 220);
+  --color-tertiary-200: oklch(0.895 0.065 220);
+  --color-tertiary-300: oklch(0.830 0.095 220);
+  --color-tertiary-400: oklch(0.745 0.130 220);
+  --color-tertiary-500: oklch(0.660 0.155 220);
+  --color-tertiary-600: oklch(0.575 0.150 220);
+  --color-tertiary-700: oklch(0.495 0.128 220);
+  --color-tertiary-800: oklch(0.418 0.102 220);
+  --color-tertiary-900: oklch(0.345 0.075 220);
+  --color-tertiary-950: oklch(0.248 0.052 220);
+
+  /* --- neutral-variant ramp (subtle warm/cool surface variation) -- */
+  --color-neutral-variant-50:  oklch(0.972 0.005 270);
+  --color-neutral-variant-100: oklch(0.940 0.008 270);
+  --color-neutral-variant-200: oklch(0.890 0.012 270);
+  --color-neutral-variant-300: oklch(0.825 0.015 270);
+  --color-neutral-variant-400: oklch(0.745 0.018 270);
+  --color-neutral-variant-500: oklch(0.660 0.020 270);
+  --color-neutral-variant-600: oklch(0.575 0.018 270);
+  --color-neutral-variant-700: oklch(0.495 0.015 270);
+  --color-neutral-variant-800: oklch(0.418 0.012 270);
+  --color-neutral-variant-900: oklch(0.345 0.010 270);
+  --color-neutral-variant-950: oklch(0.248 0.008 270);
+
+  /* --- alpha ramps for primary (a1..a12 per M3 convention) ------ */
+  --color-primary-a1:  color-mix(in oklch, var(--color-primary-500) 5%,  transparent);
+  --color-primary-a2:  color-mix(in oklch, var(--color-primary-500) 10%, transparent);
+  --color-primary-a3:  color-mix(in oklch, var(--color-primary-500) 15%, transparent);
+  --color-primary-a4:  color-mix(in oklch, var(--color-primary-500) 20%, transparent);
+  --color-primary-a5:  color-mix(in oklch, var(--color-primary-500) 30%, transparent);
+  --color-primary-a6:  color-mix(in oklch, var(--color-primary-500) 40%, transparent);
+  --color-primary-a7:  color-mix(in oklch, var(--color-primary-500) 50%, transparent);
+  --color-primary-a8:  color-mix(in oklch, var(--color-primary-500) 65%, transparent);
+  --color-primary-a9:  color-mix(in oklch, var(--color-primary-500) 75%, transparent);
+  --color-primary-a10: color-mix(in oklch, var(--color-primary-500) 85%, transparent);
+  --color-primary-a11: color-mix(in oklch, var(--color-primary-500) 92%, transparent);
+  --color-primary-a12: color-mix(in oklch, var(--color-primary-500) 97%, transparent);
+
+  /* --- container / on-container semantic pairs ------------------ */
+  --container-primary:    var(--color-primary-100);
+  --on-container-primary: var(--color-primary-900);
+  --container-secondary:    var(--color-secondary-100);
+  --on-container-secondary: var(--color-secondary-900);
+  --container-tertiary:    var(--color-tertiary-100);
+  --on-container-tertiary: var(--color-tertiary-900);
+  --container-success:    var(--color-success-50);
+  --on-container-success: var(--color-success-900);
+  --container-warning:    var(--color-warning-50);
+  --on-container-warning: var(--color-warning-900);
+  --container-danger:     var(--color-danger-50);
+  --on-container-danger:  var(--color-danger-900);
+  --container-info:       var(--color-info-50);
+  --on-container-info:    var(--color-info-900);
+}
+
+[data-theme="dark"] {
+  --surface-canvas:  var(--color-gray-950);
+  --surface-raised:  var(--color-gray-900);
+  --surface-sunken:  oklch(0.105 0.008 286);
+  --surface-overlay: rgba(0, 0, 0, 0.7);
+
+  --text-primary:    var(--color-gray-50);
+  --text-secondary:  var(--color-gray-300);
+  --text-tertiary:   var(--color-gray-400);
+  --text-inverse:    var(--color-gray-950);
+
+  --border-subtle:   var(--color-gray-800);
+  --border-default:  var(--color-gray-700);
+  --border-strong:   var(--color-gray-600);
+}
+
+/* =====================================================================
+ * Reset (modern-normalize subset)
+ *
+ * MUST live in @layer base. Unlayered CSS beats ALL layered CSS — so an
+ * unlayered `* { margin: 0 }` / `button { padding: 0 }` silently defeats
+ * every Tailwind v4 margin/padding utility (they live in @layer utilities).
+ * This exact bug shipped: sidebar workspace-button `mx-4 px-3` computed to
+ * 0 while the same `px-3` on an <a> worked. Plain (non-Tailwind) pages are
+ * unaffected — @layer works natively in all modern browsers.
+ * ===================================================================== */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; }
+  html, body { height: 100%; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: var(--font-sans-kr);
+    font-size: var(--text-md);
+    line-height: var(--leading-body, 1.7);
+    letter-spacing: -0.011em;
+    color: var(--text-primary);
+    background: var(--surface-canvas);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss06" 1;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  img, picture, video, canvas, svg { display: block; max-width: 100%; }
+  input, button, textarea, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+  p, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; word-break: keep-all; }
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: 2px;
+}
+
+/* =====================================================================
+ * Korean readability utilities (.kr-*)
+ * ===================================================================== */
+.kr-text,
+.kr-body {
+  font-family: var(--font-sans-kr);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  font-feature-settings: "ss06" 1;
+}
+
+.kr-body  { font-size: var(--text-md);  line-height: 1.7;  letter-spacing: -0.011em; }
+.kr-lead  { font-size: var(--text-lg);  line-height: 1.65; letter-spacing: -0.015em; }
+.kr-small { font-size: var(--text-sm);  line-height: 1.55; letter-spacing: -0.008em; }
+.kr-micro { font-size: var(--text-xs);  line-height: 1.45; letter-spacing: -0.005em; }
+
+.kr-h1 {
+  font-size: clamp(2.25rem, 4vw + 1rem, 3rem);
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+  word-break: keep-all;
+}
+.kr-h2 {
+  font-size: clamp(1.75rem, 2.5vw + 0.5rem, 2.25rem);
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  word-break: keep-all;
+}
+.kr-h3 {
+  font-size: var(--text-2xl);
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+  word-break: keep-all;
+}
+.kr-h4 {
+  font-size: var(--text-xl);
+  line-height: 1.45;
+  letter-spacing: -0.022em;
+  font-weight: 600;
+  word-break: keep-all;
+}
+.kr-display {
+  font-size: clamp(3rem, 8vw, 5rem);
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+  font-weight: 800;
+  word-break: keep-all;
+}
+.tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* =====================================================================
+ * Container & layout primitives
+ * ===================================================================== */
+.container       { width: 100%; margin-inline: auto; padding-inline: 16px; max-width: 1200px; }
+.container-wide  { width: 100%; margin-inline: auto; padding-inline: 16px; max-width: 1440px; }
+.container-read  { width: 100%; margin-inline: auto; padding-inline: 16px; max-width: 680px; }
+@media (min-width: 768px) {
+  .container, .container-wide, .container-read { padding-inline: 32px; }
+}
+
+/* =====================================================================
+ * Reduced motion
+ * ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =====================================================================
+ * Safe area
+ * ===================================================================== */
+.safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.safe-top    { padding-top: max(16px, env(safe-area-inset-top)); }
+
+/* =====================================================================
+ * High-contrast mode — boosts borders, surfaces, text contrast
+ * ===================================================================== */
+[data-contrast="high"] {
+  --text-secondary: var(--text-primary);  /* collapse hierarchy */
+  --border-subtle:  var(--border-strong);
+  --border-default: var(--text-primary);
+  --focus-ring-width: 3px;
+}
+[data-contrast="high"] :focus-visible {
+  outline-width: 3px !important;
+}

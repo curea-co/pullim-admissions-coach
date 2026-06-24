@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { DemoBanner } from '@/components/demo-banner';
+import { AppShell } from '@/components/app-shell';
 
 const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
 
@@ -26,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" data-theme="pullim-os">
       <head>
         <link
           rel="stylesheet"
@@ -39,7 +40,7 @@ export default function RootLayout({
       </head>
       <body>
         <DemoBanner />
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
