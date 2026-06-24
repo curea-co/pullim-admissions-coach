@@ -51,7 +51,7 @@ export default function ProcessingPage() {
   return (
     <>
       <PageHeader />
-      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+      <main className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 진행 중

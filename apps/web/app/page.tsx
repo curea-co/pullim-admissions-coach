@@ -46,7 +46,7 @@ export default function LandingPage() {
   return (
     <main className="bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Hero */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-16 pt-8 sm:pt-12">
+      <section className="w-full max-w-6xl px-6 pb-16 pt-8 sm:pt-12">
         <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
           <span className="size-1.5 rounded-full bg-brand-500" />
           AI 진학 코치 · 24시간 안에 1차 결과
@@ -90,7 +90,7 @@ export default function LandingPage() {
       </section>
 
       {/* Outputs */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-16">
+      <section className="w-full max-w-6xl px-6 pb-16">
         <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
           한 번에 받는 3종 결과
         </h2>
@@ -123,7 +123,7 @@ export default function LandingPage() {
       </section>
 
       {/* Seasons */}
-      <section className="mx-auto w-full max-w-6xl px-6 pb-20">
+      <section className="w-full max-w-6xl px-6 pb-20">
         <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
           시즌별 사용 시점
         </h2>
@@ -141,7 +141,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-ink-100">
-        <div className="mx-auto w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
+        <div className="w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
           <p>© Curea · Pullim Admissions Coach</p>
           <p className="mt-1">
             본 페이지는 Phase A 시각 프로토타입이며, 실제 사용자 데이터는 수집하지 않습니다.

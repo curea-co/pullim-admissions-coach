@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { DashboardShell } from '@/components/ui/dashboard-shell';
 import { OsRail } from '@/components/ui/os-rail';
@@ -18,14 +19,32 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
+const RAIL_KEY = 'puds-rail-collapsed';
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/';
   const items = NAV.map((n) => ({ ...n, active: isActive(pathname, n.href) }));
+
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem(RAIL_KEY) === '1') setCollapsed(true);
+  }, []);
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(RAIL_KEY, next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+
   return (
     <DashboardShell
       brand={{ logo: <PullimLogo size={30} />, title: '풀림 입시코치', href: '/' }}
-      rail={<OsRail head="입시코치" items={items} />}
+      rail={<OsRail head="입시코치" items={items} collapsed={collapsed} />}
       tabbar={items}
+      collapsed={collapsed}
+      onToggleCollapsed={toggle}
     >
       {children}
     </DashboardShell>
