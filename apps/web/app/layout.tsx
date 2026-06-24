@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { DemoBanner } from '@/components/demo-banner';
 import { AppShell } from '@/components/app-shell';
+import { AuthProvider } from '@/components/auth/auth-provider';
 
 const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
 
@@ -39,8 +40,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <DemoBanner />
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <DemoBanner />
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
