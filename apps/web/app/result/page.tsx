@@ -7,7 +7,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
-import { competencyLabel, formatStandingLabel } from '@pullim/shared';
+import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
@@ -129,9 +129,12 @@ function InterviewPanel() {
           key={idx}
           className="rounded-2xl border border-ink-100 bg-white p-5"
         >
-          <header className="flex items-baseline gap-3">
+          <header className="flex flex-wrap items-baseline gap-2">
             <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
               Q{idx + 1}
+            </span>
+            <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+              {INTERVIEW_FORMAT_LABEL[q.format]}
             </span>
             <h3 className="text-base font-semibold leading-snug text-ink-900">
               {q.question}
