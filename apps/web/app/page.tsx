@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Hero3D } from '@/components/hero-3d';
+import { StartCta } from '@/components/auth/start-cta';
 
 // ── 데이터 ─────────────────────────────────────────────────────────────
 
@@ -118,12 +119,9 @@ export default function LandingPage() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href="/submit"
-                className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-              >
+              <StartCta className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700">
                 생기부 업로드 시작
-              </Link>
+              </StartCta>
               <Link
                 href="#sample"
                 className="rounded-xl border border-ink-100 bg-white px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-200 hover:text-brand-700"
@@ -142,10 +140,7 @@ export default function LandingPage() {
       {/* 학생 / 학부모 분기 */}
       <section className="w-full max-w-6xl px-6 pb-12">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Link
-            href="/submit"
-            className="group rounded-2xl border border-ink-100 bg-white p-6 transition hover:border-brand-200 hover:shadow-md"
-          >
+          <StartCta className="group rounded-2xl border border-ink-100 bg-white p-6 transition hover:border-brand-200 hover:shadow-md">
             <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
               학생이에요
             </span>
@@ -156,7 +151,7 @@ export default function LandingPage() {
             <span className="mt-4 inline-block text-sm font-semibold text-brand-700 group-hover:underline">
               시작하기 →
             </span>
-          </Link>
+          </StartCta>
           <Link
             href="/parent"
             className="group rounded-2xl border border-ink-100 bg-white p-6 transition hover:border-brand-200 hover:shadow-md"

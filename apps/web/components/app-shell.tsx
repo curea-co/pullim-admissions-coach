@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { DashboardShell } from '@/components/ui/dashboard-shell';
 import { OsRail } from '@/components/ui/os-rail';
 import { PullimLogo } from '@/components/pullim-logo';
+import { UserMenu } from '@/components/auth/user-menu';
 
 // 입시 코치 대시보드 구조 — 풀림 OS/classbot 패턴(좌측 레일 + 상단 바 + 콘텐츠).
 const NAV: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       tabbar={items}
       collapsed={collapsed}
       onToggleCollapsed={toggle}
+      actions={<UserMenu />}
     >
       {children}
     </DashboardShell>
