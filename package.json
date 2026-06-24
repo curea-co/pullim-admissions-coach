@@ -11,6 +11,7 @@
     "build:web": "pnpm --filter @pullim/web build",
     "start:web": "pnpm --filter @pullim/web start",
     "typecheck": "pnpm -r --parallel typecheck",
-    "lint": "pnpm -r --parallel lint"
+    "lint": "pnpm -r --parallel lint",
+    "test": "pnpm --filter @pullim/shared test"
   }
 }

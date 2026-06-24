@@ -9,6 +9,7 @@
 //   - consent.isMinor=true → guardianConsentObtained=true 강제 (refine)
 
 import { z } from 'zod';
+import { hasBlockingPii } from './pii';
 
 export const SCHEMA_VERSION = '0.1' as const;
 
@@ -40,6 +41,7 @@ export const maskedFieldEnum = z.enum([
   'phone',
   'address',
   'teacher_name',
+  'email',
   'other',
 ]);
 
@@ -69,21 +71,32 @@ const baseRecord = {
   maskedFields: z.array(maskedFieldEnum).optional(),
 };
 
-export const recordSchema = z.discriminatedUnion('inputType', [
-  z.object({
-    inputType: z.literal('pdf_upload'),
-    fileRef: z.string().min(1, '파일을 업로드해주세요'),
-    ...baseRecord,
-  }),
-  z.object({
-    inputType: z.literal('text_paste'),
-    text: z
-      .string()
-      .min(1, '생기부 텍스트를 입력해주세요')
-      .max(200000, '본문이 너무 깁니다(최대 20만 자)'),
-    ...baseRecord,
-  }),
-]);
+export const recordSchema = z
+  .discriminatedUnion('inputType', [
+    z.object({
+      inputType: z.literal('pdf_upload'),
+      fileRef: z.string().min(1, '파일을 업로드해주세요'),
+      ...baseRecord,
+    }),
+    z.object({
+      inputType: z.literal('text_paste'),
+      text: z
+        .string()
+        .min(1, '생기부 텍스트를 입력해주세요')
+        .max(200000, '본문이 너무 깁니다(최대 20만 자)'),
+      ...baseRecord,
+    }),
+  ])
+  .superRefine((rec, ctx) => {
+    // block-tier(전화·주민번호·이메일·학교명) 잔존 시 제출 차단. warn-tier는 UI 처리.
+    if (rec.inputType === 'text_paste' && hasBlockingPii(rec.text)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['text'],
+        message: '전화·주민번호·이메일·학교명 등 식별정보가 남아있어요. 자동 가림을 적용해주세요.',
+      });
+    }
+  });
 
 // ── targetUniversities (선택, 최대 3) ─────────────────────────────────
 export const targetUniversitySchema = z.object({
