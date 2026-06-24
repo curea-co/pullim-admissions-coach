@@ -20,7 +20,7 @@ export function OsRail({ head, items, className }: OsRailProps) {
       aria-label={head}
       className={cn("flex w-64 flex-col gap-0.5 p-3", className)}
     >
-      <div className="px-3 pb-1.5 pt-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[.14em] text-[var(--text-tertiary)]">
+      <div className="px-3 pb-1.5 pt-2 font-[var(--font-mono)] text-[10px] uppercase tracking-[.16em] text-[var(--text-tertiary)]">
         {head}
       </div>
       {items.map((item) => (
@@ -29,7 +29,7 @@ export function OsRail({ head, items, className }: OsRailProps) {
           href={item.href}
           aria-current={item.active ? "page" : undefined}
           className={cn(
-            "relative flex items-center gap-[11px] rounded-[11px] px-3 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-150",
+            "relative flex items-center gap-[11px] rounded-[11px] px-3 py-2.5 text-[14px] font-medium text-[var(--text-secondary)] transition-colors duration-150",
             "hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]",
             "[&_svg]:h-[19px] [&_svg]:w-[19px]",
             item.active &&

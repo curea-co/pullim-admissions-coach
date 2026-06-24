@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const items = NAV.map((n) => ({ ...n, active: isActive(pathname, n.href) }));
   return (
     <DashboardShell
-      brand={{ logo: <PullimLogo />, title: '풀림 입시코치', href: '/' }}
+      brand={{ logo: <PullimLogo size={30} />, title: '풀림 입시코치', href: '/' }}
       rail={<OsRail head="입시코치" items={items} />}
       tabbar={items}
     >

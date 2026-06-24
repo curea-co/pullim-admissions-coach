@@ -29,7 +29,7 @@ function Brand({ brand }: { brand: BrandProp }) {
   return (
     <a href={href} className="flex items-center gap-2 text-[var(--text-primary)] no-underline">
       {logo}
-      <span className="text-[15px] font-extrabold tracking-[-.02em]">{title}</span>
+      <span className="text-[18px] font-extrabold tracking-[-.04em]">{title}</span>
       {sub && (
         <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[.1em] text-[var(--text-tertiary)]">
           {sub}
@@ -57,7 +57,7 @@ export function DashboardShell({
         <div className="flex-1" />
         {actions}
       </header>
-      <div className="mx-auto flex w-full max-w-[1400px]">
+      <div className="flex w-full">
         {rail && (
           <aside className="sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 overflow-y-auto md:block">
             {rail}
