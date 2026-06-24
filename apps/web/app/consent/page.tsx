@@ -9,6 +9,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { cn } from '@/lib/utils';
 
 // Phase B: 클라이언트 차단 로직.
 // 실 발송 채널(카카오 알림톡 등)·세션·DB 저장은 Phase E.
@@ -117,7 +118,7 @@ export default function ConsentPage() {
     <RequireAuth>
     <>
       <PageHeader />
-      <main className="w-full max-w-3xl px-6 py-10">
+      <div className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">동의</h1>
           <StepIndicator current="consent" />
@@ -154,7 +155,7 @@ export default function ConsentPage() {
             />
             <span className="font-medium text-ink-900">전체 동의</span>
           </label>
-          <span className="text-xs text-ink-500">필수 3개</span>
+          <span className="text-xs text-ink-500">필수 {isMinor ? 3 : 2}개</span>
         </div>
 
         <section className="space-y-3">
@@ -190,15 +191,17 @@ export default function ConsentPage() {
           </Link>
           <button
             type="button"
-            onClick={handleProceed}
-            disabled={!canProceed || isPending}
+            onClick={() => { if (!canProceed || isPending) return; handleProceed(); }}
             aria-disabled={!canProceed || isPending}
-            className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className={cn(
+              'rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2',
+              (!canProceed || isPending) && 'cursor-not-allowed opacity-50'
+            )}
           >
             {isPending ? '이동 중…' : '동의 후 진단 시작 →'}
           </button>
         </div>
-      </main>
+      </div>
     </>
     </RequireAuth>
   );

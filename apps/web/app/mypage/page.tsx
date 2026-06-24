@@ -95,7 +95,7 @@ function MyPageContent() {
     user.ageBand === 'under14' ? '14세 미만' : user.ageBand === 'over14' ? '14세 이상' : '미확인';
 
   return (
-    <main className="w-full max-w-2xl px-6 pb-16 pt-10">
+    <div className="w-full max-w-2xl px-6 pb-16 pt-10">
       {/* 페이지 제목 */}
       <h1 className="text-3xl font-bold tracking-tight text-ink-900">마이페이지</h1>
 
@@ -251,7 +251,7 @@ function MyPageContent() {
           isPending={isDeletePending}
         />
       )}
-    </main>
+    </div>
   );
 }
 
