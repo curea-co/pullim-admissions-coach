@@ -94,7 +94,7 @@ const seasons = [
 
 export default function LandingPage() {
   return (
-    <main className="bg-gradient-to-b from-brand-50 via-white to-white">
+    <div className="bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Hero */}
       <section className="w-full max-w-6xl px-6 pb-12 pt-8 sm:pt-12">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
@@ -321,6 +321,6 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }

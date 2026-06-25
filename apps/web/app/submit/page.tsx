@@ -258,7 +258,7 @@ export default function SubmitPage() {
     <RequireAuth>
     <>
       <PageHeader />
-      <main className="w-full max-w-3xl px-6 py-10">
+      <div className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             생기부 제출
@@ -279,40 +279,47 @@ export default function SubmitPage() {
             required
             help="개인 식별정보(이름·학교명·생년월일·전화·주소·교사명)를 가린 상태로 업로드하거나 붙여넣어 주세요."
           >
-            <div className="mb-3 flex gap-2 rounded-xl bg-ink-100/60 p-1 text-sm">
+            <div role="tablist" aria-label="입력 방식 선택" className="mb-3 flex gap-2 rounded-xl bg-ink-100/60 p-1 text-sm">
               <TabButton
                 active={inputType === 'text_paste'}
                 onClick={() => setInputType('text_paste')}
+                panelId="tab-panel-text"
               >
                 텍스트 붙여넣기
               </TabButton>
               <TabButton
                 active={inputType === 'pdf_upload'}
                 onClick={() => setInputType('pdf_upload')}
+                panelId="tab-panel-pdf"
               >
                 PDF 업로드
               </TabButton>
             </div>
 
             {inputType === 'text_paste' ? (
-              <textarea
-                rows={6}
-                value={recordText}
-                onChange={(e) => setRecordText(e.target.value)}
-                placeholder="여기에 마스킹된 생기부 본문을 붙여넣어주세요"
-                className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                aria-invalid={!!errors['record.text']}
-                data-field-error="record.text"
-              />
+              <div id="tab-panel-text" role="tabpanel">
+                <textarea
+                  rows={6}
+                  value={recordText}
+                  onChange={(e) => setRecordText(e.target.value)}
+                  placeholder="여기에 마스킹된 생기부 본문을 붙여넣어주세요"
+                  aria-label="생기부 본문 (마스킹 후 붙여넣기)"
+                  className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  aria-invalid={!!errors['record.text']}
+                  data-field-error="record.text"
+                />
+              </div>
             ) : (
-              <PdfUploader
-                status={pdfStatus}
-                onFile={handlePdfFile}
-                onClear={clearPdf}
-                inputRef={fileInputRef}
-                extractedText={recordText}
-                onExtractedTextChange={setRecordText}
-              />
+              <div id="tab-panel-pdf" role="tabpanel">
+                <PdfUploader
+                  status={pdfStatus}
+                  onFile={handlePdfFile}
+                  onClear={clearPdf}
+                  inputRef={fileInputRef}
+                  extractedText={recordText}
+                  onExtractedTextChange={setRecordText}
+                />
+              </div>
             )}
             <FieldError msg={errors['record.text']} />
 
@@ -336,7 +343,7 @@ export default function SubmitPage() {
           {/* 2. 지원 학부 */}
           <Field label="2. 지원 학부 (택 1)" required>
             <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
               data-field-error="targetTrack"
             >
               {tracks.map((t) => (
@@ -378,6 +385,7 @@ export default function SubmitPage() {
                       )
                     }
                     placeholder="대학명"
+                    aria-label={`${idx + 1}순위 대학명`}
                     className={inputCls}
                     data-field-error={`targetUniversities.${idx}.name`}
                   />
@@ -392,6 +400,7 @@ export default function SubmitPage() {
                       )
                     }
                     placeholder="학과 (선택)"
+                    aria-label={`${idx + 1}순위 학과 (선택)`}
                     className={inputCls}
                   />
                 </div>
@@ -446,6 +455,7 @@ export default function SubmitPage() {
               value={weakAreas}
               onChange={(e) => setWeakAreas(e.target.value)}
               placeholder="예: 진로 활동 일관성이 부족, 면접 답변 준비가 막막함 — 자유롭게 적어주세요"
+              aria-label="본인이 부족하다고 느끼는 영역 (선택)"
               className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
               data-field-error="selfReportedWeakAreas"
             />
@@ -461,19 +471,19 @@ export default function SubmitPage() {
           )}
 
           <div className="flex items-center justify-between border-t border-ink-100 pt-6">
-            <Link href="/" className="text-sm text-ink-500 hover:text-ink-900">
+            <Link href="/" className="rounded text-sm text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
               ← 처음으로
             </Link>
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
+              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-60"
             >
               {isPending ? '이동 중…' : '동의 단계로 →'}
             </button>
           </div>
         </form>
-      </main>
+      </div>
     </>
     </RequireAuth>
   );
@@ -510,18 +520,23 @@ function Field({
 function TabButton({
   active,
   onClick,
+  panelId,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  panelId: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={panelId}
       onClick={onClick}
       className={cn(
-        'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition',
+        'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
         active
           ? 'bg-white text-ink-900 shadow-sm'
           : 'text-ink-500 hover:text-ink-700'
@@ -591,7 +606,7 @@ function PdfUploader({
             }
           }}
           className={cn(
-            'cursor-pointer rounded-xl border-2 border-dashed bg-white px-4 py-10 text-center text-sm transition',
+            'cursor-pointer rounded-xl border-2 border-dashed bg-white px-4 py-10 text-center text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
             dragOver
               ? 'border-brand-400 bg-brand-50/40'
               : 'border-ink-100 hover:border-brand-200'
@@ -607,7 +622,7 @@ function PdfUploader({
               e.stopPropagation();
               pick();
             }}
-            className="mt-3 rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200"
+            className="mt-3 rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             파일 선택
           </button>
@@ -653,7 +668,7 @@ function PdfUploader({
           <button
             type="button"
             onClick={onClear}
-            className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+            className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             다시 선택
           </button>
@@ -675,7 +690,7 @@ function PdfUploader({
             <button
               type="button"
               onClick={onClear}
-              className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50"
+              className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
               다시 선택
             </button>
@@ -688,6 +703,7 @@ function PdfUploader({
               rows={8}
               value={extractedText}
               onChange={(e) => onExtractedTextChange(e.target.value)}
+              aria-label="PDF에서 추출된 본문 (마스킹 확인 후 필요 시 직접 수정)"
               className="mt-1 w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
           </div>

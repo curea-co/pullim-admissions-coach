@@ -49,7 +49,7 @@ function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-[80vh] items-center justify-center px-4 py-12">
+    <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         {/* 카드 */}
         <div className="rounded-2xl border border-ink-100 bg-white p-8 shadow-sm">
@@ -134,7 +134,7 @@ function LoginForm() {
           </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -144,9 +144,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-[80vh] items-center justify-center px-4">
+        <div className="flex min-h-[80vh] items-center justify-center px-4">
           <p className="text-sm text-ink-400">불러오는 중…</p>
-        </main>
+        </div>
       }
     >
       <LoginForm />

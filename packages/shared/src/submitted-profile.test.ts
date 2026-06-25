@@ -38,4 +38,11 @@ describe('formatStandingLabel', () => {
         targetTrack: 'science_engineering',
       } as SubmittedProfile)
     ).toBe('고3 2학기 · 특목고 · 이공'));
+  it('무전공(undeclared) 라벨 포함', () =>
+    expect(
+      formatStandingLabel({
+        ...valid,
+        targetTrack: 'undeclared',
+      } as SubmittedProfile)
+    ).toMatch(/무전공\(전공자율\)/));
 });

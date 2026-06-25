@@ -20,6 +20,7 @@ export const targetTrackEnum = z.enum([
   'science_engineering', // 이공 (자연과학 + 공학)
   'medical',             // 의치한
   'arts_athletics',      // 예체능
+  'undeclared',          // 무전공(전공자율)
   'other',               // 기타
 ]);
 export type TargetTrack = z.infer<typeof targetTrackEnum>;
@@ -51,6 +52,7 @@ export const targetTrackLabel: Record<TargetTrack, string> = {
   science_engineering: '이공',
   medical: '의치한',
   arts_athletics: '예체능',
+  undeclared: '무전공(전공자율)',
   other: '기타',
 };
 

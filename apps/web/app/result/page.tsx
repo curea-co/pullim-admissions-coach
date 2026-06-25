@@ -8,10 +8,16 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
-import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL } from '@pullim/shared';
+import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
+
+const COHORT_LABEL: Record<CohortResult['system'], string> = {
+  '2027_old': '2027 대입 · 구체제',
+  '2028_new': '2028 대입 · 신체제',
+  '2029_new': '2029 대입 · 신체제',
+};
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
@@ -32,18 +38,29 @@ export default function ResultPage() {
     <RequireAuth>
     <>
       <PageHeader />
-      <main className="w-full max-w-4xl px-6 py-10">
+      <div className="w-full max-w-4xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 결과
           </h1>
           <StepIndicator current="result" />
         </div>
-        <p className={cn('text-ink-700', profile && profile.targetUniversities.length > 0 ? 'mb-2' : 'mb-6')}>
+        <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
           {profile
             ? `${formatStandingLabel(profile)} · 24시간 안에 1차 결과 도착`
             : '예시 학생 (데모) · 고3 2학기 · 이공 · 24시간 안에 1차 결과 도착'}
         </p>
+        {profile && (() => {
+          const cohort = cohortFromGrade(profile.grade);
+          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영' : '');
+          return (
+            <p className="mb-2">
+              <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                {label}
+              </span>
+            </p>
+          );
+        })()}
         {profile && profile.targetUniversities.length > 0 && (
           <p className="mb-6 text-sm text-ink-500">
             목표:{' '}
@@ -125,7 +142,7 @@ export default function ResultPage() {
             학부모 리포트 보기 →
           </Link>
         </div>
-      </main>
+      </div>
     </>
     </RequireAuth>
   );

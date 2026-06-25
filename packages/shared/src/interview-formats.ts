@@ -102,6 +102,7 @@ export const DEFAULT_FORMATS_BY_TRACK: Record<TargetTrack, InterviewFormat[]> = 
   science_engineering: ['record_based'],
   medical: ['record_based', 'mmi'],
   arts_athletics: ['record_based'],
+  undeclared: ['record_based'],
   other: ['record_based'],
 };
 

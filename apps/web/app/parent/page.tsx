@@ -10,7 +10,7 @@ export default function ParentReportPage() {
   return (
     <>
       <PageHeader />
-      <main className="w-full max-w-3xl px-6 py-10">
+      <div className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6">
           <p className="text-sm text-ink-500">학부모 주간 리포트</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink-900">
@@ -74,7 +74,7 @@ export default function ParentReportPage() {
             주간 리포트는 매주 일요일 이메일로도 발송됩니다 (Phase E)
           </span>
         </div>
-      </main>
+      </div>
     </>
   );
 }

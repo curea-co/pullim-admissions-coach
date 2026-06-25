@@ -46,7 +46,7 @@ export default function ProcessingPage() {
     <RequireAuth>
     <>
       <PageHeader />
-      <main className="w-full max-w-3xl px-6 py-10">
+      <div className="w-full max-w-3xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 진행 중
@@ -111,7 +111,7 @@ export default function ProcessingPage() {
             {isComplete ? '결과 보기 →' : '결과 화면 미리 보기'}
           </Link>
         </div>
-      </main>
+      </div>
     </>
     </RequireAuth>
   );

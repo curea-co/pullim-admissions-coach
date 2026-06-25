@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recordSchema } from './schemas';
+import { recordSchema, studentProfileSchema, SCHEMA_VERSION } from './schemas';
 
 const base = { inputType: 'text_paste' as const, maskingApplied: true as const };
 
@@ -18,6 +18,27 @@ describe('recordSchema — block-tier PII 게이트', () => {
   });
   it('PII 없는 text는 valid', () => {
     const r = recordSchema.safeParse({ ...base, text: '자료구조 발표와 동아리 활동' });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe('studentProfileSchema — targetTrack enum', () => {
+  const consentStub = {
+    isMinor: false,
+    termsAgreed: true as const,
+    privacyPolicyAgreed: true as const,
+    guardianConsentObtained: false,
+    consentTimestamp: '2026-06-25T00:00:00.000Z',
+  };
+  const recordStub = { inputType: 'text_paste' as const, maskingApplied: true as const, text: '자료구조 발표와 동아리 활동' };
+  const baseProfile = {
+    schemaVersion: SCHEMA_VERSION,
+    record: recordStub,
+    currentStanding: { grade: 3, semester: 1, schoolType: 'general' as const },
+    consent: consentStub,
+  };
+  it('undeclared targetTrack 허용', () => {
+    const r = studentProfileSchema.safeParse({ ...baseProfile, targetTrack: 'undeclared' });
     expect(r.success).toBe(true);
   });
 });
