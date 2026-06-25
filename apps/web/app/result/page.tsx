@@ -70,8 +70,8 @@ export default function ResultPage() {
         </div>
         <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
           {profile
-            ? `${formatStandingLabel(profile)} · 24시간 안에 1차 결과 도착`
-            : '예시 학생 (데모) · 고3 2학기 · 이공 · 24시간 안에 1차 결과 도착'}
+            ? `${formatStandingLabel(profile)} · 1차 진단 결과`
+            : '예시 학생 (데모) · 고3 2학기 · 이공 · 1차 진단 결과'}
         </p>
         {profile && (() => {
           const cohort = cohortFromGrade(profile.grade);

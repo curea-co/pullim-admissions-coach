@@ -15,11 +15,10 @@ import { saveAnalyzeResult } from '@/lib/result-view';
 // 분석 진행 단계 — 실 /api/analyze 요청을 기반으로 구동한다.
 // 24h SLA 가짜 타이머 제거. 보통 1분 내로 완료(demo는 즉시).
 
-type AnalysisPhase = 'calling' | 'diagnosing' | 'done' | 'error';
+type AnalysisPhase = 'calling' | 'done' | 'error';
 
 const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
-  { key: 'calling', label: '생기부 분석', detail: '키워드 추출 + 평가 기준 매핑' },
-  { key: 'diagnosing', label: '진단·면접 준비 생성', detail: 'AI가 §6 가드 준수로 산출 중' },
+  { key: 'calling', label: '분석 중', detail: 'AI가 §6 가드레일 준수로 분석 중 (보통 1분)' },
   { key: 'done', label: '결과 도착', detail: '결과 화면을 불러옵니다' },
 ];
 
@@ -66,13 +65,10 @@ export default function ProcessingPage() {
 
         const data = await res.json();
         if (!cancelled) {
-          setPhase('diagnosing');
           // demo 응답은 즉시 완료, 실 응답도 동일 경로(결과 이미 도착)
           setIsDemo(data.demo === true);
           saveAnalyzeResult(data.result);
           clearSubmittedPayload();
-
-          // demo: 즉시 전환. 실: 작업 이미 완료됐으므로 바로 전환.
           setPhase('done');
           router.push('/result');
         }
@@ -194,8 +190,7 @@ function AnalysisStatusCard({
   const isDone = phase === 'done';
 
   const statusLabel: Record<AnalysisPhase, string> = {
-    calling: '생기부 분석 중',
-    diagnosing: '진단·면접 준비 생성 중',
+    calling: '분석 중',
     done: '결과 도착',
     error: '오류',
   };
