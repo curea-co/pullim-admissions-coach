@@ -1,0 +1,46 @@
+import { NextResponse } from 'next/server';
+import { studentProfileSchema } from '@pullim/shared';
+
+export const runtime = 'nodejs';
+export const maxDuration = 300; // 서버리스 한도(배포 환경에 맞게)
+
+export async function POST(req: Request) {
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return NextResponse.json({ error: '잘못된 요청' }, { status: 400 });
+  }
+
+  const v = studentProfileSchema.safeParse(payload);
+  if (!v.success) {
+    return NextResponse.json({ error: '입력 검증 실패' }, { status: 400 });
+  }
+
+  // mock 폴백: 키 없으면 데모 결과
+  if (!process.env.ANTHROPIC_API_KEY) {
+    const { mockAnalyzeResult } = await import('@/lib/mock/analyze-mock');
+    return NextResponse.json({ result: mockAnalyzeResult(v.data), demo: true });
+  }
+
+  try {
+    const { analyze } = await import('@/lib/analyze'); // server-only 동적 import
+    const { toAnalysisInput } = await import('@/lib/profile-adapter');
+    const profile = toAnalysisInput(v.data);
+    const result = await analyze(profile);
+    return NextResponse.json({ result, demo: false });
+  } catch (err) {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    if (err instanceof Anthropic.APIError) {
+      const status = err.status === 529 || err.status === 429 ? 503 : 502;
+      return NextResponse.json(
+        { error: 'AI 서비스가 혼잡합니다. 잠시 후 다시 시도해 주세요.' },
+        { status }
+      );
+    }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : '분석 실패' },
+      { status: 400 }
+    );
+  }
+}

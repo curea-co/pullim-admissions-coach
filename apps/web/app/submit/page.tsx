@@ -22,6 +22,7 @@ import { ErrorState } from '@/components/error-state';
 import { validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
+import { saveSubmittedPayload } from '@/lib/submitted-payload';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
@@ -249,6 +250,8 @@ export default function SubmitPage() {
       targetTrack,
       targetUniversities: universities.filter((u) => u.name.trim().length > 0),
     });
+    // processing 페이지가 /api/analyze에 POST할 payload를 sessionStorage에 임시 저장.
+    saveSubmittedPayload(buildPayload());
     startTransition(() => {
       router.push('/consent');
     });
