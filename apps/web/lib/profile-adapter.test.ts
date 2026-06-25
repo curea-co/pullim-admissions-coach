@@ -151,4 +151,13 @@ describe('toAnalysisInput', () => {
     const result = toAnalysisInput(makeProfile(), 2026)
     expect(() => analysisInputSchema.parse(result)).not.toThrow()
   })
+
+  it('pdf_upload inputType throws with Korean guidance message', () => {
+    const profile = makeProfile({
+      record: { inputType: 'pdf_upload', fileRef: 'uploads/test.pdf', maskingApplied: false } as unknown as StudentProfile['record'],
+    })
+    expect(() => toAnalysisInput(profile, 2026)).toThrow(
+      'PDF 업로드는 텍스트 추출 후 분석해 주세요(상위에서 처리 필요).',
+    )
+  })
 })

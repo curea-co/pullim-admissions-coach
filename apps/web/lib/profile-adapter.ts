@@ -61,8 +61,13 @@ export function toAnalysisInput(
   const { record, targetTrack, targetUniversities, currentStanding, consent } = payload
 
   // saengbu: the raw (masked) school record text
-  // Only text_paste inputType carries `.text`; pdf_upload will not have it here
-  // (upstream route is expected to resolve pdf→text before calling this adapter).
+  // Only text_paste inputType carries `.text`; pdf_upload must be resolved
+  // to text upstream before reaching this adapter.
+  if (record.inputType === 'pdf_upload') {
+    throw new Error(
+      'PDF 업로드는 텍스트 추출 후 분석해 주세요(상위에서 처리 필요).',
+    )
+  }
   const saengbu = record.inputType === 'text_paste' ? record.text : ''
 
   const raw = {
