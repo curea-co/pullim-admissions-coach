@@ -5,7 +5,7 @@ import type { CohortResult } from '@pullim/shared';
 
 // ── 최소 픽스처 ────────────────────────────────────────────────────────────
 
-const cohort: CohortResult = { system: '2028_new', emphasizeSetuk: true };
+const cohort: CohortResult = { system: '2028_new', track: 'core', region: 'unknown', emphasizeSetuk: true };
 
 const minimalResult: AnalyzeResult = {
   cohort,
@@ -89,7 +89,7 @@ describe('saveAnalyzeResult / loadAnalyzeResult', () => {
     saveAnalyzeResult(minimalResult);
     const updated: AnalyzeResult = {
       ...minimalResult,
-      cohort: { system: '2027_old', emphasizeSetuk: false },
+      cohort: { system: '2027_old', track: 'beachhead', region: 'unknown', emphasizeSetuk: false },
     };
     saveAnalyzeResult(updated);
     expect(loadAnalyzeResult()!.cohort.system).toBe('2027_old');
