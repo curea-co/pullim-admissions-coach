@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@pullim/engine": "workspace:*",
     "@pullim/shared": "workspace:*",
     "clsx": "^2.1.1",
     "next": "14.2.15",

@@ -1,5 +1,13 @@
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
+  resolve: {
+    alias: {
+      // `server-only` is a Next.js compile-time sentinel — it throws at runtime in non-RSC
+      // environments to prevent server modules from being bundled for the client. In the
+      // vitest (jsdom) context there is no bundler guard, so we stub it to an empty module.
+      'server-only': new URL('./lib/__stubs__/server-only.ts', import.meta.url).pathname,
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
