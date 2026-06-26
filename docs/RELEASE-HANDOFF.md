@@ -32,7 +32,9 @@
 | 7 | **잡큐(24h SLA·타임아웃 해소)** | 🔲 | **직원/인프라** | — | §5 — 동기 호출 한도 초과 대비, 프로덕션 정답 |
 | 8 | **약관/개인정보/미성년 동의 문구** | 🔲 | **법무** | — | §6 |
 
-> 베타 최소 출시선: **2(#18 키 재회전) + 3(배포)** 만으로 "실 AI가 도는 베타"는 가능(실 AI는 이미 머지됨, mock 인증·sessionStorage 영속 유지). **4·5·8**은 정식 서비스 전 필수.
+> 베타 최소 출시선: **2(#18 키 재회전) + 3(배포)** 만으로 "실 AI가 도는 데모/베타"는 가능. **단, mock 인증은 실사용자용이 아니다** — `mockAuthAdapter`는 비밀번호를 `localStorage`(`puds-auth-users`)에 **평문 저장**하므로, 실제 사용자(특히 미성년) 계정을 받는 **공개 베타에는 4(실 인증, B)가 선행 필수**. 키만 꽂은 베타는 **내부/통제된 데모**로만 쓸 것. **4·5·8**은 정식 서비스 전 필수.
+
+> ⚠️ **알려진 보안 부채(공개 전 해소):** (a) mock 인증 평문 비밀번호[#4=B], (b) `result-store.ts`가 사용자 스코프 없이 `localStorage`에 자기답변·이력 저장 → 공용 브라우저에서 **다른 로그인 사용자에게 이전 사용자 데이터 노출**[#5=C], (c) `/login?next=` 미검증 오픈 리다이렉트(§3.1 가드 규칙).
 
 ---
 
@@ -49,10 +51,12 @@ export const auth: AuthAdapter = mockAuthAdapter; // ← PullimApiAuthAdapter로
 - **설계 전부**: [docs/superpowers/specs/2026-06-24-auth-mypage-design.md](superpowers/specs/2026-06-24-auth-mypage-design.md)
   - 엔드포인트 매핑(`POST /auth/signup`·`/auth/login`·`/auth/refresh`, 계정은 `/auth` 밖 `GET /me`·`POST /account/delete` …), CSRF echo, 401→refresh→재시도, 미성년 보호자 동의, 보호 라우트, **pullim-api 선행조건(CORS·쿠키 Domain/SameSite·Swagger DTO 확정)**.
 - `AuthAdapter` 인터페이스: `apps/web/lib/auth/types.ts`. 같은 시그니처로 실 어댑터 구현 후 한 줄 교체.
+- ⚠️ **오픈 리다이렉트 가드(B 연동 시 필수):** `/login?next=`·`/signup?next=`의 `next`를 **내부 경로만** 허용하도록 검증(현재 코드는 미검증). 규칙은 [auth 설계 §5](superpowers/specs/2026-06-24-auth-mypage-design.md) 참조.
 
 ### 3.2 결과 영속 — sessionStorage → DB
-- 현재: `apps/web/lib/result-view.ts`(`saveAnalyzeResult`/`loadAnalyzeResult`, sessionStorage), `apps/web/lib/result-store.ts`(자기답변·저장 이력 mock).
-- 목표: pullim-api(또는 입시 전용 백엔드)에 결과 저장·조회·삭제. 마이페이지 진단 이력이 실제 저장분을 읽도록.
+- 현재: `apps/web/lib/result-view.ts`(`saveAnalyzeResult`/`loadAnalyzeResult`, **sessionStorage**, 탭 수명), `apps/web/lib/result-store.ts`(자기답변·저장 이력, **localStorage**, mock).
+- ⚠️ **알려진 위험:** `result-store.ts`는 **사용자 스코프 없이 localStorage**에 저장 → 같은 브라우저에서 다른 사용자가 로그인하면 **이전 사용자의 자기답변·이력이 노출**된다. 공개 전 반드시 사용자 스코프(또는 로그아웃 시 삭제) + 서버 저장으로 전환.
+- 목표: pullim-api(또는 입시 전용 백엔드)에 결과 저장·조회·삭제. 마이페이지 진단 이력이 실제 저장분(사용자 스코프)을 읽도록.
 - 비고: 이건 **백엔드 결과 저장 모듈**(auth 설계의 "하위프로젝트 3")이 선행. §6 정직 라벨(데모 플래그)·삭제권(개인정보) 유지할 것.
 
 ### 3.3 레이트리밋 — `apps/web/lib/rate-limit/index.ts`

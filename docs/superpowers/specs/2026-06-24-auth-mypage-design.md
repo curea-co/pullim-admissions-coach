@@ -77,6 +77,7 @@
   없으면 pullim-api가 만19 기준 미성년 플래그를 제공하도록 **플랜에서 게이트**한다(클라 생년월일
   판정은 UX 분기 보조용).
 - **보호 라우트**: `/submit`·`/consent`·`/processing`·`/result`·`/mypage` → 미로그인 시 `/login?next=`. **공개**: `/`·`/login`·`/signup`·`/verify-email`.
+- **`next` 오픈 리다이렉트 가드(필수):** `/login?next=`·`/signup?next=`의 `next`는 **내부 경로만** 허용한다 — `/`로 시작하고 `//`(프로토콜-상대)·`http(s):`·역참조가 아닌 값만. 검증 실패 시 기본값(`/mypage`)으로 폴백. 현재 코드(`app/login/page.tsx`·`app/signup/page.tsx`)는 `searchParams.get('next')`를 검증 없이 push하므로 외부 URL 주입이 가능 → B 연동 시 함께 가드 추가할 것. 예: `const safe = next?.startsWith('/') && !next.startsWith('//') ? next : '/mypage'`.
 - 랜딩 CTA("생기부 업로드 시작") → 미로그인 시 `/signup`으로, 로그인 시 `/submit`으로.
 
 > 정확한 요청/응답 DTO(필드명·필수·검증)는 **플랜 단계에서 pullim-api Swagger(`/api-docs`)와 DTO 파일**(`signup-request.dto`, `login-request.dto`, `me-response.dto` 등)로 확정해 코드에 반영한다.
