@@ -8,9 +8,12 @@
 const MOCK_SESSION_KEY = 'puds-auth-session';
 const ANON_KEY = 'pullim:anon-scope';
 
-let override: string | null = null;
+// undefined = 미설정(setUserScope 호출 전) → mock 세션 폴백 허용.
+// null       = 명시적 익명(로그아웃/실패) → 세션 폴백 없이 익명 스코프 강제.
+// string     = 로그인 사용자 id.
+let override: string | null | undefined = undefined;
 
-/** B 연동 시 실제 user id 주입(로그아웃 시 null). */
+/** B 연동 시 실제 user id 주입(로그아웃/실패 시 null=명시적 익명). */
 export function setUserScope(userId: string | null): void {
   override = userId;
 }
@@ -33,9 +36,13 @@ function anonScope(): string {
   }
 }
 
-/** 현재 사용자 스코프 키. 로그인=user id, 비로그인=탭 세션별 익명 id. */
+/** 현재 사용자 스코프 키. 로그인=user id, 명시적 익명/비로그인=탭 세션별 익명 id. */
 export function currentScope(): string {
-  if (override) return override;
+  // 명시적으로 설정된 경우(로그인 id 또는 null=익명): 세션 폴백 없이 그대로 따른다.
+  if (override !== undefined) {
+    return override ?? anonScope();
+  }
+  // 미설정(앱 초기/인증 프로바이더 마운트 전) — 편의상 mock 세션을 읽어본다.
   try {
     const session = localStorage.getItem(MOCK_SESSION_KEY);
     if (session) return session;
