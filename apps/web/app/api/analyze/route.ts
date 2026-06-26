@@ -25,20 +25,31 @@ export const maxDuration = 300;
  */
 function clientIp(req: Request): string {
   const headerName = process.env.RATE_LIMIT_IP_HEADER;
-  if (!headerName) {
-    if (process.env.NODE_ENV === 'production') {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (headerName) {
+    // 신뢰 헤더를 명시한 경우 **그 헤더만** 사용한다. 비어 있어도 spoofable 헤더로
+    // 폴백하지 않는다(폴백은 fail-open이 되어 우회를 허용).
+    const raw = req.headers.get(headerName);
+    if (raw && raw.trim()) return raw.split(',')[0]!.trim();
+    if (isProd) {
       throw new Error(
-        'RATE_LIMIT_IP_HEADER 미설정: 프로덕션에서는 신뢰 프록시가 보장하는 IP 헤더를 ' +
-          '명시해야 합니다(임의 헤더 신뢰 = IP 제한 우회). RELEASE-HANDOFF §5 참고.'
+        `신뢰 IP 헤더(${headerName})가 비어 있습니다(프로덕션 fail-closed). 엣지/프록시 설정을 확인하세요.`
       );
     }
-    const dev = req.headers.get('x-forwarded-for');
-    if (dev) return dev.split(',')[0]!.trim();
-    return req.headers.get('x-real-ip')?.trim() || 'unknown';
+    return 'unknown'; // 개발/테스트: 차단 대신 단일 키로 묶음.
   }
-  const raw = req.headers.get(headerName);
-  if (raw) return raw.split(',')[0]!.trim();
-  return req.headers.get('x-real-ip')?.trim() || 'unknown';
+
+  // 헤더 미설정: 프로덕션은 임의 헤더를 신뢰하지 않고 fail-closed.
+  if (isProd) {
+    throw new Error(
+      'RATE_LIMIT_IP_HEADER 미설정: 프로덕션에서는 신뢰 프록시가 보장하는 IP 헤더를 ' +
+        '명시해야 합니다(임의 헤더 신뢰 = IP 제한 우회). RELEASE-HANDOFF §5 참고.'
+    );
+  }
+  // 개발/테스트 편의: 표준 헤더 사용(프로덕션 경로 아님).
+  const dev = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
+  return dev ? dev.split(',')[0]!.trim() : 'unknown';
 }
 
 export async function POST(req: Request) {

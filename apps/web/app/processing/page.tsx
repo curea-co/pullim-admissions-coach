@@ -30,6 +30,10 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // 고비용(opus) 호출의 중복을 줄인다: 언마운트/재마운트(특히 reactStrictMode의
+    // 개발 중 이중 실행) 시 진행 중 요청을 abort. 완전한 교차요청 멱등성(서버 dedup)은
+    // 공유 스토어(KV) 기반 후속 작업 — 여기서는 클라이언트측 중복을 줄인다.
+    const controller = new AbortController();
 
     async function runAnalysis() {
       const payload = loadSubmittedPayload();
@@ -50,6 +54,7 @@ export default function ProcessingPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -84,10 +89,10 @@ export default function ProcessingPage() {
           router.push('/result');
         }
       } catch (err) {
-        if (!cancelled) {
-          setErrorMsg(err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.');
-          setPhase('error');
-        }
+        // abort(언마운트/재마운트)는 정상 취소 — 에러로 표시하지 않는다.
+        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
+        setErrorMsg(err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.');
+        setPhase('error');
       }
     }
 
@@ -95,6 +100,7 @@ export default function ProcessingPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [router]);
 

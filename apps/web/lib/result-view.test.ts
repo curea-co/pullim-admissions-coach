@@ -147,6 +147,19 @@ describe('saveAnalyzeResult 반환값', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
     expect(saveAnalyzeResult(minimalResult)).toBe(false);
   });
+
+  it('데모 플래그 키만 실패해도 false(부분 성공 차단 → 데모 고지 누락 방지)', () => {
+    const orig = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      k: string,
+      v: string
+    ) {
+      if (k === 'pullim:analyze-demo') return; // 데모 키 쓰기만 실패 모사
+      orig.call(this, k, v);
+    });
+    expect(saveAnalyzeResult(minimalResult, true)).toBe(false);
+  });
 });
 
 // ── toResultViewModel 매핑 ────────────────────────────────────────────────

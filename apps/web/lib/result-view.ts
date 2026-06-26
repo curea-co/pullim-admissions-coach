@@ -29,11 +29,17 @@ export function saveAnalyzeResult(r: AnalyzeResult, demo = false): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const serialized = JSON.stringify(r);
+    const demoFlag = demo ? '1' : '0';
     window.sessionStorage.setItem(STORAGE_KEY, serialized);
     // 항상 동기화: 직전 데모 플래그가 실결과에 남지 않도록 매 저장 시 덮어쓴다.
-    window.sessionStorage.setItem(DEMO_KEY, demo ? '1' : '0');
+    window.sessionStorage.setItem(DEMO_KEY, demoFlag);
     // 쓰기 검증(프라이빗 모드/쿼터 초과 등에서 setItem이 조용히 실패할 수 있음).
-    return window.sessionStorage.getItem(STORAGE_KEY) === serialized;
+    // 두 키 모두 검증: DEMO_KEY만 실패해도 /result가 mock을 실결과처럼 렌더(데모 고지
+    // 누락)할 수 있으므로 부분 성공을 false로 본다.
+    return (
+      window.sessionStorage.getItem(STORAGE_KEY) === serialized &&
+      window.sessionStorage.getItem(DEMO_KEY) === demoFlag
+    );
   } catch {
     // sessionStorage 비가용(프라이빗 모드 등) — 저장 실패로 보고.
     return false;
