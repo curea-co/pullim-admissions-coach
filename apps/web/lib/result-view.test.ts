@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { saveAnalyzeResult, loadAnalyzeResult, loadAnalyzeDemo, clearAnalyzeResult, toResultViewModel } from './result-view';
 import type { AnalyzeResult } from './analyze';
 import type { CohortResult } from '@pullim/shared';
@@ -130,6 +130,22 @@ describe('loadAnalyzeDemo', () => {
     expect(loadAnalyzeDemo()).toBe(true);
     saveAnalyzeResult(minimalResult, false);
     expect(loadAnalyzeDemo()).toBe(false);
+  });
+});
+
+// ── 저장 fail-closed(결과 유실 방지) ────────────────────────────────────────
+
+describe('saveAnalyzeResult 반환값', () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it('성공 시 true', () => {
+    expect(saveAnalyzeResult(minimalResult)).toBe(true);
+  });
+
+  it('setItem이 조용히 실패하면 false(호출자 fail-closed 유도)', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+    expect(saveAnalyzeResult(minimalResult)).toBe(false);
   });
 });
 

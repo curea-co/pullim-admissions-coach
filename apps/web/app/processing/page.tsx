@@ -71,7 +71,14 @@ export default function ProcessingPage() {
         if (!cancelled) {
           // demo 응답은 즉시 완료, 실 응답도 동일 경로(결과 이미 도착)
           setIsDemo(data.demo === true);
-          saveAnalyzeResult(data.result, data.demo === true);
+          // 결과 저장이 실패하면 제출 데이터를 지우거나 이동하지 않는다(fail-closed):
+          // 분석은 성공했는데 저장만 실패한 경우 /result가 데모를 표시하고 재시도가
+          // 막히는 것을 방지.
+          if (!saveAnalyzeResult(data.result, data.demo === true)) {
+            setErrorMsg('결과를 저장하지 못했어요. 브라우저 저장소 설정(프라이빗 모드 등)을 확인하고 다시 시도해주세요.');
+            setPhase('error');
+            return;
+          }
           clearSubmittedPayload();
           setPhase('done');
           router.push('/result');

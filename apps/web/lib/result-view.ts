@@ -19,14 +19,24 @@ const STORAGE_KEY = 'pullim:analyze-result';
 // 키 없이 생성된 mock 결과(데모) 여부. 결과 화면에서 정직 고지에 사용(§6).
 const DEMO_KEY = 'pullim:analyze-demo';
 
-export function saveAnalyzeResult(r: AnalyzeResult, demo = false): void {
-  if (typeof window === 'undefined') return;
+/**
+ * 분석 결과를 저장하고 **쓰기 성공 여부**를 반환한다.
+ * false면 호출자는 제출 데이터를 지우거나 /result로 이동하지 말아야 한다(fail-closed):
+ * 실 분석이 성공했는데 결과 저장이 조용히 실패하면, /result가 결과 없음으로 보고
+ * 데모를 표시하고 제출 데이터까지 지워져 재시도도 막힌다.
+ */
+export function saveAnalyzeResult(r: AnalyzeResult, demo = false): boolean {
+  if (typeof window === 'undefined') return false;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(r));
+    const serialized = JSON.stringify(r);
+    window.sessionStorage.setItem(STORAGE_KEY, serialized);
     // 항상 동기화: 직전 데모 플래그가 실결과에 남지 않도록 매 저장 시 덮어쓴다.
     window.sessionStorage.setItem(DEMO_KEY, demo ? '1' : '0');
+    // 쓰기 검증(프라이빗 모드/쿼터 초과 등에서 setItem이 조용히 실패할 수 있음).
+    return window.sessionStorage.getItem(STORAGE_KEY) === serialized;
   } catch {
-    // sessionStorage 비가용(프라이빗 모드 등) — 무시.
+    // sessionStorage 비가용(프라이빗 모드 등) — 저장 실패로 보고.
+    return false;
   }
 }
 

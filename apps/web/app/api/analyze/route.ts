@@ -14,17 +14,28 @@ export const maxDuration = 300;
 
 /**
  * 클라이언트 IP(레이트리밋 키).
- * 신뢰 IP 헤더는 배포 플랫폼에 맞게 `RATE_LIMIT_IP_HEADER`로 지정한다(예: Vercel은
- * 엣지가 덮어써 위조 불가한 `x-forwarded-for`/`x-real-ip`). 기본은 `x-forwarded-for`.
  *
- * 보안: 클라이언트가 임의로 넣을 수 있는 헤더를 신뢰하면 IP 제한이 우회된다. 따라서
- *  - 프로덕션에서는 신뢰 프록시(엣지/WAF)가 덮어쓰는 헤더만 `RATE_LIMIT_IP_HEADER`로
- *    지정하고, 인프라에서 클라이언트 주입 헤더를 제거할 것(RELEASE-HANDOFF §5).
- *  - 프로덕션 레이트리밋 자체가 공유 스토어(KV) 어댑터 + 명시 옵트인 없이는 fail-closed
- *    되도록 게이트돼 있다(lib/rate-limit/index.ts). in-memory + 헤더 신뢰는 베타 한정.
+ * 보안: 클라이언트가 임의로 넣을 수 있는 헤더를 신뢰하면 IP 제한이 우회되어 비용
+ * 보호가 깨진다. 그래서 신뢰할 IP 헤더를 명시(`RATE_LIMIT_IP_HEADER`)하게 한다 —
+ * 신뢰 프록시(엣지/WAF)가 위조 불가하게 덮어쓰는 헤더(예: Vercel `x-forwarded-for`)만
+ * 지정해야 한다(RELEASE-HANDOFF §5).
+ *  - 프로덕션: `RATE_LIMIT_IP_HEADER` 미설정이면 신뢰 가능한 IP를 알 수 없으므로
+ *    **fail-closed**(throw → 라우트 500). 임의 헤더를 조용히 신뢰하지 않는다.
+ *  - 개발/테스트: 기본 `x-forwarded-for` 사용(편의).
  */
 function clientIp(req: Request): string {
-  const headerName = process.env.RATE_LIMIT_IP_HEADER || 'x-forwarded-for';
+  const headerName = process.env.RATE_LIMIT_IP_HEADER;
+  if (!headerName) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'RATE_LIMIT_IP_HEADER 미설정: 프로덕션에서는 신뢰 프록시가 보장하는 IP 헤더를 ' +
+          '명시해야 합니다(임의 헤더 신뢰 = IP 제한 우회). RELEASE-HANDOFF §5 참고.'
+      );
+    }
+    const dev = req.headers.get('x-forwarded-for');
+    if (dev) return dev.split(',')[0]!.trim();
+    return req.headers.get('x-real-ip')?.trim() || 'unknown';
+  }
   const raw = req.headers.get(headerName);
   if (raw) return raw.split(',')[0]!.trim();
   return req.headers.get('x-real-ip')?.trim() || 'unknown';
@@ -33,8 +44,19 @@ function clientIp(req: Request): string {
 export async function POST(req: Request) {
   // 남용 가드(스펙 §8): 인증 전 무차별 호출 + opus 과금 폭증 차단.
   // mock·실 분기 이전에 적용해 데모 경로도 일관 보호.
-  const ip = clientIp(req);
-  const rl = await rateLimiter.check(ip, ANALYZE_RATE_RULES);
+  // 레이트리밋 IP/백엔드 미구성(프로덕션 fail-closed)은 일반 500으로 처리하고
+  // 상세 설정 사유는 서버 로그로만 남긴다.
+  let rl;
+  try {
+    const ip = clientIp(req);
+    rl = await rateLimiter.check(ip, ANALYZE_RATE_RULES);
+  } catch (err) {
+    console.error('[analyze] 레이트리밋 구성 오류:', err);
+    return NextResponse.json(
+      { error: '일시적으로 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 500 }
+    );
+  }
   if (!rl.allowed) {
     return NextResponse.json(
       { error: '요청이 많습니다. 잠시 후 다시 시도해 주세요.', retryAfterSec: rl.retryAfterSec },
