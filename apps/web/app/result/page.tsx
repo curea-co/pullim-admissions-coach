@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
-import { loadAnalyzeResult, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
+import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
@@ -46,16 +46,20 @@ export default function ResultPage() {
   const [tab, setTab] = useState<Tab>('interview');
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
+  const [resultIsDemo, setResultIsDemo] = useState(false);
 
   useEffect(() => {
     setProfile(loadSubmittedProfile());
     const result = loadAnalyzeResult();
     if (result) {
       setViewModel(toResultViewModel(result));
+      setResultIsDemo(loadAnalyzeDemo());
     }
   }, []);
 
-  const isDemo = !viewModel;
+  // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.
+  // 후자는 viewModel이 있어도 본문이 예시이므로 반드시 고지해야 함(§6 정직).
+  const isDemo = !viewModel || resultIsDemo;
 
   return (
     <RequireAuth>

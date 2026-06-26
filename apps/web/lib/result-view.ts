@@ -16,11 +16,15 @@ import type { FitAssessment } from './fit';
 // ── sessionStorage 키 ──────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'pullim:analyze-result';
+// 키 없이 생성된 mock 결과(데모) 여부. 결과 화면에서 정직 고지에 사용(§6).
+const DEMO_KEY = 'pullim:analyze-demo';
 
-export function saveAnalyzeResult(r: AnalyzeResult): void {
+export function saveAnalyzeResult(r: AnalyzeResult, demo = false): void {
   if (typeof window === 'undefined') return;
   try {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(r));
+    // 항상 동기화: 직전 데모 플래그가 실결과에 남지 않도록 매 저장 시 덮어쓴다.
+    window.sessionStorage.setItem(DEMO_KEY, demo ? '1' : '0');
   } catch {
     // sessionStorage 비가용(프라이빗 모드 등) — 무시.
   }
@@ -34,6 +38,16 @@ export function loadAnalyzeResult(): AnalyzeResult | null {
     return JSON.parse(raw) as AnalyzeResult;
   } catch {
     return null;
+  }
+}
+
+/** 저장된 결과가 키 없는 데모(mock)로 생성됐는지. 미저장이면 false. */
+export function loadAnalyzeDemo(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(DEMO_KEY) === '1';
+  } catch {
+    return false;
   }
 }
 

@@ -67,7 +67,7 @@ export default function ProcessingPage() {
         if (!cancelled) {
           // demo 응답은 즉시 완료, 실 응답도 동일 경로(결과 이미 도착)
           setIsDemo(data.demo === true);
-          saveAnalyzeResult(data.result);
+          saveAnalyzeResult(data.result, data.demo === true);
           clearSubmittedPayload();
           setPhase('done');
           router.push('/result');

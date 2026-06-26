@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { saveAnalyzeResult, loadAnalyzeResult, toResultViewModel } from './result-view';
+import { saveAnalyzeResult, loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel } from './result-view';
 import type { AnalyzeResult } from './analyze';
 import type { CohortResult } from '@pullim/shared';
 
@@ -93,6 +93,34 @@ describe('saveAnalyzeResult / loadAnalyzeResult', () => {
     };
     saveAnalyzeResult(updated);
     expect(loadAnalyzeResult()!.cohort.system).toBe('2027_old');
+  });
+});
+
+// ── 데모 플래그(§6 정직 고지) ───────────────────────────────────────────────
+
+describe('loadAnalyzeDemo', () => {
+  beforeEach(() => sessionStorage.clear());
+
+  it('미저장이면 false', () => {
+    expect(loadAnalyzeDemo()).toBe(false);
+  });
+
+  it('demo=true 저장 시 true (mock 결과도 viewModel은 로드되므로 플래그로 고지)', () => {
+    saveAnalyzeResult(minimalResult, true);
+    expect(loadAnalyzeResult()).not.toBeNull();
+    expect(loadAnalyzeDemo()).toBe(true);
+  });
+
+  it('기본값(실결과)은 false', () => {
+    saveAnalyzeResult(minimalResult);
+    expect(loadAnalyzeDemo()).toBe(false);
+  });
+
+  it('데모 저장 후 실결과로 덮어쓰면 플래그도 해제(잔존 금지)', () => {
+    saveAnalyzeResult(minimalResult, true);
+    expect(loadAnalyzeDemo()).toBe(true);
+    saveAnalyzeResult(minimalResult, false);
+    expect(loadAnalyzeDemo()).toBe(false);
   });
 });
 

@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { studentProfileSchema } from '@pullim/shared';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 서버리스 한도(배포 환경에 맞게)
+// opus 풀 파이프라인(3~4콜 ≈ 30~90초)용 한도.
+// 주의(배포): Vercel Hobby는 60초로 클램프되어 이 값을 무시함 → Pro/Fluid 필요.
+// twin 경로 등으로 초과 위험이 있으므로, 프로덕션 정답은 동기 호출이 아닌 잡큐(후속 P0).
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   let payload: unknown;
