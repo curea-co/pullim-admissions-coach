@@ -11,3 +11,4 @@ export * from './interview-formats';
 // #16 흡수 — 코호트(학년별 제도 #24) + §6.2 합법성 게이트(미래 AI 처방 필터)
 export * from './cohort';
 export * from './legality';
+export * from './analysis-input';

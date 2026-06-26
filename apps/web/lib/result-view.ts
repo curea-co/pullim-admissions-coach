@@ -1,0 +1,181 @@
+'use client';
+
+/**
+ * 출력 어댑터: AnalyzeResult → 결과 UI 뷰모델.
+ *
+ * - sessionStorage 영속화(submitted-profile 패턴 모방)
+ * - UPPERCASE 역량(engine) → lowercase(shared competencyLabel) 매핑
+ * - §6 준수: 합격%·점수·완성 대본 금지, 답변 방향만 노출
+ */
+
+import { competencyLabel, type Competency as SharedCompetency } from '@pullim/shared';
+import type { AnalyzeResult } from './analyze';
+import type { Roadmap } from '@pullim/engine';
+import type { FitAssessment } from './fit';
+
+// ── sessionStorage 키 ──────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'pullim:analyze-result';
+// 키 없이 생성된 mock 결과(데모) 여부. 결과 화면에서 정직 고지에 사용(§6).
+const DEMO_KEY = 'pullim:analyze-demo';
+
+/**
+ * 분석 결과를 저장하고 **쓰기 성공 여부**를 반환한다.
+ * false면 호출자는 제출 데이터를 지우거나 /result로 이동하지 말아야 한다(fail-closed):
+ * 실 분석이 성공했는데 결과 저장이 조용히 실패하면, /result가 결과 없음으로 보고
+ * 데모를 표시하고 제출 데이터까지 지워져 재시도도 막힌다.
+ */
+export function saveAnalyzeResult(r: AnalyzeResult, demo = false): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const serialized = JSON.stringify(r);
+    const demoFlag = demo ? '1' : '0';
+    window.sessionStorage.setItem(STORAGE_KEY, serialized);
+    // 항상 동기화: 직전 데모 플래그가 실결과에 남지 않도록 매 저장 시 덮어쓴다.
+    window.sessionStorage.setItem(DEMO_KEY, demoFlag);
+    // 쓰기 검증(프라이빗 모드/쿼터 초과 등에서 setItem이 조용히 실패할 수 있음).
+    // 두 키 모두 검증: DEMO_KEY만 실패해도 /result가 mock을 실결과처럼 렌더(데모 고지
+    // 누락)할 수 있으므로 부분 성공을 false로 본다.
+    return (
+      window.sessionStorage.getItem(STORAGE_KEY) === serialized &&
+      window.sessionStorage.getItem(DEMO_KEY) === demoFlag
+    );
+  } catch {
+    // sessionStorage 비가용(프라이빗 모드 등) — 저장 실패로 보고.
+    return false;
+  }
+}
+
+export function loadAnalyzeResult(): AnalyzeResult | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AnalyzeResult;
+  } catch {
+    return null;
+  }
+}
+
+/** 저장된 결과가 키 없는 데모(mock)로 생성됐는지. 미저장이면 false. */
+export function loadAnalyzeDemo(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(DEMO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 저장된 분석 결과를 제거. 새 분석을 시작하기 전 반드시 호출해,
+ * 분석이 진행 중이거나 실패한 상태에서 /result가 이전 학생의 결과를
+ * 개인화 결과처럼 표시하는 것을 막는다.
+ */
+export function clearAnalyzeResult(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(DEMO_KEY);
+  } catch {
+    // 무시
+  }
+}
+
+// ── 역량 키 매핑 ──────────────────────────────────────────────────────────
+
+/** engine UPPERCASE → shared lowercase */
+const COMP_KEY_MAP: Record<'ACADEMIC' | 'CAREER' | 'COMMUNITY', SharedCompetency> = {
+  ACADEMIC: 'academic',
+  CAREER: 'career',
+  COMMUNITY: 'community',
+};
+
+// ── 뷰모델 타입 ──────────────────────────────────────────────────────────
+
+export interface InterviewQuestionView {
+  question: string;
+  /** 근거 생기부 항목(quote + section) */
+  basisQuote: string;
+  basisSection: string;
+  /** 답변 방향(핵심 포인트만 — 완성 대본 아님) */
+  answerDirection: string;
+  followups: string[];
+}
+
+export interface DiagnosisCriterionView {
+  /** lowercase 역량 키 (competencyLabel 인덱스) */
+  competency: SharedCompetency;
+  competencyLabelText: string;
+  mapping: string;
+  strength: string;
+  weakness: string;
+  evidence: { quote: string; section: string }[];
+}
+
+export interface ImprovementItemView {
+  recordArea: string;
+  /** lowercase 역량 키 */
+  competency: SharedCompetency;
+  text: string;
+  rationale: string;
+  evidence: { quote: string; section: string };
+}
+
+export interface ResultViewModel {
+  interview: InterviewQuestionView[];
+  diagnosis: DiagnosisCriterionView[];
+  improvements: ImprovementItemView[];
+  roadmap?: Roadmap;
+  fit?: FitAssessment;
+}
+
+// ── 매퍼 ──────────────────────────────────────────────────────────────────
+
+/**
+ * AnalyzeResult → ResultViewModel.
+ * 실 데이터가 없는 옵셔널 필드(interview, roadmap, fit)는 undefined로 남긴다.
+ */
+export function toResultViewModel(r: AnalyzeResult): ResultViewModel {
+  // 면접
+  const interview: InterviewQuestionView[] = (r.interview?.questions ?? []).map((q) => ({
+    question: q.question,
+    basisQuote: q.basis.quote,
+    basisSection: q.basis.section,
+    answerDirection: q.answerDirection,
+    followups: q.followups,
+  }));
+
+  // 진단
+  const diagnosis: DiagnosisCriterionView[] = r.diagnosis.criteria.map((c) => {
+    const key = COMP_KEY_MAP[c.key];
+    return {
+      competency: key,
+      competencyLabelText: competencyLabel[key],
+      mapping: c.mapping,
+      strength: c.strength,
+      weakness: c.weakness,
+      evidence: c.evidence.map((e) => ({ quote: e.quote, section: e.section })),
+    };
+  });
+
+  // 보완(rubric)
+  const improvements: ImprovementItemView[] = r.rubric.items.map((item) => {
+    const key = COMP_KEY_MAP[item.competency];
+    return {
+      recordArea: item.recordArea,
+      competency: key,
+      text: item.text,
+      rationale: item.rationale,
+      evidence: { quote: item.evidence.quote, section: item.evidence.section },
+    };
+  });
+
+  return {
+    interview,
+    diagnosis,
+    improvements,
+    roadmap: r.roadmap,
+    fit: r.fit,
+  };
+}
