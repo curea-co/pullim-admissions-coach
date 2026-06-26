@@ -1,46 +1,118 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
-import { SkeletonCard } from '@/components/loading-skeleton';
+import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
+import { saveAnalyzeResult, clearAnalyzeResult } from '@/lib/result-view';
 
-// 24h SLA 상태머신 화면 (Phase B).
-// 정의 §8: 클럭 시작 = 입력 완료 + 동의 시점. 클럭 종료 = 결과 노출.
-// 실 SLA 잡 큐는 Phase C(BullMQ). 본 화면은 Phase A→B의 *상태 시각화*.
+// 분석 진행 단계 — 실 /api/analyze 요청을 기반으로 구동한다.
+// 24h SLA 가짜 타이머 제거. 보통 1분 내로 완료(demo는 즉시).
 
-type SlaState = 'queued' | 'parsing' | 'diagnosing' | 'completed' | 'delayed';
+type AnalysisPhase = 'calling' | 'done' | 'error';
 
-const stages: { key: SlaState; label: string; detail: string }[] = [
-  { key: 'queued', label: '접수 완료', detail: '제출 + 동의 기록 저장' },
-  { key: 'parsing', label: '생기부 분석', detail: '키워드 추출 + 평가 기준 매핑' },
-  { key: 'diagnosing', label: '진단·면접 준비 생성', detail: 'AI가 §6 가드 준수로 산출 중' },
-  { key: 'completed', label: '결과 도착', detail: '학생 화면 노출 + 학부모 리포트 큐잉' },
+const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
+  { key: 'calling', label: '분석 중', detail: 'AI가 §6 가드레일 준수로 분석 중 (보통 1분)' },
+  { key: 'done', label: '결과 도착', detail: '결과 화면을 불러옵니다' },
 ];
 
-// 데모 가속: 실 24h 대신 90초 사이클로 시연. dev 전용.
-const DEMO_CYCLE_MS = 90_000;
-
 export default function ProcessingPage() {
-  const submittedAt = useMemo(() => Date.now(), []);
-  const [now, setNow] = useState<number>(submittedAt);
+  const router = useRouter();
+  const [phase, setPhase] = useState<AnalysisPhase>('calling');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+    let cancelled = false;
+    // 고비용(opus) 호출의 중복을 줄인다: 언마운트/재마운트(특히 reactStrictMode의
+    // 개발 중 이중 실행) 시 진행 중 요청을 abort. 완전한 교차요청 멱등성(서버 dedup)은
+    // 공유 스토어(KV) 기반 후속 작업 — 여기서는 클라이언트측 중복을 줄인다.
+    const controller = new AbortController();
 
-  const elapsedMs = now - submittedAt;
-  const stageIdx = Math.min(
-    Math.floor((elapsedMs / DEMO_CYCLE_MS) * stages.length),
-    stages.length - 1
-  );
-  const state: SlaState = stages[stageIdx].key;
-  const isComplete = state === 'completed';
+    async function runAnalysis() {
+      const payload = loadSubmittedPayload();
+      if (!payload) {
+        // payload 없음 — submit 화면으로 돌아가게 안내
+        setErrorMsg('제출 데이터를 찾을 수 없습니다. 처음부터 다시 제출해주세요.');
+        setPhase('error');
+        return;
+      }
+
+      // 새 분석 시작 — 이전 결과를 먼저 비워, 실패/진행 중에 /result가
+      // 과거 결과를 이번 제출 결과처럼 표시하지 않도록 한다.
+      clearAnalyzeResult();
+
+      try {
+        setPhase('calling');
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          let msg = '분석 실패';
+          try {
+            const data = await res.json();
+            if (data?.error) msg = data.error;
+          } catch {
+            // ignore parse error
+          }
+          if (!cancelled) {
+            setErrorMsg(msg);
+            setPhase('error');
+          }
+          return;
+        }
+
+        const data = await res.json();
+        if (!cancelled) {
+          // demo 응답은 즉시 완료, 실 응답도 동일 경로(결과 이미 도착)
+          setIsDemo(data.demo === true);
+          // 결과 저장이 실패하면 제출 데이터를 지우거나 이동하지 않는다(fail-closed):
+          // 분석은 성공했는데 저장만 실패한 경우 /result가 데모를 표시하고 재시도가
+          // 막히는 것을 방지.
+          if (!saveAnalyzeResult(data.result, data.demo === true)) {
+            setErrorMsg('결과를 저장하지 못했어요. 브라우저 저장소 설정(프라이빗 모드 등)을 확인하고 다시 시도해주세요.');
+            setPhase('error');
+            return;
+          }
+          clearSubmittedPayload();
+          setPhase('done');
+          router.push('/result');
+        }
+      } catch (err) {
+        // abort(언마운트/재마운트)는 정상 취소 — 에러로 표시하지 않는다.
+        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
+        setErrorMsg(err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.');
+        setPhase('error');
+      }
+    }
+
+    runAnalysis();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [router]);
+
+  function handleRetry() {
+    setErrorMsg(null);
+    setPhase('calling');
+    // useEffect 의존성을 트리거하지 않으므로 페이지 리로드
+    window.location.reload();
+  }
+
+  const currentStepIdx = STEP_SEQUENCE.findIndex((s) => s.key === phase);
+  const activeIdx = currentStepIdx < 0 ? 0 : currentStepIdx;
 
   return (
     <RequireAuth>
@@ -55,41 +127,59 @@ export default function ProcessingPage() {
         </div>
         <p className="mb-6 text-ink-700">
           제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
+          {isDemo && (
+            <span className="ml-2 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+              데모 모드 (API 키 없음)
+            </span>
+          )}
         </p>
 
         <GuardrailLabel variant="general" className="mb-6" />
 
-        <SlaStatusCard
-          state={state}
-          stageIdx={stageIdx}
-          isComplete={isComplete}
-        />
-
-        <section className="mt-6 space-y-3">
-          {stages.map((s, idx) => (
-            <Stage
-              key={s.key}
-              index={idx}
-              label={s.label}
-              detail={s.detail}
-              state={
-                idx < stageIdx ? 'done' : idx === stageIdx ? 'current' : 'todo'
-              }
+        {phase === 'error' ? (
+          <div className="space-y-4">
+            <ErrorState
+              title="분석 중 오류가 발생했습니다"
+              message={errorMsg ?? '알 수 없는 오류'}
             />
-          ))}
-        </section>
-
-        {!isComplete && (
-          <section className="mt-8">
-            <p className="mb-3 text-sm font-semibold text-ink-700">
-              생성 결과 미리보기 (도착 시 자동 노출)
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+              >
+                다시 시도
+              </button>
+              <Link
+                href="/submit"
+                className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              >
+                처음으로
+              </Link>
             </div>
-          </section>
+          </div>
+        ) : (
+          <>
+            <AnalysisStatusCard phase={phase} activeIdx={activeIdx} />
+
+            <section className="mt-6 space-y-3">
+              {STEP_SEQUENCE.map((s, idx) => (
+                <Step
+                  key={s.key}
+                  index={idx}
+                  label={s.label}
+                  detail={s.detail}
+                  state={
+                    idx < activeIdx ? 'done' : idx === activeIdx ? 'current' : 'todo'
+                  }
+                />
+              ))}
+            </section>
+
+            <p className="mt-6 text-xs text-ink-400">
+              분석 중(보통 1분) — 완료되면 자동으로 결과 화면으로 이동합니다.
+            </p>
+          </>
         )}
 
         <div className="mt-10 flex items-center justify-between border-t border-ink-100 pt-6">
@@ -99,17 +189,6 @@ export default function ProcessingPage() {
           >
             ← 동의로
           </Link>
-          <Link
-            href="/result"
-            className={cn(
-              'rounded-xl border px-5 py-3 text-sm font-semibold shadow-sm transition',
-              isComplete
-                ? 'border-brand-500 bg-brand-600 text-white hover:bg-brand-700'
-                : 'border-ink-100 bg-white text-ink-500 hover:text-ink-700'
-            )}
-          >
-            {isComplete ? '결과 보기 →' : '결과 화면 미리 보기'}
-          </Link>
         </div>
       </div>
     </>
@@ -117,36 +196,45 @@ export default function ProcessingPage() {
   );
 }
 
-function SlaStatusCard({
-  state,
-  stageIdx,
-  isComplete,
+function AnalysisStatusCard({
+  phase,
+  activeIdx,
 }: {
-  state: SlaState;
-  stageIdx: number;
-  isComplete: boolean;
+  phase: AnalysisPhase;
+  activeIdx: number;
 }) {
-  const pct = Math.round(((stageIdx + (isComplete ? 1 : 0.5)) / stages.length) * 100);
+  const pct = Math.round(((activeIdx + 0.5) / STEP_SEQUENCE.length) * 100);
+  const isDone = phase === 'done';
+
+  const statusLabel: Record<AnalysisPhase, string> = {
+    calling: '분석 중',
+    done: '결과 도착',
+    error: '오류',
+  };
+
   return (
     <div
       className={cn(
         'rounded-2xl border p-5',
-        isComplete
+        isDone
           ? 'border-emerald-200 bg-emerald-50/50'
           : 'border-brand-200 bg-brand-50/40'
       )}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        {!isDone && (
+          <span
+            className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600"
+            aria-hidden
+          />
+        )}
         <p
           className={cn(
             'text-base font-semibold',
-            isComplete ? 'text-emerald-700' : 'text-brand-700'
+            isDone ? 'text-emerald-700' : 'text-brand-700'
           )}
         >
-          {labelFor(state)}
-        </p>
-        <p className="text-xs text-ink-500">
-          보통 몇 분 안에 1차 결과가 나와요. 늦어도 24시간 안에 끝나고, 완료되면 알려드릴게요.
+          {statusLabel[phase]}
         </p>
       </div>
       <div
@@ -154,34 +242,21 @@ function SlaStatusCard({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={pct}
+        aria-valuenow={isDone ? 100 : pct}
       >
         <div
           className={cn(
             'h-full transition-all duration-700',
-            isComplete ? 'bg-emerald-500' : 'bg-brand-500'
+            isDone ? 'bg-emerald-500' : 'bg-brand-500'
           )}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${isDone ? 100 : pct}%` }}
         />
       </div>
-      <p className="mt-2 text-xs text-ink-500">
-        지금은 &ldquo;{labelFor(state)}&rdquo; 단계예요. 끝나면 결과 화면이 자동으로 열려요.
-      </p>
     </div>
   );
 }
 
-function labelFor(s: SlaState): string {
-  return {
-    queued: '접수 완료 — 큐 대기 중',
-    parsing: '생기부 분석 중',
-    diagnosing: '진단·면접 준비 생성 중',
-    completed: '결과 도착',
-    delayed: '지연 — 운영팀이 보고 있어요',
-  }[s];
-}
-
-function Stage({
+function Step({
   index,
   label,
   detail,
