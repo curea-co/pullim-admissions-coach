@@ -26,11 +26,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null); setStatus('error'); setUserScope(null);
     }
   }, []);
-  // 로그아웃은 refresh 결과와 무관하게 스코프를 먼저 해제(즉시 격리).
+  // 로그아웃: 스코프를 먼저 해제(즉시 격리)하고, auth.logout()이 실패해도 refresh가
+  // 반드시 실행되도록 finally로 보장한다 — 안 그러면 user/status는 이전 로그인 상태로
+  // 남고 스코프만 풀리는 불일치가 생긴다.
   const logout = useCallback(async () => {
     setUserScope(null);
-    await auth.logout();
-    await refresh();
+    try {
+      await auth.logout();
+    } finally {
+      await refresh();
+    }
   }, [refresh]);
   useEffect(() => { void refresh(); }, [refresh]);
   return <AuthCtx.Provider value={{ user, status, refresh, logout }}>{children}</AuthCtx.Provider>;

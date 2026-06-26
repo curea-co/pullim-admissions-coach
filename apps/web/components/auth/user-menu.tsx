@@ -36,6 +36,15 @@ export function UserMenu({ className }: { className?: string }) {
     );
   }
 
+  // 일시 오류(/me 일시 실패) — 로그아웃이 아니므로 로그인/가입 CTA를 띄우지 않는다.
+  if (status === 'error') {
+    return (
+      <div className={cn('flex items-center', className)}>
+        <span className="text-xs text-ink-400">일시 오류</span>
+      </div>
+    );
+  }
+
   // guest
   return (
     <div className={cn('flex items-center gap-2', className)}>
