@@ -12,7 +12,14 @@ export const runtime = 'nodejs';
 // twin 경로 등으로 초과 위험이 있으므로, 프로덕션 정답은 동기 호출이 아닌 잡큐(후속 P0).
 export const maxDuration = 300;
 
-/** 프록시 체인의 첫 홉을 클라이언트 IP로 사용(없으면 unknown). */
+/**
+ * 클라이언트 IP(레이트리밋 키).
+ * 신뢰 프록시(예: Vercel 엣지)가 덮어쓴 x-forwarded-for 첫 홉을 사용한다.
+ * 주의: 신뢰 프록시 뒤가 아닌 배포에서는 클라이언트가 이 헤더를 위조해 IP 제한을
+ * 우회할 수 있다 → 자가 호스팅 시 반드시 신뢰 프록시가 붙인 값만 통과시키도록
+ * 인프라(WAF/프록시)에서 보장할 것(RELEASE-HANDOFF §5). 정확한 분산 제한은
+ * 공유 스토어(KV) 어댑터 + 플랫폼 보장 IP로 강화한다.
+ */
 function clientIp(req: Request): string {
   const fwd = req.headers.get('x-forwarded-for');
   if (fwd) return fwd.split(',')[0]!.trim();
@@ -57,10 +64,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ result: mockAnalyzeResult(v.data), demo: true });
   }
 
+  const { analyze } = await import('@/lib/analyze'); // server-only 동적 import
+  const { toAnalysisInput } = await import('@/lib/profile-adapter');
+
+  // 입력 변환 실패 = 잘못된 요청(4xx). 상세 사유는 클라이언트에 노출하지 않는다.
+  let profile;
   try {
-    const { analyze } = await import('@/lib/analyze'); // server-only 동적 import
-    const { toAnalysisInput } = await import('@/lib/profile-adapter');
-    const profile = toAnalysisInput(v.data);
+    profile = toAnalysisInput(v.data);
+  } catch (err) {
+    console.error('[analyze] 입력 어댑터 오류:', err);
+    return NextResponse.json(
+      { error: '입력을 분석할 수 없습니다. 입력 내용을 확인해 주세요.' },
+      { status: 400 }
+    );
+  }
+
+  try {
     const result = await analyze(profile);
     return NextResponse.json({ result, demo: false });
   } catch (err) {
@@ -72,9 +91,11 @@ export async function POST(req: Request) {
         { status }
       );
     }
+    // 내부 오류: 상세(err.message·SDK 문구·스택)는 서버 로그로만, 클라엔 일반 메시지 + 5xx.
+    console.error('[analyze] 내부 오류:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : '분석 실패' },
-      { status: 400 }
+      { error: '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 500 }
     );
   }
 }

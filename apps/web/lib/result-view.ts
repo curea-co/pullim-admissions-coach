@@ -51,6 +51,21 @@ export function loadAnalyzeDemo(): boolean {
   }
 }
 
+/**
+ * 저장된 분석 결과를 제거. 새 분석을 시작하기 전 반드시 호출해,
+ * 분석이 진행 중이거나 실패한 상태에서 /result가 이전 학생의 결과를
+ * 개인화 결과처럼 표시하는 것을 막는다.
+ */
+export function clearAnalyzeResult(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(DEMO_KEY);
+  } catch {
+    // 무시
+  }
+}
+
 // ── 역량 키 매핑 ──────────────────────────────────────────────────────────
 
 /** engine UPPERCASE → shared lowercase */

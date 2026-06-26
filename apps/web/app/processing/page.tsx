@@ -10,7 +10,7 @@ import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
-import { saveAnalyzeResult } from '@/lib/result-view';
+import { saveAnalyzeResult, clearAnalyzeResult } from '@/lib/result-view';
 
 // 분석 진행 단계 — 실 /api/analyze 요청을 기반으로 구동한다.
 // 24h SLA 가짜 타이머 제거. 보통 1분 내로 완료(demo는 즉시).
@@ -39,6 +39,10 @@ export default function ProcessingPage() {
         setPhase('error');
         return;
       }
+
+      // 새 분석 시작 — 이전 결과를 먼저 비워, 실패/진행 중에 /result가
+      // 과거 결과를 이번 제출 결과처럼 표시하지 않도록 한다.
+      clearAnalyzeResult();
 
       try {
         setPhase('calling');

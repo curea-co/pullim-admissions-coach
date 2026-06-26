@@ -9,6 +9,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
 import { cn } from '@/lib/utils';
 
 // Phase B: 클라이언트 차단 로직.
@@ -104,6 +105,14 @@ export default function ConsentPage() {
         }.`
       );
       return;
+    }
+
+    // 동의 정합성: /submit가 저장한 stub consent를 이 화면에서 받은 *실제* 동의값으로
+    // 갱신해야 서버(/api/analyze)가 올바른 동의 상태로 분석한다. 갱신하지 않으면
+    // 사용자가 성인으로 바꾸거나 보호자 동의를 빼도 서버는 stub(미성년+동의)을 받는다.
+    const existing = loadSubmittedPayload();
+    if (existing && typeof existing === 'object') {
+      saveSubmittedPayload({ ...(existing as Record<string, unknown>), consent: payload });
     }
 
     startTransition(() => {

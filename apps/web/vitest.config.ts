@@ -6,12 +6,14 @@ export default defineConfig({
       // environments to prevent server modules from being bundled for the client. In the
       // vitest (jsdom) context there is no bundler guard, so we stub it to an empty module.
       'server-only': new URL('./lib/__stubs__/server-only.ts', import.meta.url).pathname,
+      // `@/…` 경로 별칭(tsconfig paths) — 라우트/페이지 테스트가 앱 모듈을 import할 수 있게.
+      '@': new URL('.', import.meta.url).pathname.replace(/\/$/, ''),
     },
   },
   test: {
     environment: 'jsdom',
     globals: true,
-    include: ['lib/**/*.test.ts'],
+    include: ['lib/**/*.test.ts', 'app/**/*.test.ts'],
     // Node.js v22+ exposes a native (non-functional) `localStorage` on globalThis which
     // prevents vitest's jsdom populateGlobal from overwriting it. The setup file explicitly
     // copies jsdom's working localStorage onto globalThis.

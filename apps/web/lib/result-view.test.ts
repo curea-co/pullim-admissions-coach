@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { saveAnalyzeResult, loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel } from './result-view';
+import { saveAnalyzeResult, loadAnalyzeResult, loadAnalyzeDemo, clearAnalyzeResult, toResultViewModel } from './result-view';
 import type { AnalyzeResult } from './analyze';
 import type { CohortResult } from '@pullim/shared';
 
@@ -93,6 +93,15 @@ describe('saveAnalyzeResult / loadAnalyzeResult', () => {
     };
     saveAnalyzeResult(updated);
     expect(loadAnalyzeResult()!.cohort.system).toBe('2027_old');
+  });
+
+  it('clearAnalyzeResult: 결과 + 데모 플래그 모두 제거(이전 결과 오표시 방지)', () => {
+    saveAnalyzeResult(minimalResult, true);
+    expect(loadAnalyzeResult()).not.toBeNull();
+    expect(loadAnalyzeDemo()).toBe(true);
+    clearAnalyzeResult();
+    expect(loadAnalyzeResult()).toBeNull();
+    expect(loadAnalyzeDemo()).toBe(false);
   });
 });
 
