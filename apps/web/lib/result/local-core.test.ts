@@ -6,7 +6,7 @@ import {
   saveDiagnosisCore,
   getDiagnosisCore,
 } from './local-core';
-import { setUserScope } from './scope';
+import { setUserScope, currentScope } from './scope';
 
 beforeEach(() => {
   localStorage.clear();
@@ -43,5 +43,16 @@ describe('local-core (사용자 스코프)', () => {
     setUserScope('user_1');
     expect(getAnswerCore('q1')).toBe('user1 답'); // 다시 user_1은 자기 데이터
     expect(listDiagnosesCore()).toHaveLength(1);
+  });
+
+  it('명시적 null 스코프는 세션 폴백 없이 익명 강제(로그아웃 후 스테일 방지)', () => {
+    // mock 세션이 남아 있어도 setUserScope(null)이면 그 세션 스코프를 읽지 않아야 한다.
+    localStorage.setItem('puds-auth-session', 'sess_stale');
+    setUserScope('sess_stale');
+    setAnswerCore('q', '세션 사용자 데이터');
+
+    setUserScope(null); // 명시적 익명
+    expect(currentScope()).not.toBe('sess_stale');
+    expect(getAnswerCore('q')).toBe(''); // 세션 사용자 데이터를 보지 않음
   });
 });
