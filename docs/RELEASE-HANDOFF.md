@@ -47,7 +47,7 @@ export const auth: AuthAdapter = mockAuthAdapter; // ← PullimApiAuthAdapter로
 - 현재: `mockAuthAdapter`(localStorage 기반, 데모용).
 - 목표: `pullim-api`(NestJS) 직접 호출(CORS + httpOnly 쿠키 + CSRF + JWT).
 - **설계 전부**: [docs/superpowers/specs/2026-06-24-auth-mypage-design.md](superpowers/specs/2026-06-24-auth-mypage-design.md)
-  - 엔드포인트 매핑(`/auth/signup`·`/login`·`/refresh`·`/me`·`/account/delete` …), CSRF echo, 401→refresh→재시도, 미성년 보호자 동의, 보호 라우트, **pullim-api 선행조건(CORS·쿠키 Domain/SameSite·Swagger DTO 확정)**.
+  - 엔드포인트 매핑(`POST /auth/signup`·`/auth/login`·`/auth/refresh`, 계정은 `/auth` 밖 `GET /me`·`POST /account/delete` …), CSRF echo, 401→refresh→재시도, 미성년 보호자 동의, 보호 라우트, **pullim-api 선행조건(CORS·쿠키 Domain/SameSite·Swagger DTO 확정)**.
 - `AuthAdapter` 인터페이스: `apps/web/lib/auth/types.ts`. 같은 시그니처로 실 어댑터 구현 후 한 줄 교체.
 
 ### 3.2 결과 영속 — sessionStorage → DB
@@ -114,13 +114,13 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
 - **결제/요금제 변경**: 현재 표시만(mock).
 - **마이페이지 진단 이력**: B+C 이후 실제 저장분 연결("다시 보기"가 `/result?id=`로 라우팅되도록).
 - **알림**: 결과 완료 SES/카카오 알림톡(잡큐와 함께).
-- 기타 minor는 `.superpowers/sdd/progress.md` 레저 참조.
+- 구현 세부·태스크별 결정 이력은 각 기능의 PR(설명·코덱스 리뷰 스레드)과 커밋 메시지를 참조(예: 실 AI는 PR #37).
 
 ---
 
 ## 8. 참고 문서 인덱스
 
-- 실 AI 파이프라인: [specs](superpowers/specs/2026-06-26-real-ai-pipeline-design.md) · [plan](superpowers/plans/2026-06-26-real-ai-pipeline.md)
+- 실 AI 파이프라인: [설계 spec](superpowers/specs/2026-06-26-real-ai-pipeline-design.md) (구현·검증 이력은 PR #37)
 - 인증+마이페이지(실 연동): [specs](superpowers/specs/2026-06-24-auth-mypage-design.md) · mock: [specs](superpowers/specs/2026-06-24-auth-mypage-mock-design.md)
 - 3역량 진단 · PII · 면접 분기 · 결과 반영 · 보완안 · PUDS · 학생 경험: `docs/superpowers/specs/` 참조.
 - 정의/프롬프트/골든/스키마 SSOT: `docs/002_…definition`, `docs/prompt_v0.1.md`, `docs/golden/`, `docs/student_profile_schema_v0.1.json`.

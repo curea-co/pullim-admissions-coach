@@ -10,7 +10,7 @@
 ## 1. 배경 / 문제
 입시 코치는 현재 **로그인 없이** 제출→결과까지 가는 프로토타입이다. 사용자(가입·신원·미성년 동의·저장)가 없어 실서비스가 불가하다. 별도 레포 **`pullim-api`(NestJS 공용 백엔드)** 에 인증·계정이 이미 구현돼 있다:
 - 세션: **httpOnly 쿠키(access+refresh) + CSRF double-submit + JWT**. env 파생 Secure/Domain.
-- 가입/로그인: `POST /auth/signup`(+`/signup/guardian-consent`), `/auth/login`, `/refresh`, `/logout`, `GET /auth/csrf`, `email-verification/send|verify`, OAuth(카카오·구글·네이버·애플), guest 토큰.
+- 가입/로그인: `POST /auth/signup`(+`/auth/signup/guardian-consent`), `/auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/csrf`, `/auth/email-verification/send|verify`, OAuth(카카오·구글·네이버·애플), guest 토큰. (계정 조회·탈퇴는 `/auth` 밖: `GET /me`, `POST /account/delete`.)
 - 계정: `GET /me`(sub·email·displayName·ageBand[under14/over14/unknown]·package·tier·globalRole), `/me/entitlements`, `/me/children`, `POST /account/delete`(+cancel).
 - **미성년 보호자 동의 전용 시스템**(GuardianConsentSignup·GuardianPiiMasking·동의 로그·PII sweep).
 - **없는 것**: 입시 진단/생기부/결과 저장 모듈 → 본 작업 범위 밖(하위프로젝트 3).
