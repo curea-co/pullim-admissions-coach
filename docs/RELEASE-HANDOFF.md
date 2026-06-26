@@ -1,0 +1,115 @@
+# 풀림 입시코치 — 출시 핸드오프 (7/1 베타)
+
+- 작성: 2026-06-26
+- 목적: 베타 출시(2026-07-01)까지 남은 작업을 **소유자별로** 정리하고, mock→실 **교체점**·시크릿·배포 노트를 한 곳에 모은 인수인계 문서.
+- 대상 독자: CEO(의사결정) · 담당 직원(엔지니어) · 법무 · 인프라.
+
+---
+
+## 1. 한눈에 보기
+
+**제품:** 학종(학생부종합전형) 생기부를 입력하면 AI가 3역량 진단 + 면접 준비 + 보완안 + 로드맵 + 적합도를 만들어 주는 입시 코치. §6 가드레일(정답/대본/합격답변 금지, 방향만 + 근거 인용) 준수.
+
+**스택:** Next.js(App Router, apps/web) · pnpm 모노레포(packages/shared, packages/engine) · Tailwind v4 + PUDS 디자인 시스템 · Anthropic Claude(opus-4-8, server-only) · NestJS 공용 백엔드 `pullim-api`(별 레포, 인증).
+
+### 상태 요약
+- ✅ **main에 통합 완료** — PUDS·OS 대시보드·랜딩 · mock 인증+마이페이지 · 학생 경험(자기답변·저장/공유) · #24 학년별 제도 · #23 무전공 · #28 접근성 · #17 PII 검출/마스킹 · #19 3역량 진단 · #20 보완안 · #22 면접 분기 · #25 결과 입력 반영.
+- 🟡 **PR #37 (머지 대기)** — 실 AI 진단 파이프라인(#16 풀 포팅) + /api/analyze 남용 가드. **code + live 검증 완료**(실 키로 e2e: demo:false, §6 위반 0, 마스킹 0 누출, 429 동작). 코덱스 리뷰 후 머지는 CEO.
+- 🔲 **출시 전 P0 (아래 §2)** — 대부분 직원/법무/인프라 결정 대기.
+
+---
+
+## 2. 출시 전 P0 체크리스트
+
+| # | 항목 | 상태 | 소유자 | 선행/차단 | 참고 |
+|---|---|---|---|---|---|
+| 1 | 실 AI 파이프라인 | ✅ 완료(PR #37) | — | 머지만 | §1, PR #37 |
+| 2 | **PR #37 머지** | 🔲 | **CEO** | 코덱스 리뷰 | — |
+| 3 | **#18 API 키 재회전** | 🔲 | **CEO** | — | 테스트 키가 대화에 노출됨 → 폐기·재발급, 호스팅 시크릿에만 |
+| 4 | **B. 실 인증(pullim-api 연동)** | 🔲 | **직원** | pullim-api CORS/쿠키 설정 | §3.1, [auth 설계](superpowers/specs/2026-06-24-auth-mypage-design.md) |
+| 5 | **C. 결과 영속(DB)** | 🔲 | **직원** | 백엔드 결과 저장 모듈 | §3.2 — 현재 sessionStorage |
+| 6 | **레이트리밋 KV 전환** | 🔲 | **직원/인프라** | Upstash/Vercel KV | §3.3 — 현재 in-memory(인스턴스별) |
+| 7 | **잡큐(24h SLA·타임아웃 해소)** | 🔲 | **직원/인프라** | — | §5 — 동기 호출 한도 초과 대비, 프로덕션 정답 |
+| 8 | **약관/개인정보/미성년 동의 문구** | 🔲 | **법무** | — | §6 |
+| 9 | **배포(maxDuration tier·시크릿·도메인)** | 🔲 | **인프라** | 호스팅 결정 | §4, §5 |
+
+> 베타 최소 출시선: **2(머지) + 3(키) + 9(배포)** 만으로 "실 AI가 도는 베타"는 가능(현재 mock 인증·sessionStorage 영속 유지). **4·5·8**은 정식 서비스 전 필수.
+
+---
+
+## 3. mock → 실 교체점 (직원 착수 가이드)
+
+코드베이스는 **단일 교체점 패턴**(AuthAdapter처럼)으로 설계되어, 각 항목을 한 파일에서 바꾸면 끝난다.
+
+### 3.1 인증 — `apps/web/lib/auth/index.ts`
+```ts
+export const auth: AuthAdapter = mockAuthAdapter; // ← PullimApiAuthAdapter로 교체
+```
+- 현재: `mockAuthAdapter`(localStorage 기반, 데모용).
+- 목표: `pullim-api`(NestJS) 직접 호출(CORS + httpOnly 쿠키 + CSRF + JWT).
+- **설계 전부**: [docs/superpowers/specs/2026-06-24-auth-mypage-design.md](superpowers/specs/2026-06-24-auth-mypage-design.md)
+  - 엔드포인트 매핑(`/auth/signup`·`/login`·`/refresh`·`/me`·`/account/delete` …), CSRF echo, 401→refresh→재시도, 미성년 보호자 동의, 보호 라우트, **pullim-api 선행조건(CORS·쿠키 Domain/SameSite·Swagger DTO 확정)**.
+- `AuthAdapter` 인터페이스: `apps/web/lib/auth/types.ts`. 같은 시그니처로 실 어댑터 구현 후 한 줄 교체.
+
+### 3.2 결과 영속 — sessionStorage → DB
+- 현재: `apps/web/lib/result-view.ts`(`saveAnalyzeResult`/`loadAnalyzeResult`, sessionStorage), `apps/web/lib/result-store.ts`(자기답변·저장 이력 mock).
+- 목표: pullim-api(또는 입시 전용 백엔드)에 결과 저장·조회·삭제. 마이페이지 진단 이력이 실제 저장분을 읽도록.
+- 비고: 이건 **백엔드 결과 저장 모듈**(auth 설계의 "하위프로젝트 3")이 선행. §6 정직 라벨(데모 플래그)·삭제권(개인정보) 유지할 것.
+
+### 3.3 레이트리밋 — `apps/web/lib/rate-limit/index.ts`
+```ts
+export const rateLimiter = createMemoryRateLimiter(); // ← createUpstashRateLimiter()로 교체
+```
+- 현재: in-memory 슬라이딩 윈도우(단일 프로세스/웜 람다 내에서만 공유 → 서버리스 다중 인스턴스에선 인스턴스별 카운트).
+- 목표: Upstash Redis / Vercel KV 어댑터(`RateLimiter` 인터페이스는 `types.ts` 그대로 구현).
+- 규칙·상한은 같은 파일 상단: `ANALYZE_RATE_RULES`(버스트 3/분, 일일 10/일), `MAX_SAENGBU_CHARS`(5만 자). 운영하며 조정.
+
+---
+
+## 4. 시크릿 / 환경변수
+
+| 변수 | 용도 | 어디에 | 비고 |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | 실 AI 진단(server-only) | `apps/web/.env.local`(로컬) · **호스팅 시크릿**(배포) | **NEXT_PUBLIC 아님.** 없으면 /api/analyze는 mock 데모 반환 |
+| `NEXT_PUBLIC_PULLIM_API` | pullim-api 베이스 URL (B 연동) | env | dev 예: `http://localhost:3000`. B 착수 시 추가 |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 레이트리밋 KV (배포) | 호스팅 시크릿 | KV 전환 시 추가 |
+
+- `.env.local`은 gitignore됨. 예시: `apps/web/.env.local.example`.
+- **시크릿을 git/iCloud/대화에 절대 올리지 말 것.** 노출되면 즉시 회전.
+
+---
+
+## 5. 배포 노트
+
+- **모노레포 빌드**: `pnpm --filter @pullim/web build`. 워크스페이스 `packages/shared`·`packages/engine` 포함.
+- **함수 타임아웃**: `/api/analyze`는 opus 풀 파이프라인(3~4콜 ≈ 30~90초)이라 `maxDuration=300` 설정. **Vercel Hobby는 60초로 클램프 → Pro/Fluid 필요.** twin 경로 등으로 초과 위험 → **프로덕션 정답은 동기 호출이 아닌 잡큐**(BullMQ 등). 베타는 동기 + 타임아웃 안내로 시작.
+- **남용 가드**: §3.3 — 인증 전 공개 엔드포인트라 IP 레이트리밋 + 입력 길이 가드 적용됨. 배포 시 KV로 전환해야 다중 인스턴스에서 정확.
+- **키 회전 절차**: Anthropic 콘솔에서 발급 → 호스팅 시크릿에 주입 → 이전 키 폐기. 절대 코드/PR/대화에 평문 금지.
+
+---
+
+## 6. 법무 / 약관 (법무 소유)
+
+- 이용약관 · 개인정보 수집·이용 동의 · **미성년 법정대리인 동의** 문구.
+- 현재: 계정 가입 시 보호자 동의(1회) + 제출별 `/consent`(개인정보 수집·이용) 2층 구조. B 연동 시 계정 동의를 참조해 제출 동의 중복 제거(auth 설계 §6).
+- §6 가드레일(정답/대본/합격답변 금지)은 카피 SSOT(`apps/web/lib/guardrail-copy.ts`)로 관리 — 법무 문구도 여기 일관.
+- SSOT 문서(prompt/golden/definition/dataset) 변경은 **EPO(최선혜) 검토** 후 머지.
+
+---
+
+## 7. 알려진 후속(deferred) · 비목표
+
+- **인증 v2**: 소셜 OAuth(카카오·구글·네이버·애플), KCB 본인인증, 비밀번호 재설정.
+- **결제/요금제 변경**: 현재 표시만(mock).
+- **마이페이지 진단 이력**: B+C 이후 실제 저장분 연결("다시 보기"가 `/result?id=`로 라우팅되도록).
+- **알림**: 결과 완료 SES/카카오 알림톡(잡큐와 함께).
+- 기타 minor는 `.superpowers/sdd/progress.md` 레저 참조.
+
+---
+
+## 8. 참고 문서 인덱스
+
+- 실 AI 파이프라인: [specs](superpowers/specs/2026-06-26-real-ai-pipeline-design.md) · [plan](superpowers/plans/2026-06-26-real-ai-pipeline.md)
+- 인증+마이페이지(실 연동): [specs](superpowers/specs/2026-06-24-auth-mypage-design.md) · mock: [specs](superpowers/specs/2026-06-24-auth-mypage-mock-design.md)
+- 3역량 진단 · PII · 면접 분기 · 결과 반영 · 보완안 · PUDS · 학생 경험: `docs/superpowers/specs/` 참조.
+- 정의/프롬프트/골든/스키마 SSOT: `docs/002_…definition`, `docs/prompt_v0.1.md`, `docs/golden/`, `docs/student_profile_schema_v0.1.json`.
