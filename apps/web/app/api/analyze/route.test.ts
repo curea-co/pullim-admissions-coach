@@ -88,4 +88,20 @@ describe('POST /api/analyze', () => {
     const res = await POST(makeReq({ bad: 'shape' }, '10.10.0.5'));
     expect(res.status).toBe(400);
   });
+
+  it('프로덕션 + 키 없음 + 데모 비허용 → 503(설정 누락 fail-loud)', async () => {
+    // NODE_ENV는 읽기 전용 타입 → vi.stubEnv로 변경(finally에서 unstub).
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+    vi.stubEnv('ALLOW_DEMO_FALLBACK', '');
+    // 프로덕션에서 clientIp/limiter가 먼저 throw하지 않도록 신뢰 헤더·백엔드 명시.
+    vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      const res = await POST(makeReq(validPayload(), '10.10.0.6'));
+      expect(res.status).toBe(503);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
