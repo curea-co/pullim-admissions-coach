@@ -92,6 +92,13 @@ describe('createApiClient', () => {
     expect(err.fieldErrors?.email).toBe('중복');
   });
 
+  it('베이스 URL 미설정이면 호출 시 즉시 throw(fail-closed)', async () => {
+    const { fn, calls } = mockFetch(() => json({}));
+    const api = createApiClient({ baseUrl: '', fetchImpl: fn });
+    await expect(api.get('/me')).rejects.toThrow(/베이스 URL/);
+    expect(calls).toHaveLength(0); // 네트워크 호출 자체가 없어야
+  });
+
   it('403(CSRF) → 재부트스트랩 후 1회 재시도', async () => {
     let csrfHits = 0;
     let postHits = 0;

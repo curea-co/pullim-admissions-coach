@@ -15,7 +15,7 @@
  * 미완 상태로 임포트해도 typecheck/build는 통과한다(런타임 호출 시에만 네트워크 사용).
  */
 
-import { api } from '@/lib/api';
+import { api, type ApiError } from '@/lib/api';
 import type {
   AuthAdapter,
   User,
@@ -60,12 +60,16 @@ function mapMe(me: MeResponse, ent: EntitlementsResponse): User {
 export const pullimApiAuthAdapter: AuthAdapter = {
   async getMe(): Promise<User | null> {
     try {
-      // TODO(B): /me 와 /me/entitlements 병합. 비로그인 시 401 → null.
+      // TODO(B): /me 와 /me/entitlements 병합.
       const me = await api.get<MeResponse>('/me');
       const ent = await api.get<EntitlementsResponse>('/me/entitlements');
       return mapMe(me, ent);
-    } catch {
-      return null; // 미인증/만료 → 게스트
+    } catch (err) {
+      // 미인증/만료(401)만 게스트로. 500·네트워크·DTO 오류까지 null로 삼키면
+      // 서버 장애 시 사용자가 조용히 로그아웃된 것처럼 보이고 감지도 어렵다 → 전파.
+      const e = err as ApiError;
+      if (e?.status === 401 || e?.authExpired) return null;
+      throw err;
     }
   },
 

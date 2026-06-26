@@ -126,6 +126,14 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   }
 
   async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+    // 베이스 URL 미설정이면 same-origin 상대경로로 잘못 나가 404/HTML을 API 오류로
+    // 오인하게 된다 → 명확히 fail-closed(설정 누락을 즉시 드러냄).
+    if (!baseUrl) {
+      throw makeApiError(
+        'API 베이스 URL이 설정되지 않았습니다(NEXT_PUBLIC_PULLIM_API). 실 인증 어댑터로 전환 시 필수.',
+        0
+      );
+    }
     const isRefresh = path === refreshPath;
     let res = await raw(method, path, body);
 
@@ -162,7 +170,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 }
 
 /**
- * 기본 클라이언트(앱 런타임). 베이스 URL이 없으면(미설정) 호출 시 명확히 실패.
+ * 기본 클라이언트(앱 런타임). 베이스 URL 미설정이면 `request()`가 즉시 throw(fail-closed)
+ * 하므로, 실 어댑터 전환 후 `NEXT_PUBLIC_PULLIM_API`가 빠지면 바로 드러난다.
  * B 미연동 상태에서는 `lib/auth/index.ts`가 여전히 mock 어댑터를 쓰므로 이 클라이언트는
  * PullimApiAuthAdapter로 교체될 때 비로소 사용된다.
  */
