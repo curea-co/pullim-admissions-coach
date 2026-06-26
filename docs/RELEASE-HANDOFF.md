@@ -14,7 +14,7 @@
 
 ### 상태 요약
 - ✅ **main에 통합 완료** — PUDS·OS 대시보드·랜딩 · mock 인증+마이페이지 · 학생 경험(자기답변·저장/공유) · #24 학년별 제도 · #23 무전공 · #28 접근성 · #17 PII 검출/마스킹 · #19 3역량 진단 · #20 보완안 · #22 면접 분기 · #25 결과 입력 반영.
-- 🟡 **PR #37 (머지 대기)** — 실 AI 진단 파이프라인(#16 풀 포팅) + /api/analyze 남용 가드. **code + live 검증 완료**(실 키로 e2e: demo:false, §6 위반 0, 마스킹 0 누출, 429 동작). 코덱스 리뷰 후 머지는 CEO.
+- ✅ **실 AI 진단 파이프라인 + 남용 가드 머지됨(PR #37)** — #16 풀 포팅. live 검증(실 키 e2e: demo:false, §6 위반 0, 마스킹 0 누출, 429 동작) + 코덱스 리뷰 5사이클 대응 후 main 통합. `lib/ai`·`packages/engine`·`lib/rate-limit`.
 - 🔲 **출시 전 P0 (아래 §2)** — 대부분 직원/법무/인프라 결정 대기.
 
 ---
@@ -23,17 +23,16 @@
 
 | # | 항목 | 상태 | 소유자 | 선행/차단 | 참고 |
 |---|---|---|---|---|---|
-| 1 | 실 AI 파이프라인 | ✅ 완료(PR #37) | — | 머지만 | §1, PR #37 |
-| 2 | **PR #37 머지** | 🔲 | **CEO** | 코덱스 리뷰 | — |
-| 3 | **#18 API 키 재회전** | 🔲 | **CEO** | — | 테스트 키가 대화에 노출됨 → 폐기·재발급, 호스팅 시크릿에만 |
+| 1 | 실 AI 파이프라인 + 남용 가드 | ✅ **머지됨(PR #37)** | — | — | main 통합 완료. lib/ai·packages/engine·lib/rate-limit |
+| 2 | **#18 API 키 재회전** | 🔲 | **CEO** | — | 테스트 키가 대화에 노출됨 → 폐기·재발급, 호스팅 시크릿에만 |
+| 3 | **배포(키·maxDuration tier·시크릿·도메인)** | 🔲 | **인프라** | 호스팅 결정 | §4, §5. 프로덕션은 `RATE_LIMIT_IP_HEADER`·`RATE_LIMIT_BACKEND`도 필요(없으면 fail-closed) |
 | 4 | **B. 실 인증(pullim-api 연동)** | 🔲 | **직원** | pullim-api CORS/쿠키 설정 | §3.1, [auth 설계](superpowers/specs/2026-06-24-auth-mypage-design.md) |
 | 5 | **C. 결과 영속(DB)** | 🔲 | **직원** | 백엔드 결과 저장 모듈 | §3.2 — 현재 sessionStorage |
 | 6 | **레이트리밋 KV 전환** | 🔲 | **직원/인프라** | Upstash/Vercel KV | §3.3 — 현재 in-memory(인스턴스별) |
 | 7 | **잡큐(24h SLA·타임아웃 해소)** | 🔲 | **직원/인프라** | — | §5 — 동기 호출 한도 초과 대비, 프로덕션 정답 |
 | 8 | **약관/개인정보/미성년 동의 문구** | 🔲 | **법무** | — | §6 |
-| 9 | **배포(maxDuration tier·시크릿·도메인)** | 🔲 | **인프라** | 호스팅 결정 | §4, §5 |
 
-> 베타 최소 출시선: **2(머지) + 3(키) + 9(배포)** 만으로 "실 AI가 도는 베타"는 가능(현재 mock 인증·sessionStorage 영속 유지). **4·5·8**은 정식 서비스 전 필수.
+> 베타 최소 출시선: **2(#18 키 재회전) + 3(배포)** 만으로 "실 AI가 도는 베타"는 가능(실 AI는 이미 머지됨, mock 인증·sessionStorage 영속 유지). **4·5·8**은 정식 서비스 전 필수.
 
 ---
 
@@ -70,7 +69,10 @@ export const rateLimiter = createMemoryRateLimiter(); // ← createUpstashRateLi
 
 | 변수 | 용도 | 어디에 | 비고 |
 |---|---|---|---|
-| `ANTHROPIC_API_KEY` | 실 AI 진단(server-only) | `apps/web/.env.local`(로컬) · **호스팅 시크릿**(배포) | **NEXT_PUBLIC 아님.** 없으면 /api/analyze는 mock 데모 반환 |
+| `ANTHROPIC_API_KEY` | 실 AI 진단(server-only) | `apps/web/.env.local`(로컬) · **호스팅 시크릿**(배포) | **NEXT_PUBLIC 아님.** 없으면 dev는 mock 데모, **프로덕션은 503(fail-loud)** |
+| `RATE_LIMIT_IP_HEADER` | 레이트리밋 신뢰 IP 헤더 | 호스팅 env | **프로덕션 필수**(미설정 시 fail-closed). 엣지/프록시가 위조 불가하게 덮어쓰는 헤더만(예 Vercel `x-forwarded-for`) |
+| `RATE_LIMIT_BACKEND` | in-memory 명시 옵트인 | 호스팅 env | **프로덕션**에서 KV 어댑터 없이 in-memory 쓰려면 `memory` 명시(없으면 fail-closed). KV 도입 시 불필요 |
+| `ALLOW_DEMO_FALLBACK` | 프로덕션 데모 허용 | 호스팅 env | 선택. 스테이징 등에서 키 없이 데모 보려면 `1`. 기본은 프로덕션 503 |
 | `NEXT_PUBLIC_PULLIM_API` | pullim-api 베이스 URL (B 연동) | env | dev 예: `http://localhost:3000`. B 착수 시 추가 |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 레이트리밋 KV (배포) | 호스팅 시크릿 | KV 전환 시 추가 |
 

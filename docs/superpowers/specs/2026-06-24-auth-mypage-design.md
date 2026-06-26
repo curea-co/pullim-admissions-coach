@@ -43,7 +43,16 @@
 - **`lib/api.ts` — API 클라이언트**: 단일 fetch 래퍼.
   - 베이스 URL = `process.env.NEXT_PUBLIC_PULLIM_API` (예 dev `http://localhost:3000`).
   - 모든 요청 `credentials: 'include'`.
-  - **CSRF**: `pullim-csrf` 쿠키를 읽어 변경 요청(POST/PATCH/DELETE)에 `X-CSRF-Token` 헤더로 echo. 최초 변경 전 `GET /auth/csrf`로 부트스트랩.
+  - **CSRF**: 변경 요청(POST/PATCH/DELETE)에 `X-CSRF-Token` 헤더로 토큰을 echo한다.
+    토큰 획득 방식은 **쿠키 도메인 전략에 종속**된다(§10 선행조건과 함께 확정):
+    - 인증/CSRF 쿠키가 **api 호스트 전용**이면 웹 앱 도메인의 JS는 그 쿠키를 읽을 수
+      없으므로 echo가 불가능하다. 이 경우 **`GET /auth/csrf`가 응답 *본문*으로 토큰을
+      반환**하고(또는 웹이 읽을 수 있는 비-httpOnly 쿠키) 클라이언트가 메모리에 두고 echo한다.
+    - 또는 **공유 부모 도메인 쿠키**(`Domain=.pullim…`)로 두어 웹·api 서브도메인이 같은
+      CSRF 쿠키를 읽게 한다.
+    어느 쪽이든 "웹 JS가 echo할 토큰을 얻을 수 있어야" 한다 — api-호스트-전용 httpOnly
+    쿠키만으로는 CSRF 부트스트랩이 동작하지 않는다. 플랜 단계에서 pullim-api의 실제
+    `/auth/csrf` 응답 형태와 쿠키 도메인을 확인해 확정한다.
   - **401 처리**: `POST /auth/refresh` 1회 시도 후 원요청 재시도. 실패 시 인증 만료로 처리(로그아웃 상태 + `/login?next=` 유도).
   - 표준 에러 형태로 정규화(필드 에러/일반 에러 구분).
 - **`components/auth-provider.tsx`('use client')**: 앱 마운트 시 `GET /me`로 세션 하이드레이트.
@@ -60,7 +69,13 @@
 | `/mypage` | 프로필·연령대·요금제·미성년 동의 상태 표시 · 로그아웃 · 회원탈퇴 | `GET /me` · `GET /me/entitlements` · `POST /auth/logout` · `POST /account/delete`(+`/delete/cancel`) |
 | 전역 상단바(actions) | 로그인 시 이름+마이페이지+로그아웃 / 비로그인 시 로그인·가입 | `GET /me` |
 
-- **생년월일 → 만나이(만 19세 미만) 판정**으로 미성년 분기. (서버 권위는 `ageBand`; 클라는 UX 분기용.)
+- **미성년(만 19세 미만) 판정 = `isMinor`** 가 권위. **`ageBand`(`under14`/`over14`)와 혼동 금지** —
+  `ageBand`는 *만 14세* 경계(개인정보 동의 경계)이고, 보호자 동의/가드 분기는 *만 19세* 경계인
+  `isMinor`로 한다. `ageBand`만 신뢰해 미성년 분기를 하면 14~18세가 성인으로 처리되어 보호자
+  동의가 누락된다. (이 저장소 타입: `apps/web/lib/auth/types.ts` — `AgeBand='under14'|'over14'|'unknown'`,
+  `isMinor: boolean` 별도. `isMinorByBirth`=만19, `ageBandFromBirth`=만14.) 서버 응답에 `isMinor`가
+  없으면 pullim-api가 만19 기준 미성년 플래그를 제공하도록 **플랜에서 게이트**한다(클라 생년월일
+  판정은 UX 분기 보조용).
 - **보호 라우트**: `/submit`·`/consent`·`/processing`·`/result`·`/mypage` → 미로그인 시 `/login?next=`. **공개**: `/`·`/login`·`/signup`·`/verify-email`.
 - 랜딩 CTA("생기부 업로드 시작") → 미로그인 시 `/signup`으로, 로그인 시 `/submit`으로.
 
