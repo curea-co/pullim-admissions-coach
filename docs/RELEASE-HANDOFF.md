@@ -45,9 +45,13 @@
 코드베이스는 **단일 교체점 패턴**(AuthAdapter처럼)으로 설계되어, 각 항목을 한 파일에서 바꾸면 끝난다.
 
 ### 3.1 인증 — `apps/web/lib/auth/index.ts`
+**명시 옵트인** 게이트(코드 수정 없이 env로 전환):
 ```ts
-export const auth: AuthAdapter = mockAuthAdapter; // ← PullimApiAuthAdapter로 교체
+const usePullimApi = process.env.NEXT_PUBLIC_AUTH_BACKEND === 'pullim';
+export const auth = usePullimApi ? pullimApiAuthAdapter : mockAuthAdapter;
 ```
+실 전환은 **env 두 개**: `NEXT_PUBLIC_AUTH_BACKEND=pullim` + `NEXT_PUBLIC_PULLIM_API=<url>`.
+URL만 있고 플래그가 없으면 mock 유지(실수 주입으로 미완성 어댑터가 켜지는 것 방지).
 - 현재: `mockAuthAdapter`(localStorage 기반, 데모용).
 - 목표: `pullim-api`(NestJS) 직접 호출(CORS + httpOnly 쿠키 + CSRF + JWT).
 - **설계 전부**: [docs/superpowers/specs/2026-06-24-auth-mypage-design.md](superpowers/specs/2026-06-24-auth-mypage-design.md)
@@ -88,7 +92,8 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
 | `RATE_LIMIT_IP_HEADER` | 레이트리밋 신뢰 IP 헤더 | 호스팅 env | **프로덕션 필수**(미설정 시 fail-closed). 엣지/프록시가 위조 불가하게 덮어쓰는 헤더만(예 Vercel `x-forwarded-for`) |
 | `RATE_LIMIT_BACKEND` | in-memory 명시 옵트인 | 호스팅 env | **프로덕션**에서 KV 어댑터 없이 in-memory 쓰려면 `memory` 명시(없으면 fail-closed). KV 도입 시 불필요 |
 | `ALLOW_DEMO_FALLBACK` | 프로덕션 데모 허용 | 호스팅 env | 선택. 스테이징 등에서 키 없이 데모 보려면 `1`. 기본은 프로덕션 503 |
-| `NEXT_PUBLIC_PULLIM_API` | pullim-api 베이스 URL (B 연동) | env | dev 예: `http://localhost:3000`. B 착수 시 추가 |
+| `NEXT_PUBLIC_AUTH_BACKEND` | 실 인증 명시 옵트인 (B) | env | `pullim` 이면 실 어댑터. 없으면 mock. URL만으론 전환 안 됨 |
+| `NEXT_PUBLIC_PULLIM_API` | pullim-api 베이스 URL (B 연동) | env | dev 예: `http://localhost:3000`. 위 플래그와 **함께** 설정 |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 레이트리밋 KV (배포) | 호스팅 시크릿 | KV 전환 시 추가 |
 
 - `.env.local`은 gitignore됨. 예시: `apps/web/.env.local.example`.
