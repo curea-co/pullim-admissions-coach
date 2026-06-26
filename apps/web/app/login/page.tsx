@@ -6,6 +6,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/components/auth/auth-provider';
+import { safeNext } from '@/lib/safe-next';
 import { cn } from '@/lib/utils';
 
 // ── inner form (reads useSearchParams) ───────────────────────────────────────
@@ -15,15 +16,16 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const { status, refresh } = useAuth();
 
-  const next = searchParams.get('next') ?? '/mypage';
+  // 오픈 리다이렉트 가드(auth 설계 §5): 내부 경로만 허용, 외부 URL은 기본값 폴백.
+  const next = safeNext(searchParams.get('next'), '/mypage');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // typedRoutes: next는 require-auth가 주입한 내부 경로이므로 Route로 단언
-  const nextRoute = (next ?? '/mypage') as unknown as Route;
+  // typedRoutes: safeNext가 보장한 내부 경로이므로 Route로 단언
+  const nextRoute = next as unknown as Route;
 
   // 이미 로그인된 경우 즉시 이동
   useEffect(() => {
