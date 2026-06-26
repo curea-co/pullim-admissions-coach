@@ -34,7 +34,9 @@ export const mockAuthAdapter: AuthAdapter = {
     if (Object.values(users).some((r) => r.user.email === input.email))
       throw new Error('이미 가입된 이메일입니다.');
     const minor = isMinorByBirth(input.birthDate);
-    const id = `user_${Object.keys(users).length + 1}`;
+    // uuid로 생성 — 순번(`user_${count+1}`)은 삭제 후 재가입 시 id가 재사용되어
+    // 사용자 스코프 저장소(result scope)에서 이전 계정 데이터가 섞일 수 있다.
+    const id = `user_${crypto.randomUUID()}`;
     const user: User = {
       id, email: input.email, displayName: input.displayName,
       ageBand: ageBandFromBirth(input.birthDate), // 만14 경계(개인정보 동의) — isMinor(만19)와 별개

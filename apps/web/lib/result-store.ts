@@ -1,45 +1,36 @@
-// 학생 자기답변 + 저장된 진단 결과 — mock(localStorage). 단일 교체 지점.
-// employee 후속: 이 파일을 서버 연동 구현으로 교체(인터페이스 유지).
-export type SavedDiagnosis = { id: string; createdAt: string; track: string; summary: string };
+'use client';
 
-const ANSWERS_KEY = 'puds-self-answers';   // qid -> text
-const SAVED_KEY = 'puds-saved-diagnoses';  // SavedDiagnosis[]
+// 학생 자기답변 + 저장된 진단 결과 — **동기 facade**.
+// 실제 저장은 lib/result/local-core(사용자 스코프 localStorage)로 위임한다 →
+// 공용 브라우저에서 다른 사용자에게 데이터가 노출되던 문제(교차사용자) 차단.
+//
+// 백엔드 영속(C) 연동 시: 이 동기 facade의 소비처(self-answer·result-actions·mypage)를
+// lib/result의 async `resultStore`로 마이그레이션한다(설계 §5).
+// 설계: docs/superpowers/specs/2026-06-26-result-persistence-design.md
 
-function readJSON<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; }
-  catch { return fallback; }
-}
+import {
+  getAnswerCore,
+  setAnswerCore,
+  listDiagnosesCore,
+  saveDiagnosisCore,
+  getDiagnosisCore,
+} from './result/local-core';
+import type { SavedDiagnosis } from './result/store-types';
+
+export type { SavedDiagnosis };
 
 export function getAnswer(qid: string): string {
-  return readJSON<Record<string, string>>(ANSWERS_KEY, {})[qid] ?? '';
+  return getAnswerCore(qid);
 }
 export function setAnswer(qid: string, text: string): void {
-  const m = readJSON<Record<string, string>>(ANSWERS_KEY, {});
-  m[qid] = text;
-  localStorage.setItem(ANSWERS_KEY, JSON.stringify(m));
+  setAnswerCore(qid, text);
 }
 export function listDiagnoses(): SavedDiagnosis[] {
-  // 최신순: createdAt 내림차순(주). 동일 ms 저장은 삽입 역순(=최신 먼저)을 유지하기 위해
-  // pre-reverse 후 stable sort(ES2019) 사용.
-  return readJSON<SavedDiagnosis[]>(SAVED_KEY, [])
-    .slice()
-    .reverse()
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return listDiagnosesCore();
 }
 export function saveDiagnosis(input: { track: string; summary: string }): SavedDiagnosis {
-  const list = readJSON<SavedDiagnosis[]>(SAVED_KEY, []);
-  const existing = list.find((d) => d.track === input.track && d.summary === input.summary);
-  if (existing) return existing;
-  const d: SavedDiagnosis = {
-    id: `dx_${crypto.randomUUID()}`,
-    createdAt: new Date().toISOString(),
-    track: input.track,
-    summary: input.summary,
-  };
-  list.push(d);
-  localStorage.setItem(SAVED_KEY, JSON.stringify(list));
-  return d;
+  return saveDiagnosisCore(input);
 }
 export function getDiagnosis(id: string): SavedDiagnosis | null {
-  return readJSON<SavedDiagnosis[]>(SAVED_KEY, []).find((d) => d.id === id) ?? null;
+  return getDiagnosisCore(id);
 }

@@ -6,6 +6,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/components/auth/auth-provider';
+import { safeNext } from '@/lib/safe-next';
 import { cn } from '@/lib/utils';
 
 // ── 단계 정의 ─────────────────────────────────────────────────────────────────
@@ -78,8 +79,8 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const { refresh } = useAuth();
 
-  const next = searchParams.get('next');
-  const nextRoute = (next ?? '/submit') as unknown as Route;
+  // 오픈 리다이렉트 가드(auth 설계 §5): 내부 경로만 허용.
+  const nextRoute = safeNext(searchParams.get('next'), '/submit') as unknown as Route;
 
   // 단계 상태
   const [step, setStep] = useState<Step>('account');
