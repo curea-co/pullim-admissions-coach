@@ -56,11 +56,20 @@ export const auth: AuthAdapter = mockAuthAdapter; // ← PullimApiAuthAdapter로
 - 비고: 이건 **백엔드 결과 저장 모듈**(auth 설계의 "하위프로젝트 3")이 선행. §6 정직 라벨(데모 플래그)·삭제권(개인정보) 유지할 것.
 
 ### 3.3 레이트리밋 — `apps/web/lib/rate-limit/index.ts`
+현재 export는 한 줄 swap이 아니라 `selectLimiter()`로 감싸 **프로덕션에서 `RATE_LIMIT_BACKEND` 미설정 시 fail-closed**(첫 호출 throw)하도록 되어 있다. KV 전환은 `selectLimiter()` 안에서 한다:
 ```ts
-export const rateLimiter = createMemoryRateLimiter(); // ← createUpstashRateLimiter()로 교체
+function selectLimiter(): RateLimiter {
+  // KV 도입 시: return createKvRateLimiter();  ← 여기서 교체
+  if (process.env.NODE_ENV === 'production' && process.env.RATE_LIMIT_BACKEND !== 'memory') {
+    throw new Error('레이트리밋 백엔드 미구성(프로덕션 fail-closed)…');
+  }
+  return createMemoryRateLimiter();
+}
+// rateLimiter는 첫 check()에서 selectLimiter()를 1회 평가(지연) → next build(NODE_ENV=production) 무해.
+export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } };
 ```
-- 현재: in-memory 슬라이딩 윈도우(단일 프로세스/웜 람다 내에서만 공유 → 서버리스 다중 인스턴스에선 인스턴스별 카운트).
-- 목표: Upstash Redis / Vercel KV 어댑터(`RateLimiter` 인터페이스는 `types.ts` 그대로 구현).
+- 현재: in-memory 슬라이딩 윈도우(단일 프로세스/웜 람다 내에서만 공유 → 서버리스 다중 인스턴스에선 인스턴스별 카운트). 프로덕션은 `RATE_LIMIT_BACKEND=memory` 명시 옵트인 없이는 fail-closed.
+- 목표: Upstash Redis / Vercel KV 어댑터(`RateLimiter` 인터페이스는 `types.ts` 그대로 구현)를 `selectLimiter()`에서 반환.
 - 규칙·상한은 같은 파일 상단: `ANALYZE_RATE_RULES`(버스트 3/분, 일일 10/일), `MAX_SAENGBU_CHARS`(5만 자). 운영하며 조정.
 
 ---
