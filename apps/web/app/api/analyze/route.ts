@@ -14,15 +14,19 @@ export const maxDuration = 300;
 
 /**
  * 클라이언트 IP(레이트리밋 키).
- * 신뢰 프록시(예: Vercel 엣지)가 덮어쓴 x-forwarded-for 첫 홉을 사용한다.
- * 주의: 신뢰 프록시 뒤가 아닌 배포에서는 클라이언트가 이 헤더를 위조해 IP 제한을
- * 우회할 수 있다 → 자가 호스팅 시 반드시 신뢰 프록시가 붙인 값만 통과시키도록
- * 인프라(WAF/프록시)에서 보장할 것(RELEASE-HANDOFF §5). 정확한 분산 제한은
- * 공유 스토어(KV) 어댑터 + 플랫폼 보장 IP로 강화한다.
+ * 신뢰 IP 헤더는 배포 플랫폼에 맞게 `RATE_LIMIT_IP_HEADER`로 지정한다(예: Vercel은
+ * 엣지가 덮어써 위조 불가한 `x-forwarded-for`/`x-real-ip`). 기본은 `x-forwarded-for`.
+ *
+ * 보안: 클라이언트가 임의로 넣을 수 있는 헤더를 신뢰하면 IP 제한이 우회된다. 따라서
+ *  - 프로덕션에서는 신뢰 프록시(엣지/WAF)가 덮어쓰는 헤더만 `RATE_LIMIT_IP_HEADER`로
+ *    지정하고, 인프라에서 클라이언트 주입 헤더를 제거할 것(RELEASE-HANDOFF §5).
+ *  - 프로덕션 레이트리밋 자체가 공유 스토어(KV) 어댑터 + 명시 옵트인 없이는 fail-closed
+ *    되도록 게이트돼 있다(lib/rate-limit/index.ts). in-memory + 헤더 신뢰는 베타 한정.
  */
 function clientIp(req: Request): string {
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0]!.trim();
+  const headerName = process.env.RATE_LIMIT_IP_HEADER || 'x-forwarded-for';
+  const raw = req.headers.get(headerName);
+  if (raw) return raw.split(',')[0]!.trim();
   return req.headers.get('x-real-ip')?.trim() || 'unknown';
 }
 

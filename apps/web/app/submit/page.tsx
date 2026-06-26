@@ -251,7 +251,12 @@ export default function SubmitPage() {
       targetUniversities: universities.filter((u) => u.name.trim().length > 0),
     });
     // processing 페이지가 /api/analyze에 POST할 payload를 sessionStorage에 임시 저장.
-    saveSubmittedPayload(buildPayload());
+    // 저장이 실패하면(프라이빗 모드 등) 다음 단계로 넘어가지 않는다 — 이전 제출 payload가
+    // 남아 다른 학생 데이터가 분석되는 것을 막기 위한 fail-closed.
+    if (!saveSubmittedPayload(buildPayload())) {
+      setSubmitError('제출 데이터를 저장하지 못했어요. 브라우저 저장소 설정(프라이빗 모드 등)을 확인하고 다시 시도해주세요.');
+      return;
+    }
     startTransition(() => {
       router.push('/consent');
     });

@@ -8,12 +8,23 @@
 
 const STORAGE_KEY = 'pullim:submitted-payload';
 
-export function saveSubmittedPayload(payload: unknown): void {
-  if (typeof window === 'undefined') return;
+/**
+ * 제출 payload를 저장하고 **쓰기 성공 여부**를 반환한다.
+ * 호출자는 false면 다음 단계로 진행하지 말아야 한다(fail-closed): 저장이 조용히
+ * 실패한 채 이전 제출 payload가 남아 있으면, 이후 단계가 다른 학생의 데이터를
+ * 잘못 분석할 수 있다(정합성/프라이버시).
+ */
+export function saveSubmittedPayload(payload: unknown): boolean {
+  if (typeof window === 'undefined') return false;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    const serialized = JSON.stringify(payload);
+    window.sessionStorage.setItem(STORAGE_KEY, serialized);
+    // 쓰기 검증: 프라이빗 모드/쿼터 초과 등에서 setItem이 조용히 실패할 수 있으므로
+    // 실제로 같은 값이 저장됐는지 읽어 확인한다.
+    return window.sessionStorage.getItem(STORAGE_KEY) === serialized;
   } catch {
-    // sessionStorage 비가용(프라이빗 모드 등) — 무시.
+    // sessionStorage 비가용(프라이빗 모드 등) — 저장 실패로 보고.
+    return false;
   }
 }
 
