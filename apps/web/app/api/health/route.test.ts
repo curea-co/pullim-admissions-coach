@@ -33,16 +33,24 @@ describe('GET /api/health', () => {
     expect(JSON.stringify(body)).not.toContain('memory');
   });
 
-  it('리미터가 수용 안 하는 백엔드(upstash, KV 미연결)면 analyzeReady:false — 리미터와 단일 소스 일치', async () => {
-    // 현재 리미터는 memory만 수용(fail-closed). health도 같은 판정(rateLimitConfigError)을
-    // 써서, 런타임은 500인데 health는 ready라고 거짓 보고하는 불일치를 막는다.
+  it('RATE_LIMIT_BACKEND=kv인데 Upstash env 없으면 analyzeReady:false (리미터와 단일 소스)', async () => {
+    // 런타임은 KV env 없으면 fail-closed → health도 같은 판정으로 거짓 ready 방지.
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-x');
     vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
-    vi.stubEnv('RATE_LIMIT_BACKEND', 'upstash');
-    const body = await GET().json();
-    expect(body.analyzeReady).toBe(false);
-    expect(JSON.stringify(body)).not.toContain('upstash');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'kv');
+    // UPSTASH env 미설정
+    expect((await GET().json()).analyzeReady).toBe(false);
+  });
+
+  it('RATE_LIMIT_BACKEND=kv + Upstash env 완비 → analyzeReady:true', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-x');
+    vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'kv');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://x.upstash.io');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'tok');
+    expect((await GET().json()).analyzeReady).toBe(true);
   });
 
   it('프로덕션 + 키 누락 → analyzeReady:false(구성 누락 식별)', async () => {
