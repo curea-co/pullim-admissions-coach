@@ -66,7 +66,10 @@ curl -i -X OPTIONS http://localhost:3000/auth/login \
 
 - [ ] **`GET /auth/csrf`가 토큰을 *응답 본문*으로 반환**: `{ "csrfToken": "..." }`
   - 만약 pullim-api가 **읽기 가능한 쿠키(double-submit)** 방식이면, 입시웹 `lib/api.ts`의 `bootstrapCsrf()`를 그 쿠키를 읽도록 수정(주석에 안내됨). **둘 중 하나로 합의.**
-- [ ] **변경 요청(POST/PATCH/DELETE)에서 `X-CSRF-Token` 헤더 검증**(double-submit/세션 토큰 일치)
+- [ ] **일반 변경 요청(POST/PATCH/DELETE)에서 `X-CSRF-Token` 헤더 검증**(double-submit/세션 토큰 일치). 입시웹은 이들 요청 전 `bootstrapCsrf()`로 토큰을 확보해 echo한다.
+- [ ] **`/auth/refresh`의 CSRF 정책 합의** ⚠️ — 입시웹 `refreshOnce()`는 401 자동 갱신 시 **메모리에 토큰이 있을 때만** `X-CSRF-Token`을 보낸다(`lib/api.ts`). 즉 첫 액션이 곧바로 refresh로 가는 경로에선 **토큰 없이** 갈 수 있다. 따라서 둘 중 하나로:
+  - (권장) **`/auth/refresh`는 CSRF 면제** — refresh는 httpOnly refresh 쿠키로 인증하므로 CSRF 미요구가 일반적. 또는
+  - refresh에도 CSRF를 요구한다면, 입시웹이 refresh 전 CSRF를 항상 부트스트랩하도록 `lib/api.ts`를 수정해야 함(현재는 안 함).
 - [ ] **GET 요청엔 CSRF 미요구**(부트스트랩 자체가 GET)
 - [ ] **응답 본문 `{ csrfToken }` 키 이름 확정** → 다르면 `bootstrapCsrf()`의 `data.csrfToken` 부분을 그 키로 교정
 - [ ] **검증**: `GET /auth/csrf` → 본문에 토큰 / 토큰 없이 POST → 403 / 올바른 `X-CSRF-Token`으로 POST → 통과
