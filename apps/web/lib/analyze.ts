@@ -1,5 +1,5 @@
 import 'server-only'
-import { analysisInputSchema, type AnalysisInput } from '@pullim/shared'
+import { analysisInputSchema, lintGuardrails, type AnalysisInput, type GuardrailFlag } from '@pullim/shared'
 import {
   resolveCohort,
   assembleRubric,
@@ -32,6 +32,20 @@ export interface AnalyzeResult {
   fit?: FitAssessment
   /** 면접 준비 팩(1 LLM call) — 답변 방향만, 근거 인용 기반. */
   interview?: InterviewPack
+  /**
+   * §6 전 출력 린트 플래그(선택) — 게이트 밖 섹션(진단·로드맵·면접·적합도)에서 발견된
+   * §6.2 금지 키워드. 비파괴(권고 맥락 보존) — EPO 검토/모니터링용. 없으면 미부착.
+   */
+  guardrailFlags?: GuardrailFlag[]
+}
+
+/**
+ * 조립된 결과 전체를 §6 키워드 린트로 스캔해 플래그를 부착한다(발견 시에만).
+ * 플래그 자체가 키워드를 담으므로, 부착 *전* 결과를 스캔해 자기참조 매칭을 피한다.
+ */
+function withGuardrailLint(result: AnalyzeResult): AnalyzeResult {
+  const flags = lintGuardrails(result)
+  return flags.length > 0 ? { ...result, guardrailFlags: flags } : result
 }
 
 /**
@@ -70,7 +84,7 @@ export async function analyze(raw: unknown): Promise<AnalyzeResult> {
   // ── 단일 학기 경로(기존과 100% 동일): twin은 undefined로 둔다.
   const current = await diagnosePrescribe(profile, cohort, true)
   if (!parsed.priorSaengbu) {
-    return current // 영속화 없음 = 무학습/즉시삭제
+    return withGuardrailLint(current) // 영속화 없음 = 무학습/즉시삭제
   }
 
   // ── 종단 트윈 경로(두 학기, 한 요청, 영속화 없음).
@@ -120,5 +134,5 @@ export async function analyze(raw: unknown): Promise<AnalyzeResult> {
     summary: { landed, pending, landedRate, newEvidence: det.newEvidence.length },
   }
 
-  return { ...current, twin }
+  return withGuardrailLint({ ...current, twin })
 }

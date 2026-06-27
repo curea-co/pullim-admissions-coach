@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterActions, type ActionCandidate } from './legality';
+import { filterActions, lintGuardrails, type ActionCandidate } from './legality';
 
 const mk = (
   recordArea: string,
@@ -69,5 +69,38 @@ describe('filterActions', () => {
     const candidates = ['SETUK', 'AWARD', 'READING', 'BEHAVIOR', 'PRIVATE_EDU', 'CREATIVE_REGULAR'].map((a) => mk(a));
     const { passed } = filterActions(candidates);
     for (const p of passed) expect(['SETUK', 'CREATIVE_REGULAR', 'BEHAVIOR']).toContain(p.recordArea);
+  });
+});
+
+describe('lintGuardrails (전 출력 §6 린트)', () => {
+  it('게이트 밖 섹션의 금지 키워드를 위치·문장과 함께 플래그', () => {
+    const result = {
+      diagnosis: { criteria: [{ weakness: '심화가 필요하다. 학원 도움보다 학교 활동이 낫다.' }] },
+      roadmap: { note: '깨끗한 문장.' },
+    };
+    const flags = lintGuardrails(result);
+    expect(flags).toHaveLength(1);
+    expect(flags[0].keyword).toBe('학원');
+    expect(flags[0].path).toBe('diagnosis.criteria[0].weakness');
+    expect(flags[0].snippet).toContain('학원');
+  });
+
+  it('띄어쓰기 우회도 잡는다(교 외 수상)', () => {
+    const flags = lintGuardrails({ fit: { caveat: '교 외 수상 실적은 반영되지 않는다.' } });
+    expect(flags.map((f) => f.keyword)).toContain('교외 수상');
+  });
+
+  it('금지 키워드 없으면 빈 배열', () => {
+    const flags = lintGuardrails({ a: '학교 세특 중심으로 탐구를 이어가라.', b: ['정상', '내용'] });
+    expect(flags).toEqual([]);
+  });
+
+  it('중첩 배열/객체 전체를 순회', () => {
+    const flags = lintGuardrails({
+      interview: { questions: [{ answerDirection: '소논문 경험을 강조하라.' }] },
+    });
+    expect(flags).toHaveLength(1);
+    expect(flags[0].path).toBe('interview.questions[0].answerDirection');
+    expect(flags[0].keyword).toBe('소논문');
   });
 });

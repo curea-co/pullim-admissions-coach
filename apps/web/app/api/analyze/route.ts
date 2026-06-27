@@ -130,6 +130,14 @@ export async function POST(req: Request) {
 
   try {
     const result = await analyze(profile);
+    // §6 전 출력 린트: 게이트 밖 섹션의 금지 키워드를 모니터링 로그로 표면화(비차단).
+    // 생기부 원문/PII는 로그에 남기지 않고 위치·키워드만 남긴다.
+    if (result.guardrailFlags?.length) {
+      console.warn(
+        '[analyze] §6 guardrail flags:',
+        result.guardrailFlags.map((f) => `${f.keyword}@${f.path}`).join(', ')
+      );
+    }
     return NextResponse.json({ result, demo: false });
   } catch (err) {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
