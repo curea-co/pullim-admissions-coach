@@ -109,6 +109,35 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
 - **남용 가드**: §3.3 — 인증 전 공개 엔드포인트라 IP 레이트리밋 + 입력 길이 가드 적용됨. 배포 시 KV로 전환해야 다중 인스턴스에서 정확.
 - **키 회전 절차**: Anthropic 콘솔에서 발급 → 호스팅 시크릿에 주입 → 이전 키 폐기. 절대 코드/PR/대화에 평문 금지.
 
+### 5.1 배포 런북 — `admissions.pullim.ai` (Vercel)
+
+코드는 배포 준비 완료(빌드·프로덕션 fail-closed·env 게이트 적용). 남은 건 **Vercel 대시보드 · DNS · 키** 작업. Vercel 프로젝트(`pullim-admissions-coach-web`)는 이미 연결·모노레포 빌드 설정됨(PR 프리뷰 동작).
+
+**순서대로:**
+
+1. **🔑 키 회전** — #18 노출 키 폐기 → Anthropic 콘솔에서 새 `ANTHROPIC_API_KEY` 발급.
+
+2. **⚙️ Vercel 프로덕션 환경변수** (Settings → Environment Variables → **Production**)
+
+   | 변수 | 값 | 미설정 시 |
+   |---|---|---|
+   | `ANTHROPIC_API_KEY` | 새 회전 키 | 프로덕션 **503**(fail-loud) |
+   | `RATE_LIMIT_IP_HEADER` | `x-forwarded-for` | `/api/analyze` 전부 **500**(fail-closed) |
+   | `RATE_LIMIT_BACKEND` | `memory` | `/api/analyze` 전부 **500**(fail-closed) |
+
+   - ⚠️ 2·3번은 **반드시** 설정(코드가 의도적으로 fail-closed). `ALLOW_DEMO_FALLBACK`은 두지 말 것(키 누락을 503으로 드러내기 위함).
+   - ⚠️ `NEXT_PUBLIC_AUTH_BACKEND`는 **넣지 말 것** → 베타는 mock 인증 유지(공개 실사용자 받으려면 B 연동 선행, §3.1·known-risk).
+   - `ANTHROPIC_API_KEY`는 server-only(`NEXT_PUBLIC_` 아님).
+
+3. **📐 플랜** — `/api/analyze`의 `maxDuration=300`은 **Vercel Pro/Fluid 필요**(Hobby 60초 클램프 → twin 경로 타임아웃 위험). Hobby면 업그레이드.
+
+4. **🌐 도메인** — Vercel → Settings → Domains → `admissions.pullim.ai` 추가 → DNS(가비아/Cloudflare 등)에 Vercel 안내 **CNAME**(또는 A) 추가. 프로덕션 브랜치 = `main` 확인(머지 시 자동 프로덕션 배포).
+
+5. **✅ 배포 후 검증** — `https://admissions.pullim.ai` 접속 → 제출 → **실 AI 결과**(키 있으니 demo 배너 없어야) 확인. 빈 본문 POST가 **200이 아닌지**(스키마 400) + 키 없을 때 503 등 fail-closed 동작 점검.
+   - ⚠️ **레이트리밋(429)는 프로덕션에서 신뢰성 있게 검증 불가** — in-memory 리미터는 Vercel 서버리스 인스턴스 간 카운터를 공유하지 않아, 연속 호출이 다른 인스턴스로 분산되면 429가 안 뜰 수 있다(콜드스타트마다 리셋). **분산 환경에서 정확한 제한은 KV 어댑터 전환(§3.3)이 필요**. 베타에선 비용 가드가 약화된 상태임을 인지.
+
+> **베타 최소선**: 1+2+3+4. 인증은 mock 유지. **KV 레이트리밋**(분산 정확) · 잡큐 · B/C는 후속(§3·§7).
+
 ---
 
 ## 6. 법무 / 약관 (법무 소유)
