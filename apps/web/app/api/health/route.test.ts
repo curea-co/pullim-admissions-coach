@@ -20,7 +20,7 @@ describe('GET /api/health', () => {
     expect(JSON.stringify(body)).not.toContain('super-secret');
   });
 
-  it('프로덕션 + 구성 완비 → analyzeReady:true', async () => {
+  it('프로덕션 + 구성 완비 → analyzeReady:true, 백엔드는 boolean(원문 미노출)', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-x');
     vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
@@ -28,6 +28,19 @@ describe('GET /api/health', () => {
     const body = await GET().json();
     expect(body.env).toBe('production');
     expect(body.analyzeReady).toBe(true);
+    // 원문 값('memory') 미노출 — boolean만
+    expect(body.config.rateLimitBackend).toBe(true);
+    expect(JSON.stringify(body)).not.toContain('memory');
+  });
+
+  it('KV 전환(비-memory 백엔드)에도 analyzeReady:true (값 하드코딩 안 함)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-x');
+    vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'upstash');
+    const body = await GET().json();
+    expect(body.analyzeReady).toBe(true);
+    expect(JSON.stringify(body)).not.toContain('upstash');
   });
 
   it('프로덕션 + 키 누락 → analyzeReady:false(구성 누락 식별)', async () => {

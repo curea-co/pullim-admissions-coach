@@ -19,7 +19,7 @@
 **`GET https://admissions.pullim.ai/api/health`** — opus 호출 없이 200 + 구성 상태.
 ```json
 { "ok": true, "env": "production", "analyzeReady": true,
-  "config": { "aiKey": true, "rateLimitIpHeader": true, "rateLimitBackend": "memory", "authBackend": "mock" } }
+  "config": { "aiKey": true, "rateLimitIpHeader": true, "rateLimitBackend": true, "authBackend": "mock" } }
 ```
 - **`analyzeReady: false`** = 프로덕션 구성 누락(키/레이트 env) → /api/analyze가 fail-closed로 막힌 상태. **배포 직후·키 회전 후 반드시 확인**(우리가 실제로 키 이름 오타로 막혔던 사례).
 - 비밀 값은 노출하지 않음(boolean만).

@@ -7,19 +7,21 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export function GET() {
-  // ⚠️ 비밀 값은 절대 노출하지 않는다 — "설정됐는가"(boolean)만.
+  // ⚠️ 비밀/내부 구성 값은 노출하지 않는다 — "설정됐는가"(boolean)만.
+  // (rateLimitBackend의 실제 값 'memory'/'upstash' 등도 운영 구성이므로 boolean으로만 노출.)
   // 배포 직후 구성 누락(키 이름 오타 등)을 즉시 식별하기 위한 운영 신호.
   const isProd = process.env.NODE_ENV === 'production';
   const config = {
     aiKey: Boolean(process.env.ANTHROPIC_API_KEY),
     rateLimitIpHeader: Boolean(process.env.RATE_LIMIT_IP_HEADER),
-    rateLimitBackend: process.env.RATE_LIMIT_BACKEND ?? null,
+    rateLimitBackend: Boolean(process.env.RATE_LIMIT_BACKEND),
     authBackend: process.env.NEXT_PUBLIC_AUTH_BACKEND === 'pullim' ? 'pullim' : 'mock',
   };
-  // 프로덕션에서 /api/analyze가 정상 동작하려면 아래가 모두 충족돼야 한다(없으면 fail-closed).
+  // 프로덕션에서 /api/analyze가 구성됐는지: 필수 env가 모두 *존재*하는지로 판단한다.
+  // (특정 백엔드 값에 하드코딩하지 않음 — KV 전환 시에도 유효. 실제 fail-closed 강제는
+  // lib/rate-limit/index.ts·route.ts가 담당.)
   const analyzeReady =
-    !isProd ||
-    (config.aiKey && config.rateLimitIpHeader && config.rateLimitBackend === 'memory');
+    !isProd || (config.aiKey && config.rateLimitIpHeader && config.rateLimitBackend);
 
   return NextResponse.json({
     ok: true,
