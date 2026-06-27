@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { studentProfileSchema } from '@pullim/shared';
+import { studentProfileSchema, lintGuardrails, STUDENT_ECHO_KEYS } from '@pullim/shared';
 import {
   rateLimiter,
   ANALYZE_RATE_RULES,
@@ -130,6 +130,16 @@ export async function POST(req: Request) {
 
   try {
     const result = await analyze(profile);
+    // §6 전 출력 린트: 게이트 밖 섹션의 금지 키워드를 **서버 로그로만** 표면화(비차단).
+    // 모니터링 신호는 응답/클라이언트(sessionStorage)에 섞지 않는다. 학생 본인 인용
+    // 필드(STUDENT_ECHO_KEYS)는 제외하고, 위치·키워드만 남긴다(생기부 원문/PII 미로깅).
+    const flags = lintGuardrails(result, { skipKeys: STUDENT_ECHO_KEYS });
+    if (flags.length) {
+      console.warn(
+        '[analyze] §6 guardrail flags:',
+        flags.map((f) => `${f.keyword}@${f.path}`).join(', ')
+      );
+    }
     return NextResponse.json({ result, demo: false });
   } catch (err) {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
