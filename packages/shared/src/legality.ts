@@ -118,10 +118,24 @@ function snippetFor(text: string, keyword: string): string {
 }
 
 /**
- * 임의 객체(조립된 AnalyzeResult 등)를 깊이 순회하며 모든 문자열 필드에서 §6.2 금지
- * 키워드를 찾아 위치·문장과 함께 플래그한다. 공백 정규화로 띄어쓰기 우회까지 잡는다.
+ * 학생 본인 생기부에서 *인용*된(= AI 생성물이 아닌) 필드 키. §6 린트에서 제외한다 —
+ * §6은 AI가 생성한 관찰·처방을 통제하는 것이지 학생이 제출한 원문을 검열하지 않는다.
+ * 학생 생기부에 "학원"이 들어 있어 evidence/basis로 그대로 인용돼도 위반이 아니다.
+ *  - evidence.quote / basis.quote: 진단·보완·면접의 인용문
+ *  - newEvidence[] / matchedQuote: 종단 트윈의 학생 측 증거·매칭 인용
  */
-export function lintGuardrails(value: unknown, basePath = ''): GuardrailFlag[] {
+export const STUDENT_ECHO_KEYS = ['quote', 'newEvidence', 'matchedQuote'] as const;
+
+/**
+ * 임의 객체(조립된 AnalyzeResult 등)를 깊이 순회하며 문자열 필드에서 §6.2 금지 키워드를
+ * 찾아 위치·문장과 함께 플래그한다. 공백 정규화로 띄어쓰기 우회까지 잡는다.
+ * `skipKeys`에 든 키의 하위 트리는 스캔하지 않는다(학생 인용 필드 제외 — STUDENT_ECHO_KEYS).
+ */
+export function lintGuardrails(
+  value: unknown,
+  options: { skipKeys?: readonly string[] } = {}
+): GuardrailFlag[] {
+  const skip = new Set<string>(options.skipKeys ?? []);
   const flags: GuardrailFlag[] = [];
   const visit = (node: unknown, path: string): void => {
     if (typeof node === 'string') {
@@ -135,10 +149,11 @@ export function lintGuardrails(value: unknown, basePath = ''): GuardrailFlag[] {
       node.forEach((v, i) => visit(v, `${path}[${i}]`));
     } else if (node && typeof node === 'object') {
       for (const key of Object.keys(node as Record<string, unknown>)) {
+        if (skip.has(key)) continue; // 학생 인용 등 제외 필드의 하위 트리는 건너뜀
         visit((node as Record<string, unknown>)[key], path ? `${path}.${key}` : key);
       }
     }
   };
-  visit(value, basePath);
+  visit(value, '');
   return flags;
 }

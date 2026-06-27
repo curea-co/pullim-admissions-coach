@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterActions, lintGuardrails, type ActionCandidate } from './legality';
+import { filterActions, lintGuardrails, STUDENT_ECHO_KEYS, type ActionCandidate } from './legality';
 
 const mk = (
   recordArea: string,
@@ -102,5 +102,26 @@ describe('lintGuardrails (전 출력 §6 린트)', () => {
     expect(flags).toHaveLength(1);
     expect(flags[0].path).toBe('interview.questions[0].answerDirection');
     expect(flags[0].keyword).toBe('소논문');
+  });
+
+  it('학생 인용 필드(quote/newEvidence)는 제외 — AI 생성물만 본다', () => {
+    const result = {
+      // AI 생성 관찰: 플래그 대상
+      diagnosis: { criteria: [{ weakness: '학원 의존을 줄이고 학교 활동으로.' }] },
+      // 학생 본인 생기부 인용: 제외 대상(학생이 '학원'을 썼어도 위반 아님)
+      interview: { questions: [{ basis: { quote: '방과후 학원에서 코딩을 배움', section: '창체' } }] },
+      rubric: { items: [{ evidence: { quote: '학원 영어 토론', section: '세특' } }] },
+      twin: { newEvidence: ['교외 수상 경력'], outcomes: [{ matchedQuote: '컨설팅 받은 소논문' }] },
+    };
+    const flags = lintGuardrails(result, { skipKeys: STUDENT_ECHO_KEYS });
+    // AI 생성 weakness의 '학원' 1건만 잡혀야 한다(인용/증거는 전부 제외).
+    expect(flags).toHaveLength(1);
+    expect(flags[0].path).toBe('diagnosis.criteria[0].weakness');
+    expect(flags[0].keyword).toBe('학원');
+  });
+
+  it('skipKeys 없으면 인용 필드도 스캔(기본 동작 유지)', () => {
+    const flags = lintGuardrails({ basis: { quote: '학원 다님' } });
+    expect(flags).toHaveLength(1);
   });
 });
