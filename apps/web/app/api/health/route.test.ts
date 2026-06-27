@@ -33,13 +33,15 @@ describe('GET /api/health', () => {
     expect(JSON.stringify(body)).not.toContain('memory');
   });
 
-  it('KV 전환(비-memory 백엔드)에도 analyzeReady:true (값 하드코딩 안 함)', async () => {
+  it('리미터가 수용 안 하는 백엔드(upstash, KV 미연결)면 analyzeReady:false — 리미터와 단일 소스 일치', async () => {
+    // 현재 리미터는 memory만 수용(fail-closed). health도 같은 판정(rateLimitConfigError)을
+    // 써서, 런타임은 500인데 health는 ready라고 거짓 보고하는 불일치를 막는다.
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-x');
     vi.stubEnv('RATE_LIMIT_IP_HEADER', 'x-forwarded-for');
     vi.stubEnv('RATE_LIMIT_BACKEND', 'upstash');
     const body = await GET().json();
-    expect(body.analyzeReady).toBe(true);
+    expect(body.analyzeReady).toBe(false);
     expect(JSON.stringify(body)).not.toContain('upstash');
   });
 
