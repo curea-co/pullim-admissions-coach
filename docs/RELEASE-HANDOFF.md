@@ -136,6 +136,8 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
 5. **✅ 배포 후 검증** — `https://admissions.pullim.ai` 접속 → 제출 → **실 AI 결과**(키 있으니 demo 배너 없어야) 확인. 빈 본문 POST가 **200이 아닌지**(스키마 400) + 키 없을 때 503 등 fail-closed 동작 점검.
    - ⚠️ **레이트리밋(429)는 프로덕션에서 신뢰성 있게 검증 불가** — in-memory 리미터는 Vercel 서버리스 인스턴스 간 카운터를 공유하지 않아, 연속 호출이 다른 인스턴스로 분산되면 429가 안 뜰 수 있다(콜드스타트마다 리셋). **분산 환경에서 정확한 제한은 KV 어댑터 전환(§3.3)이 필요**. 베타에선 비용 가드가 약화된 상태임을 인지.
 
+6. **📡 모니터링** — 배포 후 [docs/MONITORING.md](MONITORING.md) 따라 셋업: `GET /api/health`(무료 구성/가동 체크, `analyzeReady` 확인) + UptimeRobot + Anthropic spend limit + Vercel 로그(§6 플래그·에러).
+
 > **베타 최소선**: 1+2+3+4. 인증은 mock 유지. **KV 레이트리밋**(분산 정확) · 잡큐 · B/C는 후속(§3·§7).
 
 ---
