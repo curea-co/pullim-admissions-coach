@@ -56,6 +56,7 @@ URL만 있고 플래그가 없으면 mock 유지(실수 주입으로 미완성 �
 - 목표: `pullim-api`(NestJS) 직접 호출(CORS + httpOnly 쿠키 + CSRF + JWT).
 - **설계 전부**: [docs/superpowers/specs/2026-06-24-auth-mypage-design.md](superpowers/specs/2026-06-24-auth-mypage-design.md)
   - 엔드포인트 매핑(`POST /auth/signup`·`/auth/login`·`/auth/refresh`, 계정은 `/auth` 밖 `GET /me`·`POST /account/delete` …), CSRF echo, 401→refresh→재시도, 미성년 보호자 동의, 보호 라우트, **pullim-api 선행조건(CORS·쿠키 Domain/SameSite·Swagger DTO 확정)**.
+- **pullim-api 선행조건 체크리스트(백엔드 설정)**: [docs/pullim-api-prereqs-checklist.md](pullim-api-prereqs-checklist.md) — CORS·쿠키·CSRF·엔드포인트 NestJS 설정 + 검증 + 함정.
 - `AuthAdapter` 인터페이스: `apps/web/lib/auth/types.ts`. 같은 시그니처로 실 어댑터 구현 후 한 줄 교체.
 - ⚠️ **오픈 리다이렉트 가드(B 연동 시 필수):** `/login?next=`·`/signup?next=`의 `next`를 **내부 경로만** 허용하도록 검증(현재 코드는 미검증). 규칙은 [auth 설계 §5](superpowers/specs/2026-06-24-auth-mypage-design.md) 참조.
 
