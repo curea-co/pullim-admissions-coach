@@ -67,21 +67,13 @@ URL만 있고 플래그가 없으면 mock 유지(실수 주입으로 미완성 �
 - 비고: 이건 **백엔드 결과 저장 모듈**(auth 설계의 "하위프로젝트 3")이 선행. §6 정직 라벨(데모 플래그)·삭제권(개인정보) 유지할 것.
 
 ### 3.3 레이트리밋 — `apps/web/lib/rate-limit/index.ts`
-현재 export는 한 줄 swap이 아니라 `selectLimiter()`로 감싸 **프로덕션에서 `RATE_LIMIT_BACKEND` 미설정 시 fail-closed**(첫 호출 throw)하도록 되어 있다. KV 전환은 `selectLimiter()` 안에서 한다:
-```ts
-function selectLimiter(): RateLimiter {
-  // KV 도입 시: return createKvRateLimiter();  ← 여기서 교체
-  if (process.env.NODE_ENV === 'production' && process.env.RATE_LIMIT_BACKEND !== 'memory') {
-    throw new Error('레이트리밋 백엔드 미구성(프로덕션 fail-closed)…');
-  }
-  return createMemoryRateLimiter();
-}
-// rateLimiter는 첫 check()에서 selectLimiter()를 1회 평가(지연) → next build(NODE_ENV=production) 무해.
-export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } };
-```
-- 현재: in-memory 슬라이딩 윈도우(단일 프로세스/웜 람다 내에서만 공유 → 서버리스 다중 인스턴스에선 인스턴스별 카운트). 프로덕션은 `RATE_LIMIT_BACKEND=memory` 명시 옵트인 없이는 fail-closed.
-- 목표: Upstash Redis / Vercel KV 어댑터(`RateLimiter` 인터페이스는 `types.ts` 그대로 구현)를 `selectLimiter()`에서 반환.
-- 규칙·상한은 같은 파일 상단: `ANALYZE_RATE_RULES`(버스트 3/분, 일일 10/일), `MAX_SAENGBU_CHARS`(5만 자). 운영하며 조정.
+`RATE_LIMIT_BACKEND`로 백엔드 선택(`selectLimiter()`, 프로덕션 미구성 시 fail-closed):
+- **`kv`(프로덕션 권장)** — Upstash Redis 분산 슬라이딩 윈도우(`kv-adapter.ts`, `@upstash/ratelimit`). 서버리스 다중 인스턴스 간 카운터 **공유**. `UPSTASH_REDIS_REST_URL`/`_TOKEN`(또는 `KV_REST_API_URL`/`_TOKEN`) 필요. 동적 import라 memory 모드엔 미로드.
+- **`memory`** — in-memory 슬라이딩 윈도우. 단일 인스턴스 한정(다중 인스턴스에선 인스턴스별·콜드스타트 리셋). dev/단일 인스턴스용.
+- **미설정/그 외** — 프로덕션 fail-closed(첫 호출 throw → 라우트 500).
+
+**전환:** 프로덕션 env에 `RATE_LIMIT_BACKEND=kv` + Upstash env 추가만 하면 됨(코드 변경 없음). `analyzeReady`(/api/health)가 KV env 유무까지 단일 소스로 판정.
+- 규칙·상한: 같은 파일 상단 `ANALYZE_RATE_RULES`(버스트 3/분, 일일 10/일), `MAX_SAENGBU_CHARS`(5만 자). 운영하며 조정.
 
 ---
 
@@ -91,11 +83,11 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | 실 AI 진단(server-only) | `apps/web/.env.local`(로컬) · **호스팅 시크릿**(배포) | **NEXT_PUBLIC 아님.** 없으면 dev는 mock 데모, **프로덕션은 503(fail-loud)** |
 | `RATE_LIMIT_IP_HEADER` | 레이트리밋 신뢰 IP 헤더 | 호스팅 env | **프로덕션 필수**(미설정 시 fail-closed). 엣지/프록시가 위조 불가하게 덮어쓰는 헤더만(예 Vercel `x-forwarded-for`) |
-| `RATE_LIMIT_BACKEND` | in-memory 명시 옵트인 | 호스팅 env | **프로덕션**에서 KV 어댑터 없이 in-memory 쓰려면 `memory` 명시(없으면 fail-closed). KV 도입 시 불필요 |
+| `RATE_LIMIT_BACKEND` | 레이트리밋 백엔드 | 호스팅 env | **프로덕션 필수**: `kv`(분산, 권장) 또는 `memory`(단일 인스턴스). 미설정/그 외 → fail-closed |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 레이트리밋 KV 연결 | 호스팅 시크릿 | `RATE_LIMIT_BACKEND=kv`일 때 필수(또는 `KV_REST_API_URL`/`_TOKEN`) |
 | `ALLOW_DEMO_FALLBACK` | 프로덕션 데모 허용 | 호스팅 env | 선택. 스테이징 등에서 키 없이 데모 보려면 `1`. 기본은 프로덕션 503 |
 | `NEXT_PUBLIC_AUTH_BACKEND` | 실 인증 명시 옵트인 (B) | env | `pullim` 이면 실 어댑터. 없으면 mock. URL만으론 전환 안 됨 |
 | `NEXT_PUBLIC_PULLIM_API` | pullim-api 베이스 URL (B 연동) | env | dev 예: `http://localhost:3000`. 위 플래그와 **함께** 설정 |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | 레이트리밋 KV (배포) | 호스팅 시크릿 | KV 전환 시 추가 |
 
 - `.env.local`은 gitignore됨. 예시: `apps/web/.env.local.example`.
 - **시크릿을 git/iCloud/대화에 절대 올리지 말 것.** 노출되면 즉시 회전.
@@ -126,6 +118,7 @@ export const rateLimiter: RateLimiter = { check(key, rules) { /* lazy init */ } 
    | `RATE_LIMIT_BACKEND` | `memory` | `/api/analyze` 전부 **500**(fail-closed) |
 
    - ⚠️ 2·3번은 **반드시** 설정(코드가 의도적으로 fail-closed). `ALLOW_DEMO_FALLBACK`은 두지 말 것(키 누락을 503으로 드러내기 위함).
+   - 🔁 **분산 정확 레이트리밋(권장):** `RATE_LIMIT_BACKEND=kv` + `UPSTASH_REDIS_REST_URL`/`_TOKEN`. 그러면 인스턴스 간 카운터 공유(§3.3). 단일 인스턴스/베타면 `memory`로 시작 가능.
    - ⚠️ `NEXT_PUBLIC_AUTH_BACKEND`는 **넣지 말 것** → 베타는 mock 인증 유지(공개 실사용자 받으려면 B 연동 선행, §3.1·known-risk).
    - `ANTHROPIC_API_KEY`는 server-only(`NEXT_PUBLIC_` 아님).
 
