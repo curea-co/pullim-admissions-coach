@@ -37,11 +37,6 @@ function defaultFactory(): RuleLimiterFactory {
     });
 }
 
-/** 가장 빡빡한(최소 max) 규칙 선택 — limit/remaining 보고용. */
-function tightest<T extends { rule: RateLimitRule }>(items: T[]): T {
-  return items.reduce((a, b) => (a.rule.max <= b.rule.max ? a : b));
-}
-
 export function createKvRateLimiter(
   opts: { factory?: RuleLimiterFactory; now?: () => number } = {}
 ): RateLimiter {
@@ -61,26 +56,27 @@ export function createKvRateLimiter(
 
   return {
     async check(key: string, rules: RateLimitRule[]): Promise<RateLimitResult> {
-      const results = await Promise.all(
-        rules.map(async (rule) => ({ rule, res: await limiterFor(rule).limit(key) }))
-      );
-
-      const blocked = results.filter((r) => !r.res.success);
-      if (blocked.length > 0) {
-        // 차단을 유발한 규칙들 중 가장 늦게 풀리는 시각까지 대기.
-        const retryAfterSec = Math.max(
-          ...blocked.map((b) => Math.max(1, Math.ceil((b.res.reset - now()) / 1000)))
-        );
-        const t = tightest(blocked);
-        return { allowed: false, retryAfterSec, limit: t.rule.max, remaining: 0 };
+      // @upstash/ratelimit의 limit()은 매 호출 quota를 차감한다. memory-adapter 계약
+      // ("막힌 호출은 기록하지 않음")에 맞추려면 **순차 검사 + 첫 차단 시 단락**해야 한다 —
+      // 그래야 한 규칙에서 막힌 요청이 이후 규칙(예: 일일 캡)의 quota를 더 깎지 않는다.
+      // 규칙은 좁은 윈도우(버스트)부터 두는 것을 권장(자주 막히는 규칙을 먼저 단락).
+      const passed: { rule: RateLimitRule; remaining: number }[] = [];
+      for (const rule of rules) {
+        const res = await limiterFor(rule).limit(key);
+        if (!res.success) {
+          const retryAfterSec = Math.max(1, Math.ceil((res.reset - now()) / 1000));
+          return { allowed: false, retryAfterSec, limit: rule.max, remaining: 0 };
+        }
+        passed.push({ rule, remaining: res.remaining });
       }
 
-      const t = tightest(results);
+      // 전부 통과 — 실제 남은 허용 횟수는 가장 적게 남은(binding) 규칙이 결정한다.
+      const binding = passed.reduce((a, b) => (a.remaining <= b.remaining ? a : b));
       return {
         allowed: true,
         retryAfterSec: 0,
-        limit: t.rule.max,
-        remaining: Math.max(0, t.res.remaining),
+        limit: binding.rule.max,
+        remaining: Math.max(0, binding.remaining),
       };
     },
   };
