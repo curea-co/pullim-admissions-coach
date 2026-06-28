@@ -67,7 +67,14 @@ async function selectLimiter(): Promise<RateLimiter> {
 let _limiterPromise: Promise<RateLimiter> | null = null;
 export const rateLimiter: RateLimiter = {
   check(key, rules) {
-    if (!_limiterPromise) _limiterPromise = selectLimiter();
+    if (!_limiterPromise) {
+      _limiterPromise = selectLimiter();
+      // 초기화 실패(콜드스타트 Upstash 일시 장애·동적 import 실패 등)가 프로세스 수명 동안
+      // 캐시돼 영구 500이 되지 않도록, reject 시 캐시를 비워 다음 호출에서 재시도하게 한다.
+      _limiterPromise.catch(() => {
+        _limiterPromise = null;
+      });
+    }
     return _limiterPromise.then((l) => l.check(key, rules));
   },
 };
