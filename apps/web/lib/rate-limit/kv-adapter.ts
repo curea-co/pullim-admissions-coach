@@ -9,6 +9,7 @@
 
 import { Ratelimit, type Duration } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { resolveKvCreds } from './kv-creds';
 import type { RateLimiter, RateLimitRule, RateLimitResult } from './types';
 
 /** 한 규칙에 대한 리미터(테스트 주입용 최소 계약 — Ratelimit이 이를 충족). */
@@ -19,20 +20,20 @@ export type RuleLimiterFactory = (rule: RateLimitRule) => RuleLimiter;
 
 /** Upstash(또는 Vercel KV) env에서 Redis를 만들고 규칙별 슬라이딩 윈도우 리미터를 생성. */
 function defaultFactory(): RuleLimiterFactory {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  if (!url || !token) {
+  const creds = resolveKvCreds(); // 한 provider의 완전한 쌍만(혼합 방지, index와 단일 소스)
+  if (!creds) {
     throw new Error(
-      'KV 레이트리밋 env 누락: UPSTASH_REDIS_REST_URL/TOKEN(또는 KV_REST_API_URL/TOKEN) 필요.'
+      'KV 레이트리밋 env 누락: UPSTASH_REDIS_REST_URL/TOKEN(또는 KV_REST_API_URL/TOKEN) 한 쌍 필요.'
     );
   }
-  const redis = new Redis({ url, token });
+  const redis = new Redis(creds);
   return (rule) =>
     new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(rule.max, `${rule.windowSec} s` as Duration),
-      // 규칙(윈도우)별로 키 공간 분리 — 버스트와 일일 카운터가 섞이지 않게.
-      prefix: `pullim:rl:${rule.windowSec}`,
+      // 규칙(윈도우+상한)별로 키 공간 분리 — 윈도우 같고 max만 다른 규칙이나, 롤링 배포 중
+      // max가 바뀌는 경우에도 서로 다른 정책이 같은 카운터를 공유하지 않게 한다.
+      prefix: `pullim:rl:${rule.windowSec}:${rule.max}`,
       analytics: false,
     });
 }

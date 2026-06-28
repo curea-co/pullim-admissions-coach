@@ -4,14 +4,12 @@
 //           (또는 KV_REST_API_URL/TOKEN) 필요. kv-adapter는 동적 import(메모리 모드는 미로드).
 
 import { createMemoryRateLimiter } from './memory-adapter';
+import { resolveKvCreds } from './kv-creds';
 import type { RateLimiter, RateLimitRule } from './types';
 
-/** KV(Upstash/Vercel KV) 연결 env가 있는지 — 호출 시점에 읽는다(테스트/런타임 모두 정확). */
+/** KV 연결 자격증명(한 provider의 완전한 쌍)이 있는지 — kv-adapter와 단일 소스 공유. */
 function kvEnvPresent(): boolean {
-  return Boolean(
-    (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL) &&
-      (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN)
-  );
+  return resolveKvCreds() !== null;
 }
 
 export type { RateLimiter, RateLimitRule, RateLimitResult } from './types';
