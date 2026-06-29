@@ -87,9 +87,10 @@ export default function SubmitPage() {
   const [targetTrack, setTargetTrack] = useState<TargetTrack>(
     parkJunho.profile.targetTrack
   );
+  // 목표 대학은 학생 본인 입력값 — 데모 프리필 대신 빈 3순위 슬롯으로 시작(첫 사용자 혼동 방지).
   const [universities, setUniversities] = useState<
     { name: string; department?: string }[]
-  >(parkJunho.profile.targetUniversities.map((u) => ({ ...u })));
+  >([{ name: '' }, { name: '' }, { name: '' }]);
   const [grade, setGrade] = useState<number>(parkJunho.identity.grade);
   const [semester, setSemester] = useState<1 | 2>(
     parkJunho.identity.semester as 1 | 2

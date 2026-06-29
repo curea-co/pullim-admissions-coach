@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { consentSchema } from '@pullim/shared';
@@ -9,6 +9,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { useAuth } from '@/components/auth/auth-provider';
 import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +52,13 @@ export default function ConsentPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  // 미성년 여부 기본값 = 가입 시 생년월일(user.isMinor). 사용자가 토글로 직접 바꾸기 전까지 자동 반영.
+  const { user } = useAuth();
   const [isMinor, setIsMinor] = useState(true);
+  const [minorTouched, setMinorTouched] = useState(false);
+  useEffect(() => {
+    if (!minorTouched && user) setIsMinor(user.isMinor);
+  }, [user, minorTouched]);
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
@@ -144,7 +151,7 @@ export default function ConsentPage() {
           한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
 
-        {/* 미성년자 여부 토글 — 실 서비스에서는 회원가입 단계에서 결정. 데모용 토글. */}
+        {/* 미성년자 여부 — 가입 생년월일로 기본값 설정, 필요 시 사용자가 직접 변경. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-ink-900">미성년자(만 19세 미만)인가요?</p>
@@ -154,7 +161,7 @@ export default function ConsentPage() {
           </div>
           <button
             type="button"
-            onClick={() => setIsMinor((v) => !v)}
+            onClick={() => { setMinorTouched(true); setIsMinor((v) => !v); }}
             className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             {isMinor ? '미성년 · 변경' : '성인 · 변경'}
@@ -299,7 +306,7 @@ function BlockerNote() {
       <p className="mt-1 text-amber-900/80">
         본 서비스는 미성년자 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두
         가동된 이후에만 실제 사용자 데이터를 받습니다. 본 화면은 그 절차를 사용자에게
-        가시화한 Phase B 검증 시각 셸입니다.
+        미리 안내하는 베타 미리보기입니다.
       </p>
     </aside>
   );

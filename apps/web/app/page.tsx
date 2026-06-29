@@ -73,7 +73,7 @@ const promises = [
 const faqs = [
   {
     q: '비용이 드나요?',
-    a: '2026-07-01 베타 서비스 오픈 예정입니다. 요금 정책은 베타 오픈 시 안내합니다.',
+    a: '베타 서비스 오픈을 준비 중입니다. 요금 정책은 베타 오픈 시 안내합니다.',
   },
   {
     q: '제 개인정보는 어디에 저장되나요?',
@@ -101,7 +101,7 @@ export default function LandingPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
               <span className="size-1.5 rounded-full bg-brand-500" />
-              베타 서비스 · 2026-07-01 오픈
+              베타 서비스 오픈 준비 중
             </span>
             <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-[2.6rem] sm:leading-[1.18]">
               생기부를 넣으면
@@ -317,7 +317,7 @@ export default function LandingPage() {
         <div className="w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
           <p>© Curea · Pullim Admissions Coach</p>
           <p className="mt-1">
-            본 페이지는 Phase A 시각 프로토타입이며, 실제 사용자 데이터는 수집하지 않습니다.
+            본 페이지는 베타 미리보기이며, 실제 사용자 데이터는 수집하지 않습니다.
           </p>
         </div>
       </footer>

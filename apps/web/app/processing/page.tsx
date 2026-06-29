@@ -129,7 +129,7 @@ export default function ProcessingPage() {
           제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
           {isDemo && (
             <span className="ml-2 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-              데모 모드 (API 키 없음)
+              데모 미리보기
             </span>
           )}
         </p>
