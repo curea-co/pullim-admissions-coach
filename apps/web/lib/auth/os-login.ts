@@ -17,7 +17,12 @@
 export function osLoginHref(returnUrl: string): string | null {
   const base = process.env.NEXT_PUBLIC_OS_URL;
   if (!base) return null;
-  const url = new URL('/login', base);
-  url.searchParams.set('next', returnUrl);
-  return url.toString();
+  try {
+    const url = new URL('/login', base);
+    url.searchParams.set('next', returnUrl);
+    return url.toString();
+  } catch {
+    // base 형식 오류(스킴 누락 'os.pullim.ai' 등) → null → 호출부가 내부 /login(mock)으로 폴백.
+    return null;
+  }
 }

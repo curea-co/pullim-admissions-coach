@@ -22,4 +22,9 @@ describe('osLoginHref (OS 로그인 redirect + next 복귀)', () => {
     vi.stubEnv('NEXT_PUBLIC_OS_URL', '');
     expect(osLoginHref('http://x/y')).toBeNull();
   });
+
+  it('NEXT_PUBLIC_OS_URL 형식 오류(스킴 누락) → null(throw 안 하고 폴백)', () => {
+    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'os.pullim.ai'); // 스킴 없음 → new URL throw
+    expect(osLoginHref('http://x/y')).toBeNull();
+  });
 });

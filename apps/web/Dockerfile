@@ -44,7 +44,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3030
+ENV PORT=3007
 ENV HOSTNAME=0.0.0.0
 
 # Non-root user
@@ -58,12 +58,12 @@ COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/public ./apps/web/publi
 
 USER nextjs
 
-EXPOSE 3030
+EXPOSE 3007
 
 # ALB target group health check should be GET / 200 (Phase A landing renders static).
 # Future: switch to a dedicated /api/health endpoint when api service is up.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3030/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3007/ || exit 1
 
 # Next.js standalone entrypoint
 CMD ["node", "apps/web/server.js"]
