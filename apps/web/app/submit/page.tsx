@@ -43,6 +43,18 @@ const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
 ).map(([value, label]) => ({ value, label }));
 
+// 검증 에러 노출용 — 스키마 키 → 한국어 라벨(내부 필드명 `record.maskingApplied` 등 노출 방지).
+const FIELD_LABELS: Record<string, string> = {
+  'record.text': '생기부 본문',
+  'record.maskingApplied': '개인정보 마스킹 확인',
+  targetTrack: '지원 학부',
+  'currentStanding.grade': '학년',
+  'currentStanding.semester': '학기',
+  'currentStanding.schoolType': '학교 유형',
+  targetUniversities: '목표 대학',
+};
+const fieldLabel = (key: string): string => FIELD_LABELS[key] ?? '입력 항목';
+
 export default function SubmitPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -232,7 +244,7 @@ export default function SubmitPage() {
       const first = Object.keys(result.errors)[0];
       setSubmitError(
         `${Object.keys(result.errors).length}개 항목을 확인해주세요.${
-          first ? ` (예: ${first})` : ''
+          first ? ` (${fieldLabel(first)})` : ''
         }`
       );
       // 첫 에러 필드로 포커스 이동

@@ -13,6 +13,10 @@ import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-pro
 import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
+import { saveDiagnosis } from '@/lib/result-store';
+
+// 결과 이력 요약 — ResultActions(수동 저장)와 자동 저장이 동일 값을 써 중복 제거가 맞물린다.
+const RESULT_SUMMARY = '면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
 import type { FitAssessment } from '@/lib/fit';
 
@@ -56,6 +60,15 @@ export default function ResultPage() {
       setResultIsDemo(loadAnalyzeDemo());
     }
   }, []);
+
+  // #4: 실(개인화) 결과는 자동으로 마이페이지 진단 이력에 저장 — '내 결과 저장'을 누르지 않아도
+  // 결과 유실 방지. saveDiagnosis는 track+summary로 중복 제거하므로 수동 저장과 충돌하지 않는다.
+  // 데모/mock 결과(resultIsDemo)는 저장하지 않는다.
+  useEffect(() => {
+    if (viewModel && !resultIsDemo && profile) {
+      saveDiagnosis({ track: formatStandingLabel(profile), summary: RESULT_SUMMARY });
+    }
+  }, [viewModel, resultIsDemo, profile]);
 
   // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.
   // 후자는 viewModel이 있어도 본문이 예시이므로 반드시 고지해야 함(§6 정직).
@@ -175,7 +188,7 @@ export default function ResultPage() {
           <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
           <ResultActions
             track={profile ? formatStandingLabel(profile) : '공학계열'}
-            summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
+            summary={RESULT_SUMMARY}
           />
         </div>
 
