@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useState, useTransition } from 'react';
+import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Route } from 'next';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/components/auth/auth-provider';
 import { safeNext } from '@/lib/safe-next';
+import { isOsAuthEnabled, redirectToOsAuth } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
 
 // ── 단계 정의 ─────────────────────────────────────────────────────────────────
@@ -81,6 +82,12 @@ function SignupForm() {
 
   // 오픈 리다이렉트 가드(auth 설계 §5): 내부 경로만 허용.
   const nextRoute = safeNext(searchParams.get('next'), '/submit') as unknown as Route;
+
+  // 중앙 로그인(OS) 모드면 자체 가입 폼 대신 ${OS}/signup?next= 로 보낸다(ADR-010).
+  const osEnabled = isOsAuthEnabled();
+  useEffect(() => {
+    if (osEnabled) redirectToOsAuth('signup', searchParams.get('next'));
+  }, [osEnabled, searchParams]);
 
   // 단계 상태
   const [step, setStep] = useState<Step>('account');
@@ -195,6 +202,14 @@ function SignupForm() {
   const labelCls = 'text-sm font-medium text-ink-900';
 
   // ── 렌더 ─────────────────────────────────────────────────────────────────
+
+  if (osEnabled) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center px-4">
+        <p className="text-sm text-ink-400">가입 페이지로 이동 중…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">

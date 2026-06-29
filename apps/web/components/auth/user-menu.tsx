@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/auth-provider';
+import { isOsAuthEnabled, redirectToOsAuth } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
 
 export function UserMenu({ className }: { className?: string }) {
@@ -36,19 +37,31 @@ export function UserMenu({ className }: { className?: string }) {
     );
   }
 
-  // guest
+  // guest — 중앙 로그인(OS) 모드면 ${OS}/login?next= 로 보낸다(ADR-010). 미설정이면 자체 페이지(데모).
+  const loginCls =
+    'rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:border-brand-200 hover:text-brand-700';
+  const signupCls =
+    'rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700';
+
+  if (isOsAuthEnabled()) {
+    return (
+      <div className={cn('flex items-center gap-2', className)}>
+        <button type="button" onClick={() => redirectToOsAuth('login')} className={loginCls}>
+          로그인
+        </button>
+        <button type="button" onClick={() => redirectToOsAuth('signup')} className={signupCls}>
+          가입
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <Link
-        href="/login"
-        className="rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:border-brand-200 hover:text-brand-700"
-      >
+      <Link href="/login" className={loginCls}>
         로그인
       </Link>
-      <Link
-        href="/signup"
-        className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
+      <Link href="/signup" className={signupCls}>
         가입
       </Link>
     </div>

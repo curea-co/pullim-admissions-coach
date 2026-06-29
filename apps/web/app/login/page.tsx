@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/components/auth/auth-provider';
 import { safeNext } from '@/lib/safe-next';
+import { isOsAuthEnabled, redirectToOsAuth } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
 
 // ── inner form (reads useSearchParams) ───────────────────────────────────────
@@ -27,6 +28,12 @@ function LoginForm() {
   // typedRoutes: safeNext가 보장한 내부 경로이므로 Route로 단언
   const nextRoute = next as unknown as Route;
 
+  // 중앙 로그인(OS) 모드면 자체 폼 대신 ${OS}/login?next= 로 보낸다(ADR-010).
+  const osEnabled = isOsAuthEnabled();
+  useEffect(() => {
+    if (osEnabled) redirectToOsAuth('login', searchParams.get('next'));
+  }, [osEnabled, searchParams]);
+
   // 이미 로그인된 경우 즉시 이동
   useEffect(() => {
     if (status === 'authed') {
@@ -34,6 +41,14 @@ function LoginForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  if (osEnabled) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center px-4">
+        <p className="text-sm text-ink-400">로그인 페이지로 이동 중…</p>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

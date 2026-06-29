@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/auth-provider';
+import { isOsAuthEnabled, redirectToOsAuth } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
 
 interface StartCtaProps {
@@ -18,6 +19,15 @@ export function StartCta({ children, className }: StartCtaProps) {
       <span aria-disabled="true" className={cn(className, 'cursor-wait opacity-60')}>
         {children}
       </span>
+    );
+  }
+
+  // 비로그인 + 중앙 로그인(OS) 모드: 자체 /signup 대신 ${OS}/signup?next= 로 보낸다(ADR-010).
+  if (status !== 'authed' && isOsAuthEnabled()) {
+    return (
+      <button type="button" onClick={() => redirectToOsAuth('signup')} className={cn(className)}>
+        {children}
+      </button>
     );
   }
 
