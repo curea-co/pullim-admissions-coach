@@ -2,12 +2,18 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './auth-provider';
+import { osLoginHref } from '@/lib/auth/os-login';
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { status, refresh } = useAuth();
   const router = useRouter(); const pathname = usePathname();
   useEffect(() => {
     // 'guest'(미인증/만료)만 로그인으로. 'error'(서버/네트워크 일시 장애)는 강등하지 않는다.
-    if (status === 'guest') router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    // SSO 모드(NEXT_PUBLIC_OS_URL)면 OS 로그인으로 보내 UserMenu와 진입점을 통일, 아니면 내부 /login.
+    if (status === 'guest') {
+      const sso = osLoginHref(window.location.href);
+      if (sso) window.location.assign(sso);
+      else router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    }
   }, [status, router, pathname]);
 
   // 일시 오류 — 로그아웃시키지 않고 재시도 제공(백엔드 장애 시 강제 로그인 방지).

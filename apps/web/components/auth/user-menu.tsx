@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/auth-provider';
+import { osLoginHref } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
+
+const LOGIN_CTA_CLASS =
+  'rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:border-brand-200 hover:text-brand-700';
 
 export function UserMenu({ className }: { className?: string }) {
   const { user, status, logout } = useAuth();
@@ -45,15 +49,23 @@ export function UserMenu({ className }: { className?: string }) {
     );
   }
 
-  // guest
+  // guest — NEXT_PUBLIC_OS_URL 설정 시 OS 로그인으로 SSO redirect(돌아올 URL을 next로),
+  // 미설정 시 내부 /login(mock) 폴백.
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <Link
-        href="/login"
-        className="rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:border-brand-200 hover:text-brand-700"
-      >
-        로그인
-      </Link>
+      {process.env.NEXT_PUBLIC_OS_URL ? (
+        <button
+          type="button"
+          onClick={() => window.location.assign(osLoginHref(window.location.href) ?? '/login')}
+          className={LOGIN_CTA_CLASS}
+        >
+          로그인
+        </button>
+      ) : (
+        <Link href="/login" className={LOGIN_CTA_CLASS}>
+          로그인
+        </Link>
+      )}
       <Link
         href="/signup"
         className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
