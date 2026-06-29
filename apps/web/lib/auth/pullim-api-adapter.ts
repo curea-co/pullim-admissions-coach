@@ -26,44 +26,40 @@ import type {
   AgeBand,
 } from './types';
 
-// pullim-api `GET /me` 응답(부분) — TODO(B): Swagger me-response.dto와 정합 확인.
+// pullim-api `GET /me` 응답 — me-response.dto.ts(2026-06 확인)와 정합.
+// package·tier 가 /me 에 직접 포함되어 별도 /me/entitlements 병합 불필요.
 interface MeResponse {
   sub: string;
   email: string;
   displayName: string;
-  ageBand: AgeBand;
-  // ⚠️ 미성년(만19) 판정은 isMinor가 권위 — ageBand(만14)와 혼동 금지(설계 §5).
-  // 서버가 isMinor를 안 주면 pullim-api에 추가 요청(설계 §5 게이트).
-  isMinor: boolean;
-  guardianConsent?: 'none' | 'pending' | 'approved';
+  ageBand: AgeBand; // under14|over14|unknown (만14 경계 — birth_date 복호 만나이)
+  package: string; // entitlements.package
+  tier: string; // entitlements.tier
+  role: string; // student|parent|teacher|institution
 }
 
-interface EntitlementsResponse {
-  package: string;
-  tier: string;
-}
-
-/** MeResponse(+entitlements) → 앱 User. TODO(B): 필드명 실제 응답과 정합. */
-function mapMe(me: MeResponse, ent: EntitlementsResponse): User {
+/** MeResponse → 앱 User. */
+function mapMe(me: MeResponse): User {
   return {
     id: me.sub,
     email: me.email,
     displayName: me.displayName,
     ageBand: me.ageBand,
-    isMinor: me.isMinor,
-    guardianConsent: me.guardianConsent ?? 'none',
-    package: ent.package,
-    tier: ent.tier,
+    // ⚠️ 갭: /me 는 만14 ageBand 만 반환하고 만19 isMinor 는 미보유. under14 를 보수적 근사로 사용한다.
+    //   정확한 consent 게이트(만19)는 pullim-api /me 가 birth_date 파생 isMinor 를 반환해야 한다(설계 §5).
+    isMinor: me.ageBand === 'under14',
+    // guardian 동의 상태는 /me 미반환 — 후속(/me/children 또는 동의 조회)으로 채운다.
+    guardianConsent: 'none',
+    package: me.package,
+    tier: me.tier,
   };
 }
 
 export const pullimApiAuthAdapter: AuthAdapter = {
   async getMe(): Promise<User | null> {
     try {
-      // TODO(B): /me 와 /me/entitlements 병합.
       const me = await api.get<MeResponse>('/me');
-      const ent = await api.get<EntitlementsResponse>('/me/entitlements');
-      return mapMe(me, ent);
+      return mapMe(me);
     } catch (err) {
       // 미인증/만료(401)만 게스트로. 500·네트워크·DTO 오류까지 null로 삼키면
       // 서버 장애 시 사용자가 조용히 로그아웃된 것처럼 보이고 감지도 어렵다 → 전파.
@@ -79,9 +75,8 @@ export const pullimApiAuthAdapter: AuthAdapter = {
       '/auth/signup',
       input
     );
-    const ent = await api.get<EntitlementsResponse>('/me/entitlements').catch(() => ({ package: 'home', tier: 'free' }));
     return {
-      user: mapMe(res.user, ent),
+      user: mapMe(res.user),
       needsEmailVerify: res.needsEmailVerify,
       needsGuardianConsent: res.needsGuardianConsent,
     };
@@ -100,8 +95,7 @@ export const pullimApiAuthAdapter: AuthAdapter = {
   async login(email: string, password: string): Promise<User> {
     await api.post('/auth/login', { email, password });
     const me = await api.get<MeResponse>('/me');
-    const ent = await api.get<EntitlementsResponse>('/me/entitlements');
-    return mapMe(me, ent);
+    return mapMe(me);
   },
 
   async logout(): Promise<void> {
