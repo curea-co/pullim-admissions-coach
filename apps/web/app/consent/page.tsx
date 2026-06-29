@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { consentSchema } from '@pullim/shared';
@@ -52,13 +52,11 @@ export default function ConsentPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // 미성년 여부 기본값 = 가입 시 생년월일(user.isMinor). 사용자가 토글로 직접 바꾸기 전까지 자동 반영.
+  // 미성년 여부 = 가입 시 생년월일로 산정된 **권위값**(user.isMinor) — 화면에서 임의 변경 불가.
+  // 미성년자가 스스로 성인으로 바꿔 법정대리인 동의를 우회하는 것을 막는다(codex #52 리뷰).
+  // 정정이 필요하면 계정 정보 수정 플로우로. user 미로딩 시 안전하게 미성년(엄격)으로 가정.
   const { user } = useAuth();
-  const [isMinor, setIsMinor] = useState(true);
-  const [minorTouched, setMinorTouched] = useState(false);
-  useEffect(() => {
-    if (!minorTouched && user) setIsMinor(user.isMinor);
-  }, [user, minorTouched]);
+  const isMinor = user?.isMinor ?? true;
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
@@ -151,21 +149,26 @@ export default function ConsentPage() {
           한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
 
-        {/* 미성년자 여부 — 가입 생년월일로 기본값 설정, 필요 시 사용자가 직접 변경. */}
+        {/* 미성년 여부는 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-ink-900">미성년자(만 19세 미만)인가요?</p>
             <p className="mt-0.5 text-xs text-ink-500">
-              미성년자라면 법정대리인 동의가 필수로 추가됩니다.
+              {isMinor
+                ? '가입 정보 기준 미성년자입니다 — 법정대리인 동의가 필수로 추가됩니다.'
+                : '가입 정보 기준 성인입니다. 정정이 필요하면 계정 정보에서 생년월일을 수정하세요.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => { setMinorTouched(true); setIsMinor((v) => !v); }}
-            className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          <span
+            className={cn(
+              'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium',
+              isMinor
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-ink-100 bg-ink-100/50 text-ink-600'
+            )}
           >
-            {isMinor ? '미성년 · 변경' : '성인 · 변경'}
-          </button>
+            {isMinor ? '미성년' : '성인'}
+          </span>
         </div>
 
         <div className="mb-4 flex items-center justify-between rounded-xl bg-ink-100/50 px-4 py-2.5 text-sm">
