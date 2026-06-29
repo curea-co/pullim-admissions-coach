@@ -31,11 +31,11 @@ function Brand({ brand }: { brand: BrandProp }) {
   if (!isBrandObject(brand)) return <>{brand}</>;
   const { logo, title, sub, href = "/" } = brand;
   return (
-    <a href={href} className="flex items-center gap-2 text-[var(--text-primary)] no-underline">
+    <a href={href} className="flex items-center gap-2.5 text-[var(--text-primary)] no-underline">
       {logo}
       <span className="text-[18px] font-extrabold tracking-[-.04em]">{title}</span>
       {sub && (
-        <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[.1em] text-[var(--text-tertiary)]">
+        <span className="ml-0.5 border-l border-[var(--border-default)] pl-[9px] font-[var(--font-mono)] text-[11px] tracking-[.04em] text-[var(--text-tertiary)]">
           {sub}
         </span>
       )}
@@ -57,7 +57,7 @@ export function DashboardShell({
   const tabbarNode = Array.isArray(tabbar) ? <OsTabbar items={tabbar} /> : tabbar;
   return (
     <div className={cn("min-h-screen bg-[var(--surface-canvas)] text-[var(--text-primary)]", className)}>
-      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-4 border-b border-[var(--border-default)] bg-[var(--surface-raised)] px-4">
+      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-[18px] border-b border-[var(--border-default)] bg-white/80 px-[22px] backdrop-blur-[14px] backdrop-saturate-[1.8]">
         <Brand brand={brand} />
         {switcher}
         <div className="flex-1" />

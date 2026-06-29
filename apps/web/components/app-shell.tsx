@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <DashboardShell
-      brand={{ logo: <PullimLogo size={30} />, title: '풀림 입시코치', href: '/' }}
+      brand={{ logo: <PullimLogo size={30} />, title: '풀림', sub: '입시코치', href: '/' }}
       rail={<OsRail head="입시코치" items={items} collapsed={collapsed} />}
       tabbar={items}
       collapsed={collapsed}
