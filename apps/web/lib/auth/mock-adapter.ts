@@ -2,6 +2,7 @@ import type {
   AuthAdapter, User, SignupInput, GuardianInput, DiagnosisSummary, SignupResult,
 } from './types';
 import { isMinorByBirth, ageBandFromBirth } from './types';
+import { safeRandomUUID } from '@/lib/uuid';
 
 const SESSION_KEY = 'puds-auth-session'; // 현재 로그인 user id
 const USERS_KEY = 'puds-auth-users';     // id -> {user, password(검증용, 데모 한정)}
@@ -36,7 +37,7 @@ export const mockAuthAdapter: AuthAdapter = {
     const minor = isMinorByBirth(input.birthDate);
     // uuid로 생성 — 순번(`user_${count+1}`)은 삭제 후 재가입 시 id가 재사용되어
     // 사용자 스코프 저장소(result scope)에서 이전 계정 데이터가 섞일 수 있다.
-    const id = `user_${crypto.randomUUID()}`;
+    const id = `user_${safeRandomUUID()}`;
     const user: User = {
       id, email: input.email, displayName: input.displayName,
       ageBand: ageBandFromBirth(input.birthDate), // 만14 경계(개인정보 동의) — isMinor(만19)와 별개

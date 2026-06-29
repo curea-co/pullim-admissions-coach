@@ -5,6 +5,7 @@
 // 공용 브라우저에서 다른 사용자에게 데이터가 노출되지 않게 한다.
 
 import { currentScope } from './scope';
+import { safeRandomUUID } from '@/lib/uuid';
 import type { SavedDiagnosis } from './store-types';
 
 const ANSWERS_BASE = 'puds-self-answers';
@@ -49,7 +50,7 @@ export function saveDiagnosisCore(input: { track: string; summary: string }): Sa
   const existing = list.find((d) => d.track === input.track && d.summary === input.summary);
   if (existing) return existing;
   const d: SavedDiagnosis = {
-    id: `dx_${crypto.randomUUID()}`,
+    id: `dx_${safeRandomUUID()}`,
     createdAt: new Date().toISOString(),
     track: input.track,
     summary: input.summary,
