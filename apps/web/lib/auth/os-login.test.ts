@@ -5,16 +5,17 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe('osLoginHref (OS 로그인 redirect + next 복귀)', () => {
   it('NEXT_PUBLIC_OS_URL 설정 시 {OS}/login?next=<returnUrl>', () => {
-    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'http://os.pullim.local:3001');
+    // base = apex(로그인 페이지 호스트). os.* 는 OS 셸이라 /login 404 — .env.local.example 참고.
+    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'http://pullim.local:3001');
     expect(osLoginHref('http://os.pullim.local:3007/result/abc')).toBe(
-      'http://os.pullim.local:3001/login?next=http%3A%2F%2Fos.pullim.local%3A3007%2Fresult%2Fabc'
+      'http://pullim.local:3001/login?next=http%3A%2F%2Fos.pullim.local%3A3007%2Fresult%2Fabc'
     );
   });
 
   it('trailing slash 있는 base도 정상(/login 합성)', () => {
-    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'https://os.pullim.ai/');
+    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'https://pullim.ai/');
     expect(osLoginHref('https://admissions.pullim.ai/submit')).toBe(
-      'https://os.pullim.ai/login?next=https%3A%2F%2Fadmissions.pullim.ai%2Fsubmit'
+      'https://pullim.ai/login?next=https%3A%2F%2Fadmissions.pullim.ai%2Fsubmit'
     );
   });
 
