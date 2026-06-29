@@ -14,15 +14,22 @@ import { parkJunho } from '@/lib/mock/park-junho';
 // (요약은 비-PII 진행/역량 수준이며 면접·진단 본문은 '학생 화면 전용'으로 분리 유지.)
 
 export default function ParentReportPage() {
-  const { user } = useAuth();
+  const { user, status } = useAuth();
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [vm, setVm] = useState<ResultViewModel | null>(null);
 
+  // ⚠️ 인증된 사용자일 때만 실제 자녀 데이터를 읽는다 — 로그아웃/공유 탭에서 이전 사용자의
+  //    진행 요약이 노출되는 것을 막는다(codex #51 리뷰). 미인증이면 예시(데모) 미리보기만.
   useEffect(() => {
+    if (status !== 'authed') {
+      setProfile(null);
+      setVm(null);
+      return;
+    }
     setProfile(loadSubmittedProfile());
     const r = loadAnalyzeResult();
-    if (r) setVm(toResultViewModel(r));
-  }, []);
+    setVm(r ? toResultViewModel(r) : null);
+  }, [status]);
 
   const hasReal = !!profile && !!vm;
   const competencies = vm

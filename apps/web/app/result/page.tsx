@@ -14,6 +14,7 @@ import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewM
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import { saveDiagnosis } from '@/lib/result-store';
+import { useAuth } from '@/components/auth/auth-provider';
 
 // 결과 이력 요약 — ResultActions(수동 저장)와 자동 저장이 동일 값을 써 중복 제거가 맞물린다.
 const RESULT_SUMMARY = '면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안';
@@ -47,6 +48,7 @@ const tabs: { id: Tab; label: string }[] = [
 ];
 
 export default function ResultPage() {
+  const { status } = useAuth();
   const [tab, setTab] = useState<Tab>('interview');
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
@@ -64,11 +66,13 @@ export default function ResultPage() {
   // #4: 실(개인화) 결과는 자동으로 마이페이지 진단 이력에 저장 — '내 결과 저장'을 누르지 않아도
   // 결과 유실 방지. saveDiagnosis는 track+summary로 중복 제거하므로 수동 저장과 충돌하지 않는다.
   // 데모/mock 결과(resultIsDemo)는 저장하지 않는다.
+  // ⚠️ status==='authed' 확인 후에만 저장 — auth-provider가 setUserScope(user.id)를 끝내기 전에
+  //    저장하면 익명/legacy 스코프에 기록돼 마이페이지에서 사라진다(codex #51 리뷰).
   useEffect(() => {
-    if (viewModel && !resultIsDemo && profile) {
+    if (status === 'authed' && viewModel && !resultIsDemo && profile) {
       saveDiagnosis({ track: formatStandingLabel(profile), summary: RESULT_SUMMARY });
     }
-  }, [viewModel, resultIsDemo, profile]);
+  }, [status, viewModel, resultIsDemo, profile]);
 
   // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.
   // 후자는 viewModel이 있어도 본문이 예시이므로 반드시 고지해야 함(§6 정직).
