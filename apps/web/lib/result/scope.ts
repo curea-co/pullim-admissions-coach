@@ -1,5 +1,7 @@
 'use client';
 
+import { safeRandomUUID } from '@/lib/uuid';
+
 // 저장 격리 스코프(사용자별) — 교차사용자 노출 차단.
 // 지금은 mock 세션(localStorage 'puds-auth-session')을 읽는다.
 // B(실 인증) 연동 시: auth-provider가 로그인/로그아웃에서 setUserScope(user.id | null)를
@@ -27,7 +29,7 @@ function anonScope(): string {
   try {
     let id = sessionStorage.getItem(ANON_KEY);
     if (!id) {
-      id = `anon_${crypto.randomUUID()}`;
+      id = `anon_${safeRandomUUID()}`;
       sessionStorage.setItem(ANON_KEY, id);
     }
     return id;

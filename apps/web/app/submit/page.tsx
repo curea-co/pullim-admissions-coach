@@ -174,14 +174,16 @@ export default function SubmitPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function buildPayload() {
+  function buildPayload(maskingOverride?: boolean) {
     // Phase A+B: PDF든 텍스트든 최종 제출은 항상 text_paste.
     // PDF 탭은 *입력 방법*이고, 추출된 텍스트가 recordText에 들어가 있다.
     // Phase D에서 백엔드 S3 업로드 도착 시 pdf_upload 변환 경로 추가.
     const recordPart = {
       inputType: 'text_paste' as const,
       text: recordText,
-      maskingApplied,
+      // PII 게이트 통과 시점엔 마스킹이 적용된 상태 — setMaskingApplied(true) 직후 같은 렌더에서
+      // 호출 시 setState 비동기로 stale false가 잡히는 것을 막기 위해 명시 override 허용.
+      maskingApplied: maskingOverride ?? maskingApplied,
       maskedFields,
     };
 
@@ -224,7 +226,7 @@ export default function SubmitPage() {
     }
     setMaskingApplied(true);
 
-    const result = validate(studentProfileSchema, buildPayload());
+    const result = validate(studentProfileSchema, buildPayload(true));
     if (!result.ok) {
       setErrors(result.errors);
       const first = Object.keys(result.errors)[0];
@@ -253,7 +255,7 @@ export default function SubmitPage() {
     // processing 페이지가 /api/analyze에 POST할 payload를 sessionStorage에 임시 저장.
     // 저장이 실패하면(프라이빗 모드 등) 다음 단계로 넘어가지 않는다 — 이전 제출 payload가
     // 남아 다른 학생 데이터가 분석되는 것을 막기 위한 fail-closed.
-    if (!saveSubmittedPayload(buildPayload())) {
+    if (!saveSubmittedPayload(buildPayload(true))) {
       setSubmitError('제출 데이터를 저장하지 못했어요. 브라우저 저장소 설정(프라이빗 모드 등)을 확인하고 다시 시도해주세요.');
       return;
     }
