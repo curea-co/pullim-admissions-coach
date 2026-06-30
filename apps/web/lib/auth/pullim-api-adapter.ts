@@ -50,8 +50,9 @@ function mapMe(me: MeResponse): User {
     // 구버전 api(필드 부재) 대비 fail-closed: 미상 시 보수적 true(미성년 보호 우선).
     isMinor: me.isMinor ?? true,
     // 입시 학부모 동의(만19)는 **admissions 도메인** 소관 — auth /me 의 만14 KCB guardian_consents 와 별개라
-    // 여기서 권위값을 줄 수 없다. 입시 동의 흐름(admissions consents)이 정본 — 그 전까지 'none'(미기록).
-    guardianConsent: 'none',
+    // 여기서 권위값을 줄 수 없다. 'none'(미기록)으로 단정하면 동의 완료 미성년이 '대기'로 오표시되므로
+    // 'unknown'(미확정)으로 둔다 — UI 는 중립 표시. admissions consents API 연결 시 실값으로 교체.
+    guardianConsent: 'unknown',
     package: me.package,
     tier: me.tier,
   };

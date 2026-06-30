@@ -1,5 +1,7 @@
 export type AgeBand = 'under14' | 'over14' | 'unknown';
-export type GuardianConsent = 'none' | 'pending' | 'approved';
+// 'unknown' = 권위 소스 미연결(예: auth /me 는 입시 만19 보호자 동의를 모름 — admissions 도메인).
+// UI 는 'unknown' 을 '대기'(amber)로 오표시하지 말고 중립(확인 필요)으로 다뤄야 한다.
+export type GuardianConsent = 'none' | 'pending' | 'approved' | 'unknown';
 
 export type User = {
   id: string;
