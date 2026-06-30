@@ -132,12 +132,16 @@ function MyPageContent() {
                   'rounded-md px-2.5 py-1 text-xs font-medium',
                   user.guardianConsent === 'approved'
                     ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-amber-50 text-amber-700'
+                    : user.guardianConsent === 'unknown'
+                      ? 'bg-ink-50 text-ink-600'
+                      : 'bg-amber-50 text-amber-700'
                 )}
               >
                 {user.guardianConsent === 'approved'
                   ? '✓ 보호자 동의 완료'
-                  : '보호자 동의 대기'}
+                  : user.guardianConsent === 'unknown'
+                    ? '보호자 동의 상태 확인 필요'
+                    : '보호자 동의 대기'}
               </span>
             )}
           </div>

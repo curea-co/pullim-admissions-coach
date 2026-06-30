@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/auth-provider';
-import { osLoginHref } from '@/lib/auth/os-login';
+import { osLoginHref, osSignupHref } from '@/lib/auth/os-login';
 import { cn } from '@/lib/utils';
 
 const LOGIN_CTA_CLASS =
@@ -66,12 +66,22 @@ export function UserMenu({ className }: { className?: string }) {
           로그인
         </Link>
       )}
-      <Link
-        href="/signup"
-        className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        가입
-      </Link>
+      {process.env.NEXT_PUBLIC_OS_URL ? (
+        <button
+          type="button"
+          onClick={() => window.location.assign(osSignupHref(window.location.href) ?? '/signup')}
+          className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          가입
+        </button>
+      ) : (
+        <Link
+          href="/signup"
+          className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          가입
+        </Link>
+      )}
     </div>
   );
 }

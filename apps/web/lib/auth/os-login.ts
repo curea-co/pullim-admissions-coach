@@ -16,14 +16,27 @@
  * @returns SSO 로그인 URL, 또는 NEXT_PUBLIC_OS_URL 미설정 시 null
  */
 export function osLoginHref(returnUrl: string): string | null {
+  return osAuthHref('/login', returnUrl);
+}
+
+/**
+ * OS 가입 URL(`{NEXT_PUBLIC_OS_URL}/signup?next=<returnUrl>`)을 만든다.
+ * 가입도 OS(pullim-web)가 정본 — 입시코치 내부 mock /signup 대신 SSO 가입으로 보낸다.
+ * @returns SSO 가입 URL, 또는 NEXT_PUBLIC_OS_URL 미설정 시 null(호출부가 내부 /signup mock 폴백).
+ */
+export function osSignupHref(returnUrl: string): string | null {
+  return osAuthHref('/signup', returnUrl);
+}
+
+function osAuthHref(path: string, returnUrl: string): string | null {
   const base = process.env.NEXT_PUBLIC_OS_URL;
   if (!base) return null;
   try {
-    const url = new URL('/login', base);
+    const url = new URL(path, base);
     url.searchParams.set('next', returnUrl);
     return url.toString();
   } catch {
-    // base 형식 오류(스킴 누락 'os.pullim.ai' 등) → null → 호출부가 내부 /login(mock)으로 폴백.
+    // base 형식 오류(스킴 누락 'os.pullim.ai' 등) → null → 호출부가 내부 mock으로 폴백.
     return null;
   }
 }
