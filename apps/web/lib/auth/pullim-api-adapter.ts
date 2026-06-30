@@ -33,6 +33,7 @@ interface MeResponse {
   email: string;
   displayName: string;
   ageBand: AgeBand; // under14|over14|unknown (만14 경계 — birth_date 복호 만나이)
+  isMinor: boolean; // 만19 미만 — /me 권위값(birth_date 파생, fail-closed true). ageBand(만14)와 별개.
   package: string; // entitlements.package
   tier: string; // entitlements.tier
   role: string; // student|parent|teacher|institution
@@ -45,10 +46,11 @@ function mapMe(me: MeResponse): User {
     email: me.email,
     displayName: me.displayName,
     ageBand: me.ageBand,
-    // ⚠️ 갭: /me 는 만14 ageBand 만 반환하고 만19 isMinor 는 미보유. under14 를 보수적 근사로 사용한다.
-    //   정확한 consent 게이트(만19)는 pullim-api /me 가 birth_date 파생 isMinor 를 반환해야 한다(설계 §5).
-    isMinor: me.ageBand === 'under14',
-    // guardian 동의 상태는 /me 미반환 — 후속(/me/children 또는 동의 조회)으로 채운다.
+    // 만19 isMinor 는 /me 권위값을 그대로 쓴다(이전 ageBand 근사 폐기 — 만14-18 미성년 오분류 회귀 해소).
+    // 구버전 api(필드 부재) 대비 fail-closed: 미상 시 보수적 true(미성년 보호 우선).
+    isMinor: me.isMinor ?? true,
+    // 입시 학부모 동의(만19)는 **admissions 도메인** 소관 — auth /me 의 만14 KCB guardian_consents 와 별개라
+    // 여기서 권위값을 줄 수 없다. 입시 동의 흐름(admissions consents)이 정본 — 그 전까지 'none'(미기록).
     guardianConsent: 'none',
     package: me.package,
     tier: me.tier,
