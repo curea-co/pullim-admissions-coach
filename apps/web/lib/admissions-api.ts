@@ -109,6 +109,25 @@ export async function submitAndDiagnose(payload: StudentProfile): Promise<string
     guardianConsentObtained: payload.consent.guardianConsentObtained,
   });
 
+  // 재시도 경로 중복 enqueue 방지 — 이전 시도가 diagnose 직후 끊겼다면 이 submission 의
+  // 비실패 진단이 이미 있다: 새로 enqueue 하지 않고 그 진단을 이어서 폴링한다.
+  // (요청 단위 멱등키는 백엔드 후속 — 클라는 이력 조회로 보수 처리.)
+  try {
+    const existing = (await listDiagnoses()).find(
+      (r) => r.submissionId === submissionId && r.status !== 'failed'
+    );
+    if (existing) {
+      try {
+        window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+      } catch {
+        // 무해.
+      }
+      return existing.id;
+    }
+  } catch {
+    // 이력 조회 실패 — enqueue 시도로 진행(멱등 jobId 는 진단 id 기준).
+  }
+
   const diagnosis = await api.post<DiagnosisDto>(
     `/admissions/submissions/${submissionId}/diagnose`
   );
@@ -166,7 +185,11 @@ export function saveLastResultId(id: string): boolean {
  */
 export async function fetchLatestDiagnosis(): Promise<DiagnosisDto | null> {
   const rows = await listDiagnoses();
-  return rows[0] ?? null;
+  // 서버 기본 정렬에 의존하지 않고 클라에서 createdAt DESC 를 한 번 더 보장한다.
+  const sorted = [...rows].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  return sorted[0] ?? null;
 }
 
 export function loadLastResultId(): string | null {

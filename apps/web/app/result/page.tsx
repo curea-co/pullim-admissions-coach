@@ -59,23 +59,23 @@ export default function ResultPage() {
     // 데모로 가리지 않고 명시 분기(§6 정직 — 진행 안내/오류 노출). 레거시 세션 결과는 하위호환 폴백.
     let cancelled = false;
     async function loadFromServer() {
+      // 최신 진단을 정본으로(멀티탭·새 제출로 로컬 포인터가 낡았을 수 있음) — 이력 조회가
+      // 실패할 때만 로컬 id 단건 조회로 폴백한다.
       let dto: DiagnosisDto | null = null;
-      const id = loadLastResultId();
-      if (id) {
-        try {
-          dto = await getDiagnosis(id);
-        } catch {
-          // 조회 실패(만료·파기) — 서버 이력 복구 시도.
-        }
-      }
       let fetchFailed = false;
-      if (!dto) {
-        try {
-          dto = await fetchLatestDiagnosis();
-          if (dto) saveLastResultId(dto.id);
-        } catch {
-          // 이력 조회 자체가 실패(일시 500·네트워크·인증 갱신) — 데모로 가리지 않고 명시 표시.
-          fetchFailed = true;
+      try {
+        dto = await fetchLatestDiagnosis();
+        if (dto) saveLastResultId(dto.id);
+      } catch {
+        fetchFailed = true;
+        const id = loadLastResultId();
+        if (id) {
+          try {
+            dto = await getDiagnosis(id);
+            fetchFailed = false;
+          } catch {
+            // 단건 폴백도 실패 — 아래 unavailable.
+          }
         }
       }
       if (cancelled) return;
