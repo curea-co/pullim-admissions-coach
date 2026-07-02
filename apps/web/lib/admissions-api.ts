@@ -58,9 +58,14 @@ export interface ParentSummaryDto {
  */
 const PENDING_SUBMISSION_KEY = 'pullim.admissions.pendingSubmissionId';
 
-/** payload 지문(djb2) — 재시도 복원이 *같은 입력*일 때만 이전 submission 을 재사용하게 한다. */
+/**
+ * payload 지문(djb2) — 재시도 복원이 *같은 제출 입력*일 때만 이전 submission 을 재사용하게 한다.
+ * consent(consentTimestamp 등 변동 필드)는 제외 — 동의 재통과·재시도 시각이 달라도 본문이 같으면
+ * 동일 제출로 본다(중복 영속 방지 보장 유지).
+ */
 function fingerprint(payload: StudentProfile): string {
-  const str = JSON.stringify(payload);
+  const { consent: _consent, ...submissionPart } = payload;
+  const str = JSON.stringify(submissionPart);
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
   return String(h >>> 0);
@@ -173,8 +178,13 @@ export function saveLastResultId(id: string): boolean {
     window.sessionStorage.setItem(LAST_RESULT_ID_KEY, id);
     return true;
   } catch {
-    // 저장 실패(프라이빗 모드) — 서버가 정본이므로 진행은 막지 않는다.
-    // /result·/processing 이 fetchLatestDiagnosis(서버 이력)로 복구한다.
+    // 저장 실패(프라이빗 모드) — 이전 세션의 낡은 포인터가 현재 제출로 오인되지 않게 제거를 시도한다.
+    // 서버가 정본이므로 진행은 막지 않고, /result·/processing 이 fetchLatestDiagnosis 로 복구한다.
+    try {
+      window.sessionStorage.removeItem(LAST_RESULT_ID_KEY);
+    } catch {
+      // 제거도 불가한 환경 — 복구 경로가 최신 이력 우선이라 안전.
+    }
     return false;
   }
 }

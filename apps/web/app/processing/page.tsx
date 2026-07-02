@@ -72,8 +72,10 @@ export default function ProcessingPage() {
       if (!payload) {
         // payload 없음 — 진행 중이던 진단이 있으면 폴링 재개(새로고침 복원).
         // 로컬 id 유실(프라이빗 모드)이어도 서버 이력에서 최신 진단으로 복구한다.
-        let pendingId = loadLastResultId();
-        if (!pendingId) {
+        // 최신 이력을 우선 신뢰(낡은 로컬 포인터가 과거 진단을 현재 제출로 오인하는 것 차단) —
+        // 이력 조회 실패 시에만 로컬 id 폴백.
+        let pendingId: string | null = null;
+        {
           try {
             const latest = await fetchLatestDiagnosis();
             if (latest) {
@@ -92,13 +94,16 @@ export default function ProcessingPage() {
               pendingId = latest.id;
             }
           } catch {
-            // 이력 조회 자체가 실패(일시 장애·인증 갱신) — 제출이 이미 접수됐을 수 있으므로
-            // 재제출을 유도하지 않고 재시도 안내로 처리(중복 submission 방지).
-            setErrorMsg(
-              '분석 상태를 확인하지 못했어요(일시적인 오류). 잠시 후 새로고침해주세요 — 이미 접수된 제출은 다시 제출할 필요가 없습니다.'
-            );
-            setPhase('error');
-            return;
+            // 이력 조회 실패(일시 장애·인증 갱신) — 로컬 id 폴백. 그것도 없으면 재제출 대신
+            // 재시도 안내(제출이 이미 접수됐을 수 있음 — 중복 submission 방지).
+            pendingId = loadLastResultId();
+            if (!pendingId) {
+              setErrorMsg(
+                '분석 상태를 확인하지 못했어요(일시적인 오류). 잠시 후 새로고침해주세요 — 이미 접수된 제출은 다시 제출할 필요가 없습니다.'
+              );
+              setPhase('error');
+              return;
+            }
           }
         }
         if (pendingId) {
