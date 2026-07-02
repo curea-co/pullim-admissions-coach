@@ -35,7 +35,8 @@ pullim-api admissions 서비스 (10번째 경계, ADR-058 · 설계 4뷰 = docs/
    (pullim-web 레포 `pnpm-workspace.yaml` packages 누락 — 수정 권장)
 4. **FE**: `cd apps/web && pnpm dev` (3007). `apps/web/.env.local` 에 `NEXT_PUBLIC_OS_URL`·`NEXT_PUBLIC_AUTH_BACKEND=pullim`·`NEXT_PUBLIC_PULLIM_API` 필요.
 5. **hosts**: `pullim.local`·`os.pullim.local`·`api.pullim.local` → 127.0.0.1 (쿠키 Domain=.pullim.local 공유)
-6. **테스트 계정**: `realtest@pullim.local` / `Test1234!` (`POST /auth/dev/seed-member` 로 재시드 가능)
+6. **테스트 계정**: 자격은 커밋하지 않는다 — local 전용 dev seed 엔드포인트로 본인 계정을 직접 생성해 사용
+   (`POST /auth/dev/seed-member` — email·password 본인 임의값. 기존 공용 테스트 자격이 필요하면 별도 채널로 전달)
 
 ## 3. 점검 결과 (2026-07-02 라이브 전수)
 
@@ -56,7 +57,7 @@ pullim-api admissions 서비스 (10번째 경계, ADR-058 · 설계 4뷰 = docs/
 ### 미검증 1건 (형식적 확인 권장)
 
 - **브라우저 로그인 후 화면 흐름**(제출→동의→processing→결과 UI) — API 레벨은 전부 검증됐고,
-  자동화 도구로 비밀번호 입력을 하지 않아 브라우저 1회 수동 패스만 남음. 위 테스트 계정 사용.
+  자동화 도구로 비밀번호 입력을 하지 않아 브라우저 1회 수동 패스만 남음(§2-6 시드 계정 사용).
 
 ## 4. 로그인 연동 관련 인계 사항
 
