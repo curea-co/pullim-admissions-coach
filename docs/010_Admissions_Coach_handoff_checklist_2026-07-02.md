@@ -74,6 +74,7 @@ pullim-api admissions 서비스 (10번째 경계, ADR-058 · 설계 4뷰 = docs/
 
 | 항목 | 상태 | 근거/추적 |
 |---|---|---|
+| FE analyze 실패경로 테스트(레이트리밋·413·fail-loud) | 라우트 삭제로 함께 은퇴 — 해당 책임은 백엔드로 이전(입력 상한=DTO MaxLength·인가=Guard·부하=BullMQ) | pullim-api #256 |
 | 종단 트윈(priorSaengbu 2학기 비교) | 백엔드 미지원(단일 학기만) | 후속 카드 |
 | 보호자↔자녀 연결(진짜 학부모 계정 열람) | 미구현 — 현재 본인 요약만 | ADR-058 ⑤ |
 | NER 비식별화·record_text 저장 암호화 | 잠정 통제 집합으로 운영(법무 게이트) | ADR-058 ② |
