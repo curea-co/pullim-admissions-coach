@@ -49,7 +49,7 @@ export default function ResultPage() {
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
   const [resultIsDemo, setResultIsDemo] = useState(false);
   // 서버 진단이 아직 완료 전/실패인 상태 — 데모로 가리지 않고 명시 분기(§6 정직).
-  const [serverState, setServerState] = useState<'in_progress' | 'failed' | null>(null);
+  const [serverState, setServerState] = useState<'in_progress' | 'failed' | 'unavailable' | null>(null);
 
   useEffect(() => {
     setProfile(loadSubmittedProfile());
@@ -68,15 +68,21 @@ export default function ResultPage() {
           // 조회 실패(만료·파기) — 서버 이력 복구 시도.
         }
       }
+      let fetchFailed = false;
       if (!dto) {
         try {
           dto = await fetchLatestDiagnosis();
           if (dto) saveLastResultId(dto.id);
         } catch {
-          // 이력 조회 실패(비로그인·네트워크) — 아래 레거시/데모 폴백.
+          // 이력 조회 자체가 실패(일시 500·네트워크·인증 갱신) — 데모로 가리지 않고 명시 표시.
+          fetchFailed = true;
         }
       }
       if (cancelled) return;
+      if (!dto && fetchFailed) {
+        setServerState('unavailable');
+        return;
+      }
 
       if (dto) {
         if (dto.status === 'done') {
@@ -159,6 +165,14 @@ export default function ResultPage() {
             >
               진행 상태 보기
             </Link>
+          </div>
+        )}
+        {serverState === 'unavailable' && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+            <p className="text-sm font-semibold text-amber-800">결과를 불러오지 못했어요</p>
+            <p className="mt-1 text-sm text-ink-700">
+              일시적인 오류로 진단 결과를 확인할 수 없습니다. 잠시 후 새로고침해주세요 — 결과는 사라지지 않습니다.
+            </p>
           </div>
         )}
         {serverState === 'failed' && (

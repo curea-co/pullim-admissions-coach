@@ -58,13 +58,26 @@ export interface ParentSummaryDto {
  */
 const PENDING_SUBMISSION_KEY = 'pullim.admissions.pendingSubmissionId';
 
+/** payload 지문(djb2) — 재시도 복원이 *같은 입력*일 때만 이전 submission 을 재사용하게 한다. */
+function fingerprint(payload: StudentProfile): string {
+  const str = JSON.stringify(payload);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+
 export async function submitAndDiagnose(payload: StudentProfile): Promise<string> {
   const record = payload.record;
+  const fp = fingerprint(payload);
   // 부분 실패 재시도 복원 — 이전 시도에서 제출은 성공했는데 동의/진단 단계가 끊겼다면
-  // 같은 submission 을 재사용한다(민감 본문의 중복 영속 방지). 동의는 append-only 라 재적재 무해.
+  // *같은 payload 일 때만* 그 submission 을 재사용한다(민감 본문 중복 영속 방지 + 수정 재제출은 새로).
   let submissionId: string | null = null;
   try {
-    submissionId = window.sessionStorage.getItem(PENDING_SUBMISSION_KEY);
+    const saved = window.sessionStorage.getItem(PENDING_SUBMISSION_KEY);
+    if (saved) {
+      const [savedFp, savedId] = saved.split(':');
+      if (savedFp === fp && savedId) submissionId = savedId;
+    }
   } catch {
     // 저장소 미가용 — 새 제출로 진행.
   }
@@ -84,7 +97,7 @@ export async function submitAndDiagnose(payload: StudentProfile): Promise<string
     });
     submissionId = submission.id;
     try {
-      window.sessionStorage.setItem(PENDING_SUBMISSION_KEY, submissionId);
+      window.sessionStorage.setItem(PENDING_SUBMISSION_KEY, `${fp}:${submissionId}`);
     } catch {
       // 재시도 복원만 포기 — 흐름은 계속.
     }

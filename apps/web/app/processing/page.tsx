@@ -92,7 +92,13 @@ export default function ProcessingPage() {
               pendingId = latest.id;
             }
           } catch {
-            // 이력 조회 실패 — 아래 안내로.
+            // 이력 조회 자체가 실패(일시 장애·인증 갱신) — 제출이 이미 접수됐을 수 있으므로
+            // 재제출을 유도하지 않고 재시도 안내로 처리(중복 submission 방지).
+            setErrorMsg(
+              '분석 상태를 확인하지 못했어요(일시적인 오류). 잠시 후 새로고침해주세요 — 이미 접수된 제출은 다시 제출할 필요가 없습니다.'
+            );
+            setPhase('error');
+            return;
           }
         }
         if (pendingId) {
