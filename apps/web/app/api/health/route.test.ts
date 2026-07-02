@@ -44,6 +44,8 @@ describe('GET /api/health', () => {
   });
 
   it.each([
+    ['NEXT_PUBLIC_PULLIM_API', 'api.pullim.ai'], // 스킴 누락 — 형식 오류도 ready:false
+    ['NEXT_PUBLIC_OS_URL', 'os.pullim.ai'],
     ['NEXT_PUBLIC_AUTH_BACKEND', ''],
     ['NEXT_PUBLIC_PULLIM_API', ''],
     ['NEXT_PUBLIC_OS_URL', ''],
