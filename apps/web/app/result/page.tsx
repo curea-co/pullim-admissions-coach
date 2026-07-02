@@ -87,6 +87,9 @@ export default function ResultPage() {
             setServerState(null);
             return;
           }
+          // done 인데 본문 손상(부분 영속) — 오래된 레거시/데모로 가리지 않고 실패로 노출(재제출 유도).
+          setServerState('failed');
+          return;
         } else if (dto.status === 'pending' || dto.status === 'processing') {
           setServerState('in_progress');
           return;

@@ -24,12 +24,14 @@ function RealSummaryCard() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // 계정 전환·재조회 시작 시 이전 사용자의 요약을 즉시 비운다(stale 재노출 = 프라이버시 이슈).
+    setSummary(null);
     if (status !== 'authed' || !user) {
-      setSummary(null);
       setLoaded(status !== 'loading');
       return;
     }
     let cancelled = false;
+    setLoaded(false);
     getParentSummary(user.id)
       .then((s) => {
         if (!cancelled) setSummary(s);
@@ -78,6 +80,9 @@ export default function ParentReportPage() {
           </h1>
           <p className="mt-2 text-ink-700">
             {r.weekOf} 주간 · {parkJunho.identity.displayLabel}
+            <span className="ml-2 inline-flex rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+              예시 화면(데모)
+            </span>
           </p>
         </div>
 
@@ -85,7 +90,11 @@ export default function ParentReportPage() {
 
         <RealSummaryCard />
 
-        <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <p className="mt-8 text-sm font-semibold text-ink-500">
+          아래는 리포트가 어떻게 생겼는지 보여주는 예시입니다(가상 학생 — 실제 자녀 데이터가 아닙니다).
+        </p>
+
+        <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Card title="이번 주 진행 상태" emphasis>
             <p className="text-base font-semibold text-brand-700">{r.progress}</p>
           </Card>

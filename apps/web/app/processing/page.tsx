@@ -76,7 +76,19 @@ export default function ProcessingPage() {
         if (!pendingId) {
           try {
             const latest = await fetchLatestDiagnosis();
-            if (latest && (latest.status === 'pending' || latest.status === 'processing')) {
+            if (latest) {
+              if (latest.status === 'done') {
+                // 이미 완료 — 포인터 재저장 후 결과로.
+                saveLastResultId(latest.id);
+                setPhase('done');
+                router.push('/result');
+                return;
+              }
+              if (latest.status === 'failed') {
+                setErrorMsg('분석에 실패했어요. 처음부터 다시 제출해주세요.');
+                setPhase('error');
+                return;
+              }
               pendingId = latest.id;
             }
           } catch {
