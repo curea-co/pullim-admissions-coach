@@ -11,6 +11,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
+import { getDiagnosis, toAnalyzeResult, loadLastResultId } from '@/lib/admissions-api';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
@@ -50,11 +51,36 @@ export default function ResultPage() {
 
   useEffect(() => {
     setProfile(loadSubmittedProfile());
-    const result = loadAnalyzeResult();
-    if (result) {
-      setViewModel(toResultViewModel(result));
-      setResultIsDemo(loadAnalyzeDemo());
+
+    // 정본 = admissions 백엔드(diagnosis_results) — 마지막 진단 id 로 서버 재조회(ADR-058).
+    // 세션 레거시 결과(loadAnalyzeResult)는 하위호환 폴백, 둘 다 없으면 데모 고지.
+    let cancelled = false;
+    async function loadFromServer() {
+      const id = loadLastResultId();
+      if (id) {
+        try {
+          const dto = await getDiagnosis(id);
+          const result = toAnalyzeResult(dto);
+          if (!cancelled && result) {
+            setViewModel(toResultViewModel(result));
+            setResultIsDemo(false);
+            return;
+          }
+        } catch {
+          // 조회 실패(만료·파기·네트워크) — 아래 레거시/데모 폴백.
+        }
+      }
+      if (cancelled) return;
+      const legacy = loadAnalyzeResult();
+      if (legacy) {
+        setViewModel(toResultViewModel(legacy));
+        setResultIsDemo(loadAnalyzeDemo());
+      }
     }
+    loadFromServer();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.

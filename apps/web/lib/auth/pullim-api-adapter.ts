@@ -111,8 +111,17 @@ export const pullimApiAuthAdapter: AuthAdapter = {
   },
 
   async listDiagnoses(): Promise<DiagnosisSummary[]> {
-    // TODO(B/C): 진단 이력은 결과 영속(C, 하위프로젝트 3) 백엔드가 선행.
-    // 그 전까지는 빈 배열(마이페이지는 "곧" placeholder).
-    return [];
+    // admissions 백엔드(ADR-058) — 본인 진단 이력. done 만 노출(진행/실패는 processing 화면 소관).
+    const rows = await api.get<
+      { id: string; status: string; createdAt: string }[]
+    >('/admissions/results');
+    return rows
+      .filter((r) => r.status === 'done')
+      .map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        track: '학생부 종합 진단',
+        summary: '면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안',
+      }));
   },
 };

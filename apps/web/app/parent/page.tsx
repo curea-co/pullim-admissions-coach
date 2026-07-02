@@ -1,9 +1,69 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { parkJunho } from '@/lib/mock/park-junho';
+import { useAuth } from '@/components/auth/auth-provider';
+import { getParentSummary, type ParentSummaryDto } from '@/lib/admissions-api';
 
 // 정의 §6.3 가드: 자녀 생기부 원문·결과물 전문 미노출. 진행 요약만.
-// Phase A 시각 셸. 실 발송(SES)·인증·가구 모델은 Phase E.
+// 실 요약 = admissions 학부모 투영(GET /admissions/parent/summary — 본문 비노출, ADR-058).
+// 보호자↔자녀 연결 인가 도입 전에는 본인(학생 겸 열람) 요약만 조회된다. 아래 사례는 데모 표기.
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: '분석 대기 중',
+  processing: '분석 진행 중',
+  done: '진단 완료',
+  failed: '분석 실패 — 재제출 필요',
+};
+
+function RealSummaryCard() {
+  const { user, status } = useAuth();
+  const [summary, setSummary] = useState<ParentSummaryDto | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'authed' || !user) {
+      setSummary(null);
+      setLoaded(status !== 'loading');
+      return;
+    }
+    let cancelled = false;
+    getParentSummary(user.id)
+      .then((s) => {
+        if (!cancelled) setSummary(s);
+      })
+      .catch(() => {
+        /* 미엔타이틀·네트워크 — 데모 사례만 표시 */
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, user]);
+
+  if (!loaded || !summary) return null;
+  return (
+    <section className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/50 p-5">
+      <h2 className="text-base font-semibold text-ink-900">우리 아이 실제 진행 상태</h2>
+      <p className="mt-2 text-sm text-ink-700">
+        {summary.hasResult
+          ? `${STATUS_LABEL[summary.status ?? ''] ?? summary.status}${
+              summary.lastDiagnosedAt
+                ? ` · 최근 진단 ${new Date(summary.lastDiagnosedAt).toLocaleDateString('ko-KR')}`
+                : ''
+            }`
+          : '아직 제출된 진단이 없습니다. 자녀가 생기부를 제출하면 여기에서 진행 상태를 확인할 수 있어요.'}
+      </p>
+      <p className="mt-2 text-xs text-ink-500">
+        결과 본문은 학생 화면 전용입니다 — 학부모 화면은 진행 요약만 제공합니다(§6.3).
+      </p>
+    </section>
+  );
+}
 
 export default function ParentReportPage() {
   const r = parkJunho.parentReport;
@@ -22,6 +82,8 @@ export default function ParentReportPage() {
         </div>
 
         <PrivacyNote />
+
+        <RealSummaryCard />
 
         <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Card title="이번 주 진행 상태" emphasis>
