@@ -2,7 +2,7 @@
 
 /**
  * 제출 payload를 sessionStorage에 임시 저장.
- * processing 페이지가 /api/analyze에 POST할 때 꺼내 쓴다.
+ * processing 페이지가 admissions 백엔드로 접수(submitAndDiagnose)할 때 꺼내 쓴다.
  * 민감 데이터(생기부 text)를 포함하므로 sessionStorage에만 저장하고 localStorage는 사용하지 않는다.
  */
 

@@ -1,36 +1,41 @@
 import { NextResponse } from 'next/server';
-import { rateLimitConfigError } from '@/lib/rate-limit';
 
-// 가벼운 헬스/구성 체크 — uptime 모니터·배포 후 점검용. opus 호출 없음(무료·즉시).
-// /api/analyze는 핑 1회에 opus 풀 파이프라인이라 모니터링에 부적합 → 이 엔드포인트 사용.
+// 가벼운 헬스/구성 체크 — uptime 모니터·배포 후 점검용.
+// 진단(analyze)은 admissions 백엔드(pullim-api) 소관으로 이전(ADR-058) — 그 가용성은
+// 백엔드 헬스가 답하고, FE 는 자신의 구성(인증 백엔드·API 베이스)만 신호한다.
 export const runtime = 'nodejs';
 // 항상 최신 구성을 반영하도록 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
 
+/** 존재 + URL 형식 유효(스킴 포함)까지 판정 — 실제 소비부(osLoginHref·createApiClient)와 어긋나지 않게. */
+function isValidUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false; // 스킴 누락('api.pullim.ai') 등 — 소비부가 폴백/오동작하므로 ready 로 치지 않는다.
+  }
+}
+
 export function GET() {
-  // ⚠️ 비밀/내부 구성 값은 노출하지 않는다 — "설정됐는가"(boolean)만.
-  // (rateLimitBackend의 실제 값 'memory'/'upstash' 등도 운영 구성이므로 boolean으로만 노출.)
-  // 배포 직후 구성 누락(키 이름 오타 등)을 즉시 식별하기 위한 운영 신호.
+  // ⚠️ 비밀/내부 구성 값은 노출하지 않는다 — "설정됐는가"(boolean/enum)만.
   const isProd = process.env.NODE_ENV === 'production';
   const config = {
-    aiKey: Boolean(process.env.ANTHROPIC_API_KEY),
-    rateLimitIpHeader: Boolean(process.env.RATE_LIMIT_IP_HEADER),
-    rateLimitBackend: Boolean(process.env.RATE_LIMIT_BACKEND),
-    authBackend: process.env.NEXT_PUBLIC_AUTH_BACKEND === 'pullim' ? 'pullim' : 'mock',
+    authBackend:
+      process.env.NEXT_PUBLIC_AUTH_BACKEND === 'pullim' ? 'pullim' : 'mock',
+    admissionsApiBase: isValidUrl(process.env.NEXT_PUBLIC_PULLIM_API),
+    osUrl: isValidUrl(process.env.NEXT_PUBLIC_OS_URL),
   };
-  // 프로덕션에서 /api/analyze가 구성됐는지(config-level 신호): 키·신뢰 IP 헤더 env가
-  // 존재하고, 레이트리밋 백엔드가 **리미터가 실제로 수용하는** 구성인지.
-  // 백엔드 판정은 리미터와 동일한 단일 소스(rateLimitConfigError)를 써서 어긋나지 않게 한다
-  // — KV 전환 시 그 함수만 바꾸면 health도 자동 반영. (per-request IP 헤더 비어있음 같은
-  // 런타임 조건은 요청 시점에 clientIp가 강제하므로 config 신호 범위 밖.)
-  const analyzeReady =
+  // 프로덕션 준비 신호: 실 인증 + admissions API 베이스 + OS SSO 진입점이 전부 구성됐는가.
+  const ready =
     !isProd ||
-    (config.aiKey && config.rateLimitIpHeader && rateLimitConfigError() === null);
+    (config.authBackend === 'pullim' && config.admissionsApiBase && config.osUrl);
 
   return NextResponse.json({
     ok: true,
     env: isProd ? 'production' : process.env.NODE_ENV ?? 'unknown',
-    analyzeReady,
+    ready,
     config,
   });
 }
