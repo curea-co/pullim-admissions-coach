@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
-import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
+import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
 import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, type DiagnosisDto } from '@/lib/admissions-api';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
@@ -98,11 +98,8 @@ export default function ResultPage() {
           return;
         }
       }
-      const legacy = loadAnalyzeResult();
-      if (legacy) {
-        setViewModel(toResultViewModel(legacy));
-        setResultIsDemo(loadAnalyzeDemo());
-      }
+      // 레거시 세션 결과 폴백은 은퇴 — 현재 사용자·진단과 연결되지 않은 값이라 네트워크/권한
+      // 오류 시 타인·과거 결과가 재렌더될 수 있다(서버가 유일 정본, 없으면 데모 고지).
     }
     loadFromServer();
     return () => {

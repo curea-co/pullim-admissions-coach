@@ -56,9 +56,20 @@ export interface ParentSummaryDto {
  * 미성년 판정은 서버 권위값) ③ POST diagnose(동의 게이트 통과 후 pending+enqueue).
  * @returns 진단 결과 id(폴링 키)
  */
+const PENDING_SUBMISSION_KEY = 'pullim.admissions.pendingSubmissionId';
+
 export async function submitAndDiagnose(payload: StudentProfile): Promise<string> {
   const record = payload.record;
-  const submission = await api.post<SubmissionDto>('/admissions/submissions', {
+  // 부분 실패 재시도 복원 — 이전 시도에서 제출은 성공했는데 동의/진단 단계가 끊겼다면
+  // 같은 submission 을 재사용한다(민감 본문의 중복 영속 방지). 동의는 append-only 라 재적재 무해.
+  let submissionId: string | null = null;
+  try {
+    submissionId = window.sessionStorage.getItem(PENDING_SUBMISSION_KEY);
+  } catch {
+    // 저장소 미가용 — 새 제출로 진행.
+  }
+  if (!submissionId) {
+    const submission = await api.post<SubmissionDto>('/admissions/submissions', {
     schemaVersion: payload.schemaVersion,
     recordText: record.inputType === 'text_paste' ? record.text : record.fileRef,
     inputType: record.inputType,
@@ -70,17 +81,29 @@ export async function submitAndDiagnose(payload: StudentProfile): Promise<string
     semester: payload.currentStanding.semester,
     schoolType: payload.currentStanding.schoolType,
     selfReportedWeakAreas: payload.selfReportedWeakAreas,
-  });
+    });
+    submissionId = submission.id;
+    try {
+      window.sessionStorage.setItem(PENDING_SUBMISSION_KEY, submissionId);
+    } catch {
+      // 재시도 복원만 포기 — 흐름은 계속.
+    }
+  }
 
-  await api.post(`/admissions/submissions/${submission.id}/consents`, {
+  await api.post(`/admissions/submissions/${submissionId}/consents`, {
     termsAgreed: payload.consent.termsAgreed,
     privacyAgreed: payload.consent.privacyPolicyAgreed,
     guardianConsentObtained: payload.consent.guardianConsentObtained,
   });
 
   const diagnosis = await api.post<DiagnosisDto>(
-    `/admissions/submissions/${submission.id}/diagnose`
+    `/admissions/submissions/${submissionId}/diagnose`
   );
+  try {
+    window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+  } catch {
+    // 무해 — 다음 제출 시작 시 덮어씀.
+  }
   return diagnosis.id;
 }
 
