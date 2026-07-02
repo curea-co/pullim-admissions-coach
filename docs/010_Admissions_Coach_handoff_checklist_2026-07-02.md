@@ -6,7 +6,8 @@
 ## 0. 한 줄 결론
 
 **기능 코어는 완성 상태** — 인가·동의 게이트·서버 마스킹·즉시삭제(CASCADE)·실 Claude 진단(E2E 40~90초 done)까지
-29항목 전수 통과. 핸드오프 블로커 없음. 아래 환경 절차·잔여 목록만 인지하면 됨.
+29항목 전수 통과. **단 §3 미검증 1건(브라우저 로그인 후 UI 수동 패스)과 §4 OAuth 미검증을 완료해야 릴리스 게이트 통과**
+— API 레벨 완성 기준의 핸드오프이며, 그 2건은 인계 후 첫 작업으로 남긴다.
 
 ## 1. 아키텍처 요약 (무엇이 어디에 있나)
 
@@ -15,7 +16,7 @@
   ├─ 인증: pullim-api 실 멤버 인증 소비 — 로그인/가입 버튼은 OS(pullim.local:3001)로 SSO redirect
   │        어댑터 = apps/web/lib/auth/pullim-api-adapter.ts (/me 계약 정합·isMinor 만19 포함)
   └─ 진단: apps/web/lib/admissions-api.ts — 제출→동의→진단 enqueue→done 폴링→결과 서버 재조회
-           (세션엔 비민감 진단 id 포인터만. FE /api/analyze 는 은퇴 — 파일만 잔존)
+           (세션엔 비민감 진단 id 포인터만. FE /api/analyze 는 물리 제거됨 — 이 PR)
 
 pullim-api admissions 서비스 (10번째 경계, ADR-058 · 설계 4뷰 = docs/design/services/admissions/)
   ├─ POST/GET/DELETE /admissions/submissions[/:id]      (uuid ID·저장 전 서버 마스킹·보존 30일 파기 cron)
@@ -66,14 +67,13 @@ pullim-api admissions 서비스 (10번째 경계, ADR-058 · 설계 4뷰 = docs/
 - 가입도 OS `/signup` SSO redirect(로그인과 대칭 — `osSignupHref`, 단위테스트 8케이스).
 - `guardianConsent: 'unknown'` — 마이페이지 "보호자 동의 상태 확인 필요" 중립 표시.
   실값 연결은 admissions consents 조회(권위 소스) 후속.
-- prod 배포 시: 호스트 = `exam.pullim.ai`(plan.md 표면 SoT), 시크릿 `pullim/dev|prod/backend` 에
+- prod 배포 시: 호스트 = `exam.pullim.ai`(SoT: pullim-api 레포 `docs/design/_platform/plan.md` 표면 표 — 이 레포엔 없음), 시크릿 `pullim/dev|prod/backend` 에
   `ANTHROPIC_API_KEY` 등재 필요(현재 local 만).
 
 ## 5. 잔여 목록 (기능 아님 — 정리·후속 카드)
 
 | 항목 | 상태 | 근거/추적 |
 |---|---|---|
-| FE `/api/analyze`·`lib/mock/analyze-mock.ts` | **비활성 잔존**(호출처 0·키 제거) — 물리 삭제 정리 | #55 머지 코멘트 |
 | 종단 트윈(priorSaengbu 2학기 비교) | 백엔드 미지원(단일 학기만) | 후속 카드 |
 | 보호자↔자녀 연결(진짜 학부모 계정 열람) | 미구현 — 현재 본인 요약만 | ADR-058 ⑤ |
 | NER 비식별화·record_text 저장 암호화 | 잠정 통제 집합으로 운영(법무 게이트) | ADR-058 ② |

@@ -252,7 +252,7 @@ export default function SubmitPage() {
       targetTrack,
       targetUniversities: universities.filter((u) => u.name.trim().length > 0),
     });
-    // processing 페이지가 /api/analyze에 POST할 payload를 sessionStorage에 임시 저장.
+    // processing 페이지가 admissions 백엔드로 접수할 payload 를 sessionStorage 에 임시 저장.
     // 저장이 실패하면(프라이빗 모드 등) 다음 단계로 넘어가지 않는다 — 이전 제출 payload가
     // 남아 다른 학생 데이터가 분석되는 것을 막기 위한 fail-closed.
     if (!saveSubmittedPayload(buildPayload(true))) {

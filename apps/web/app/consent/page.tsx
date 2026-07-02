@@ -108,7 +108,7 @@ export default function ConsentPage() {
     }
 
     // 동의 정합성: /submit가 저장한 stub consent를 이 화면에서 받은 *실제* 동의값으로
-    // 갱신해야 서버(/api/analyze)가 올바른 동의 상태로 분석한다.
+    // 갱신해야 서버(admissions consents)가 올바른 동의 상태로 적재한다.
     // 이번 제출 payload가 없으면(직접 진입/저장 실패) 진행을 차단한다 — 이전/타 학생의
     // record에 동의값만 덮어 잘못 분석하는 것을 막는 fail-closed.
     const existing = loadSubmittedPayload();
