@@ -113,12 +113,24 @@ export function toAnalyzeResult(dto: DiagnosisDto): AnalyzeResult | null {
 // ── 마지막 진단 id(비민감 포인터만 세션 보관 — 본문은 서버 재조회) ──────────
 const LAST_RESULT_ID_KEY = 'pullim.admissions.lastResultId';
 
-export function saveLastResultId(id: string): void {
+export function saveLastResultId(id: string): boolean {
   try {
     window.sessionStorage.setItem(LAST_RESULT_ID_KEY, id);
+    return true;
   } catch {
-    // 저장 실패(프라이빗 모드) — /result 진입 시 이력 API 폴백이 커버.
+    // 저장 실패(프라이빗 모드) — 서버가 정본이므로 진행은 막지 않는다.
+    // /result·/processing 이 fetchLatestDiagnosis(서버 이력)로 복구한다.
+    return false;
   }
+}
+
+/**
+ * 서버 이력 기반 복구 — 로컬 id 포인터가 없거나(프라이빗 모드 저장 실패·세션 유실) 조회가 실패할 때
+ * 본인 진단 이력의 최신 1건을 정본에서 가져온다(목록은 created_at DESC).
+ */
+export async function fetchLatestDiagnosis(): Promise<DiagnosisDto | null> {
+  const rows = await listDiagnoses();
+  return rows[0] ?? null;
 }
 
 export function loadLastResultId(): string | null {

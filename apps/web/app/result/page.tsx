@@ -11,7 +11,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { loadAnalyzeResult, loadAnalyzeDemo, toResultViewModel, type ResultViewModel } from '@/lib/result-view';
-import { getDiagnosis, toAnalyzeResult, loadLastResultId } from '@/lib/admissions-api';
+import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, type DiagnosisDto } from '@/lib/admissions-api';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
@@ -48,29 +48,53 @@ export default function ResultPage() {
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
   const [resultIsDemo, setResultIsDemo] = useState(false);
+  // 서버 진단이 아직 완료 전/실패인 상태 — 데모로 가리지 않고 명시 분기(§6 정직).
+  const [serverState, setServerState] = useState<'in_progress' | 'failed' | null>(null);
 
   useEffect(() => {
     setProfile(loadSubmittedProfile());
 
     // 정본 = admissions 백엔드(diagnosis_results) — 마지막 진단 id 로 서버 재조회(ADR-058).
-    // 세션 레거시 결과(loadAnalyzeResult)는 하위호환 폴백, 둘 다 없으면 데모 고지.
+    // 로컬 id 유실(프라이빗 모드) 시 서버 이력 최신 1건으로 복구. pending/processing·failed 는
+    // 데모로 가리지 않고 명시 분기(§6 정직 — 진행 안내/오류 노출). 레거시 세션 결과는 하위호환 폴백.
     let cancelled = false;
     async function loadFromServer() {
+      let dto: DiagnosisDto | null = null;
       const id = loadLastResultId();
       if (id) {
         try {
-          const dto = await getDiagnosis(id);
-          const result = toAnalyzeResult(dto);
-          if (!cancelled && result) {
-            setViewModel(toResultViewModel(result));
-            setResultIsDemo(false);
-            return;
-          }
+          dto = await getDiagnosis(id);
         } catch {
-          // 조회 실패(만료·파기·네트워크) — 아래 레거시/데모 폴백.
+          // 조회 실패(만료·파기) — 서버 이력 복구 시도.
+        }
+      }
+      if (!dto) {
+        try {
+          dto = await fetchLatestDiagnosis();
+          if (dto) saveLastResultId(dto.id);
+        } catch {
+          // 이력 조회 실패(비로그인·네트워크) — 아래 레거시/데모 폴백.
         }
       }
       if (cancelled) return;
+
+      if (dto) {
+        if (dto.status === 'done') {
+          const result = toAnalyzeResult(dto);
+          if (result) {
+            setViewModel(toResultViewModel(result));
+            setResultIsDemo(false);
+            setServerState(null);
+            return;
+          }
+        } else if (dto.status === 'pending' || dto.status === 'processing') {
+          setServerState('in_progress');
+          return;
+        } else if (dto.status === 'failed') {
+          setServerState('failed');
+          return;
+        }
+      }
       const legacy = loadAnalyzeResult();
       if (legacy) {
         setViewModel(toResultViewModel(legacy));
@@ -123,6 +147,36 @@ export default function ResultPage() {
           </p>
         )}
 
+        {serverState === 'in_progress' && (
+          <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+            <p className="text-sm font-semibold text-brand-800">분석이 아직 진행 중입니다</p>
+            <p className="mt-1 text-sm text-ink-700">
+              AI 진단이 완료되면 이 화면에서 결과를 볼 수 있어요(보통 1–3분).
+            </p>
+            <Link
+              href="/processing"
+              className="mt-3 inline-flex rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              진행 상태 보기
+            </Link>
+          </div>
+        )}
+        {serverState === 'failed' && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/60 p-5">
+            <p className="text-sm font-semibold text-red-800">분석에 실패했어요</p>
+            <p className="mt-1 text-sm text-ink-700">
+              일시적인 오류일 수 있어요. 생기부를 다시 제출하면 새로 분석합니다.
+            </p>
+            <Link
+              href="/submit"
+              className="mt-3 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              다시 제출하기
+            </Link>
+          </div>
+        )}
+        {serverState !== null ? null : (
+        <>
         <GuardrailLabel
           variant={
             tab === 'interview'
@@ -204,6 +258,8 @@ export default function ResultPage() {
             summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
           />
         </div>
+        </>
+        )}
 
         <div className="mt-10 flex items-center justify-between border-t border-ink-100 pt-6">
           <Link

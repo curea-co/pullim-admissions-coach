@@ -17,6 +17,7 @@ import {
   getDiagnosis,
   saveLastResultId,
   loadLastResultId,
+  fetchLatestDiagnosis,
 } from '@/lib/admissions-api';
 import type { ApiError } from '@/lib/api';
 
@@ -69,8 +70,19 @@ export default function ProcessingPage() {
     async function runAnalysis() {
       const payload = loadSubmittedPayload();
       if (!payload) {
-        // payload 없음 — 진행 중이던 진단이 있으면 폴링 재개(새로고침 복원), 없으면 안내.
-        const pendingId = loadLastResultId();
+        // payload 없음 — 진행 중이던 진단이 있으면 폴링 재개(새로고침 복원).
+        // 로컬 id 유실(프라이빗 모드)이어도 서버 이력에서 최신 진단으로 복구한다.
+        let pendingId = loadLastResultId();
+        if (!pendingId) {
+          try {
+            const latest = await fetchLatestDiagnosis();
+            if (latest && (latest.status === 'pending' || latest.status === 'processing')) {
+              pendingId = latest.id;
+            }
+          } catch {
+            // 이력 조회 실패 — 아래 안내로.
+          }
+        }
         if (pendingId) {
           try {
             setPhase('analyzing');
@@ -103,9 +115,10 @@ export default function ProcessingPage() {
         setPhase('submitting');
         // 제출 영속(서버가 저장 전 마스킹 재적용) → 동의 append → 진단 enqueue(멱등 jobId).
         const diagnosisId = await submitAndDiagnose(parsed.data);
-        // 서버 영속 완료 — 민감 본문은 즉시 세션에서 파기(비민감 포인터 id 만 보관).
-        clearSubmittedPayload();
+        // id 포인터를 먼저 저장 시도한 뒤 민감 본문을 파기한다 — 저장이 실패해도(프라이빗 모드)
+        // 서버가 정본이므로 파기는 진행하고, /result·재진입은 서버 이력(fetchLatestDiagnosis)로 복구된다.
         saveLastResultId(diagnosisId);
+        clearSubmittedPayload();
 
         if (cancelled) return;
         setPhase('analyzing');
