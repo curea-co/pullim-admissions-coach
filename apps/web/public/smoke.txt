@@ -1,0 +1,5 @@
+pullim-admissions-coach — dev 배포 스모크 테스트
+date: 2026-07-06
+branch model: feature → dev(통합/staging) → main(운영)
+purpose: dev 파이프라인 검증 — Vercel dev(dev-admissions.pullim.ai) + ECS staging
+marker: SMOKE-DEV-0706
