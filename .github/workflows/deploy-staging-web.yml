@@ -1,6 +1,7 @@
 # Pullim Admissions Coach — staging web deploy
 # Builds apps/web Docker image, pushes to ECR, updates ECS service.
-# OIDC auth (no long-lived AWS keys). Triggered on push to main + manual.
+# OIDC auth (no long-lived AWS keys). Triggered on push to dev + manual.
+# (브랜치 모델: feature→dev(통합/staging)→main(운영). staging 은 dev 브랜치가 소유.)
 #
 # Required GitHub repo settings (configured by DevOps):
 #   Secrets/Vars (Repository or Environment "staging"):
@@ -20,7 +21,7 @@ name: deploy-staging-web
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'apps/web/**'
       - 'packages/shared/**'
