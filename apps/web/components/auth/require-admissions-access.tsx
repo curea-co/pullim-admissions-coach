@@ -33,10 +33,11 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
       .then((ok) => alive && setAccess(ok ? 'ok' : 'denied'))
       .catch((err: ApiError) => {
         if (!alive) return;
-        // 세션 만료(401 + refresh 실패)는 재인증 대상 — error 로 뭉뚱그리지 않고 refresh() 로 넘긴다
-        // (status→guest 시 상위 RequireAuth 가 OS 로그인 redirect). 일시 장애만 error.
+        // 401(세션 만료)은 error 로 뭉뚱그리지 않고 세션 갱신 시도 후 **재검증**한다:
+        //  · 갱신 성공(status 'authed' 유지) → nonce++ 로 effect 재실행해 재확인('checking' 에 갇히지 않음)
+        //  · 갱신 실패 → auth-provider 가 status→guest 로 내려 상위 RequireAuth 가 OS 로그인 redirect
         if (err?.authExpired || err?.status === 401) {
-          void refresh();
+          void refresh().finally(() => alive && setNonce((n) => n + 1));
           return;
         }
         setAccess('error');
