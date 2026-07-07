@@ -25,24 +25,35 @@ interface MeEntitlementsResponse {
 }
 
 // 세션 내 캐시 — 게이트가 페이지마다(submit→consent→processing) 재마운트되며 매번 /me/entitlements
-// 를 치지 않도록 결과를 재사용한다. 사용자 전환(로그인/로그아웃)·결제 후 재검증 시 무효화(교차사용자 잔존 방지).
+// 를 치지 않도록 결과를 재사용한다. **진행 중 Promise 도 캐시**(single-flight) — 첫 응답 전 동시 호출
+// (StrictMode 이중 마운트 등)에도 요청은 1회. 사용자 전환·결제 후 재검증 시 무효화(교차사용자 잔존 방지).
 let accessCache: boolean | null = null;
+let accessInflight: Promise<boolean> | null = null;
 
 /** 엔타이틀먼트 캐시 무효화 — auth-provider(로그인/로그아웃) · 결제 후 재검증에서 호출. */
 export function clearAdmissionsAccessCache(): void {
   accessCache = null;
+  accessInflight = null;
 }
 
 /**
  * admissions 이용권 보유 여부 — **권위 신호** `GET /me/entitlements` 의 `flags.admissions`(#348).
  * ≥1 = 보유(진입 허용), 부재/0 = 미보유(free 회원 → 구매 벽). 진입 즉시 사전 판정(403 프로브 대체).
- * 세션 캐시 재사용(페이지 이동 중복호출 방지) — 갱신은 clearAdmissionsAccessCache(). 401/네트워크는 전파.
+ * 세션 캐시 + single-flight(중복 요청 방지) — 갱신은 clearAdmissionsAccessCache(). 401/네트워크는 전파.
  */
-export async function hasAdmissionsAccess(): Promise<boolean> {
-  if (accessCache !== null) return accessCache;
-  const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
-  accessCache = (ent.flags?.admissions ?? 0) >= 1;
-  return accessCache;
+export function hasAdmissionsAccess(): Promise<boolean> {
+  if (accessCache !== null) return Promise.resolve(accessCache);
+  if (accessInflight) return accessInflight;
+  accessInflight = (async () => {
+    try {
+      const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
+      accessCache = (ent.flags?.admissions ?? 0) >= 1;
+      return accessCache;
+    } finally {
+      accessInflight = null; // 성공=캐시 확정, 실패=재조회 허용
+    }
+  })();
+  return accessInflight;
 }
 
 // ── 백엔드 DTO(응답) ─────────────────────────────────────────────────────────
