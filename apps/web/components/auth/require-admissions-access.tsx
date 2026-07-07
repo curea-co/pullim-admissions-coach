@@ -16,6 +16,9 @@ type Access = 'checking' | 'ok' | 'denied' | 'error';
 export function RequireAdmissionsAccess({ children }: { children: React.ReactNode }) {
   const { status, refresh } = useAuth();
   const [access, setAccess] = useState<Access>('checking');
+  // 재검증 트리거(Codex #59) — 결제 완료 후 같은 탭 복귀(denied) 또는 일시 오류(error)에서 재확인.
+  const [nonce, setNonce] = useState(0);
+  const recheck = () => setNonce((n) => n + 1);
 
   useEffect(() => {
     if (status !== 'authed') return;
@@ -25,26 +28,34 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
       .then((ok) => alive && setAccess(ok ? 'ok' : 'denied'))
       .catch((err: ApiError) => {
         if (!alive) return;
-        // 세션 만료(401 + refresh 실패)는 로그아웃이 아니라 재인증 대상 — error UI 로 뭉뚱그리지 않는다.
-        // auth 재검증(refresh)으로 넘기면 status→guest 시 상위 RequireAuth 가 OS 로그인으로 redirect.
+        // 세션 만료(401 + refresh 실패)는 재인증 대상 — error 로 뭉뚱그리지 않고 refresh() 로 넘긴다
+        // (status→guest 시 상위 RequireAuth 가 OS 로그인 redirect). 일시 장애만 error.
         if (err?.authExpired || err?.status === 401) {
           void refresh();
-          return; // access=checking 유지 → 상위 RequireAuth 가 처리
+          return;
         }
         setAccess('error');
       });
     return () => {
       alive = false;
     };
-  }, [status, refresh]);
+  }, [status, refresh, nonce]);
 
-  // 인증은 상위 RequireAuth 소유 — 미인증이면 여기선 아무것도 렌더하지 않는다(상위가 처리).
   if (status !== 'authed') return null;
-  if (access === 'denied') return <PurchaseWall />;
+  // 결제 완료 후 같은 탭 복귀 시 "다시 확인"으로 재검증 → 구매 반영되면 통과(구매 벽에 갇히지 않음).
+  if (access === 'denied') return <PurchaseWall onRecheck={recheck} />;
+  // 일시 장애(5xx/네트워크) — 유효 유료 사용자가 갇히지 않게 재시도 버튼 제공.
   if (access === 'error') {
     return (
-      <div className="px-6 py-10 text-sm text-ink-500">
-        이용 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.
+      <div className="px-6 py-10 text-sm text-ink-600">
+        <p className="mb-3">이용 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.</p>
+        <button
+          type="button"
+          onClick={recheck}
+          className="rounded-xl border border-brand-300 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        >
+          다시 시도
+        </button>
       </div>
     );
   }

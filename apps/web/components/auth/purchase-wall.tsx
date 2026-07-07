@@ -17,7 +17,7 @@ function osPurchaseHref(): string | null {
   return OS_URL;
 }
 
-export function PurchaseWall() {
+export function PurchaseWall({ onRecheck }: { onRecheck?: () => void }) {
   const href = osPurchaseHref();
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
@@ -42,6 +42,17 @@ export function PurchaseWall() {
           <p className="mt-6 rounded-xl border border-ink-100 bg-ink-50 px-4 py-2.5 text-sm text-ink-500">
             구매 페이지 준비 중입니다.
           </p>
+        )}
+
+        {/* 결제 완료 후 같은 탭 복귀 시 재검증(Codex #59) — 구매 반영되면 통과. */}
+        {onRecheck && (
+          <button
+            type="button"
+            onClick={onRecheck}
+            className="mt-3 text-sm text-ink-500 underline decoration-ink-200 underline-offset-2 transition hover:text-ink-700"
+          >
+            구매를 완료했다면 다시 확인
+          </button>
         )}
       </div>
     </div>
