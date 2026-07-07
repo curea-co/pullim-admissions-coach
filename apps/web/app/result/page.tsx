@@ -8,9 +8,11 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
-// 주의: /result 는 랜딩의 공개 "전체 예시 결과 보기"(§6 데모, parkJunho) 대상이라 admissions
-// 구매 게이트로 감싸지 않는다 — 실 결과 데이터는 admissions API(BE EntitlementGuard)가 막고,
-// 미보유 시 예시(데모)로 폴백한다(Codex #59). 유료 게이트는 제출·동의·진단 흐름에만.
+// 주의: /result 는 RequireAuth(로그인)만 두고 **admissions 구매 게이트는 두지 않는다** —
+// 로그인 회원이 무료여도 예시 결과(§6 데모, parkJunho)를 볼 수 있어야 하기 때문(랜딩 "전체 예시").
+// 실 결과 데이터는 admissions API(BE EntitlementGuard)가 막고 미보유 시 예시로 폴백. 유료 게이트는
+// 제출·동의·진단 흐름에만. (비로그인 사용자까지 공개할지는 RequireAuth 유지=로그인 필요 — 기존
+// 동작 유지, 공개 전환은 별도 제품 결정이라 이 PR에서 바꾸지 않음, Codex #59.)
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';

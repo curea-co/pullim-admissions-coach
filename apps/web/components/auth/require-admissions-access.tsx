@@ -10,6 +10,7 @@ import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { isPullimAuth } from '@/lib/auth';
+import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
 
 type Access = 'checking' | 'ok' | 'denied' | 'error';
@@ -45,10 +46,9 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
       })
       .catch((err: ApiError) => {
         if (!alive) return;
-        // 401(세션 만료)은 세션 갱신 후 **1회** 재검증. 갱신 성공(status 유지) → nonce++ 재확인,
-        // 갱신 실패 → auth-provider 가 status→guest → 상위 RequireAuth 가 OS 로그인 redirect.
-        // 재시도 후에도 401이면(세션 만료 아님) 무한 루프 방지 위해 error 로 종료.
-        if ((err?.authExpired || err?.status === 401) && authRetryRef.current < 1) {
+        // 401(세션 만료)은 세션 갱신 후 **1회** 재검증(갱신 성공 시 nonce++ 재확인, 실패 시
+        // auth-provider 가 guest→상위 RequireAuth redirect). 재시도 소진·5xx·네트워크는 error.
+        if (decideAccessOnError(err, authRetryRef.current) === 'retry') {
           authRetryRef.current += 1;
           void refresh().finally(() => alive && setNonce((n) => n + 1));
           return;
