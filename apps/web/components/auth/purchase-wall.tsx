@@ -10,11 +10,16 @@
 
 const OS_URL = process.env.NEXT_PUBLIC_OS_URL ?? '';
 
-/** OS 결제(구매) 진입 URL. 미설정 시 null → 버튼 비활성(안내만). */
+/** OS 결제(구매) 진입 URL. 미설정/형식오류 시 null → 버튼 대신 "준비 중" 안내. */
 function osPurchaseHref(): string | null {
   if (!OS_URL) return null;
-  // TODO: exam 상품 결제 딥링크 확정 시 경로 교체(예: `${OS_URL}/store/exam` 또는 billing 경로).
-  return OS_URL;
+  try {
+    // 절대 URL 검증(스킴 누락 'os.pullim.ai' 등 방어 — os-login.ts 와 동일 패턴).
+    // TODO(P0·OS 소관): admissions 상품 결제 딥링크 확정 시 경로 교체(현재는 OS 홈으로 폴백).
+    return new URL(OS_URL).toString();
+  } catch {
+    return null;
+  }
 }
 
 export function PurchaseWall({ onRecheck }: { onRecheck?: () => void }) {

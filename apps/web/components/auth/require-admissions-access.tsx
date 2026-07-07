@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
-import { hasAdmissionsAccess } from '@/lib/admissions-api';
+import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { isPullimAuth } from '@/lib/auth';
 import type { ApiError } from '@/lib/api';
 
@@ -22,7 +22,11 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
   const [access, setAccess] = useState<Access>(() => (isPullimAuth ? 'checking' : 'ok'));
   // 재검증 트리거(Codex #59) — 결제 완료 후 같은 탭 복귀(denied) 또는 일시 오류(error)에서 재확인.
   const [nonce, setNonce] = useState(0);
-  const recheck = () => setNonce((n) => n + 1);
+  // 재검증은 캐시를 비우고(결제 반영·장애 복구 위해 fresh fetch 강제) effect 를 재실행한다.
+  const recheck = () => {
+    clearAdmissionsAccessCache();
+    setNonce((n) => n + 1);
+  };
 
   useEffect(() => {
     if (!isPullimAuth) return; // mock/데모: 초기값 'ok' 유지(통과)
