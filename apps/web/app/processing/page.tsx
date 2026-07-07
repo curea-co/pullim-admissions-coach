@@ -9,6 +9,7 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
 import { studentProfileSchema } from '@pullim/shared';
 import { clearAnalyzeResult } from '@/lib/result-view';
@@ -36,7 +37,20 @@ const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_MS = 8 * 60 * 1000;
 
+// 게이트를 페이지 최상위에서 렌더 — 분석 흐름(effect 포함)은 게이트 **하위 자식**으로 둔다.
+// 페이지 컴포넌트 자신에 effect 를 두면 게이트가 JSX 렌더만 막고 마운트 effect(제출·진단 호출)는
+// 그대로 실행되므로(Codex #59), 미보유 사용자의 deep-link 에서도 API 가 발사되지 않게 분리.
 export default function ProcessingPage() {
+  return (
+    <RequireAuth>
+      <RequireAdmissionsAccess>
+        <ProcessingFlow />
+      </RequireAdmissionsAccess>
+    </RequireAuth>
+  );
+}
+
+function ProcessingFlow() {
   const router = useRouter();
   const [phase, setPhase] = useState<AnalysisPhase>('submitting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -174,7 +188,6 @@ export default function ProcessingPage() {
   const activeIdx = currentStepIdx < 0 ? 0 : currentStepIdx;
 
   return (
-    <RequireAuth>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -246,7 +259,6 @@ export default function ProcessingPage() {
         </div>
       </div>
     </>
-    </RequireAuth>
   );
 }
 

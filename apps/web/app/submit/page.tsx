@@ -26,6 +26,7 @@ import { saveSubmittedPayload } from '@/lib/submitted-payload';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 
 type InputType = 'pdf_upload' | 'text_paste';
 
@@ -266,6 +267,7 @@ export default function SubmitPage() {
 
   return (
     <RequireAuth>
+    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -495,6 +497,7 @@ export default function SubmitPage() {
         </form>
       </div>
     </>
+    </RequireAdmissionsAccess>
     </RequireAuth>
   );
 }

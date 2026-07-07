@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { auth, type User } from '@/lib/auth';
 import { setUserScope } from '@/lib/result';
+import { clearAdmissionsAccessCache } from '@/lib/admissions-api';
 
 // 'error' = getMe가 예외를 던짐(서버/네트워크/DTO). 401 만료는 어댑터가 null로 주므로
 // 'guest'다. 'error'는 로그아웃이 아니므로 /login 강제 리다이렉트하지 않는다(RequireAuth).
@@ -13,6 +14,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const refresh = useCallback(async () => {
+    // 엔타이틀먼트 캐시 무효화 — 로그인/로그아웃(사용자 전환) 시 이전 사용자 admissions 판정이
+    // 남지 않게(교차사용자 격리). 이후 게이트가 새 사용자로 재조회.
+    clearAdmissionsAccessCache();
     try {
       const u = await auth.getMe();
       setUser(u); setStatus(u ? 'authed' : 'guest');

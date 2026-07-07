@@ -8,10 +8,17 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+// 주의: /result 는 RequireAuth(로그인)만 두고 **admissions 구매 게이트는 두지 않는다** —
+// 로그인 회원이 무료여도 예시 결과(§6 데모, parkJunho)를 볼 수 있어야 하기 때문(랜딩 "전체 예시").
+// 실 결과: **미보유(free)는 권위 신호(flags.admissions) 선판정으로 예시(데모) 경로**("진입만+예시
+// 열람" 정책 — 403 해석 아님: 실제 장애를 데모로 가리지 않기 위해), 보유자의 fetch 실패(403 포함·
+// 5xx/네트워크)는 §6 정직 원칙대로 명시 상태(진행중/실패/unavailable) 노출. 유료 게이트는 제출·
+// 동의·진단 흐름에만. (비로그인 공개 여부는 RequireAuth 유지=별도 제품 결정, 이 PR 미변경 — Codex #59.)
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
-import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, type DiagnosisDto } from '@/lib/admissions-api';
+import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, hasAdmissionsAccess, type DiagnosisDto } from '@/lib/admissions-api';
+import { isPullimAuth } from '@/lib/auth';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
@@ -61,6 +68,19 @@ export default function ResultPage() {
     async function loadFromServer() {
       // 최신 진단을 정본으로(멀티탭·새 제출로 로컬 포인터가 낡았을 수 있음) — 이력 조회가
       // 실패할 때만 로컬 id 단건 조회로 폴백한다.
+      // admissions 미보유(free)는 **권위 신호(flags.admissions, 캐시)로 선판정** — 서버 fetch 없이
+      // 예시(§6 데모) 경로("진입만+예시 열람" 정책). 403 응답을 미보유로 해석하지 않는다:
+      // 그러면 RBAC 오설정·정책 회귀 같은 실제 장애까지 데모로 가려진다(Codex #59). 선판정 후의
+      // 403/실패는 진짜 이상 → 아래 unavailable 로 정직 노출. 판정 실패는 fetch 흐름으로 폴백.
+      if (isPullimAuth) {
+        try {
+          const has = await hasAdmissionsAccess();
+          if (cancelled) return;
+          if (!has) return; // serverState=null 유지 → 예시(데모) 렌더(본문 데모 고지 포함).
+        } catch {
+          // 판정 불가(네트워크 등) — 아래 fetch 시도(실패 시 unavailable).
+        }
+      }
       let dto: DiagnosisDto | null = null;
       let fetchFailed = false;
       try {

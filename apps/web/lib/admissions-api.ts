@@ -15,6 +15,54 @@ import { api } from '@/lib/api';
 import type { StudentProfile } from '@pullim/shared';
 import type { AnalyzeResult } from './analyze';
 
+// ── 엔타이틀먼트(구매 벽) — 회원플랜: 입시코치는 admissions 이용권 보유자만(유료 전용) ──────
+
+/** `GET /me/entitlements` 응답(부분) — pullim-api #348. flags 가 서비스별 등급 맵. */
+interface MeEntitlementsResponse {
+  flags: Record<string, number>;
+  package: string;
+  tier: string;
+}
+
+// 세션 내 캐시 — 게이트가 페이지마다(submit→consent→processing) 재마운트되며 매번 /me/entitlements
+// 를 치지 않도록 결과를 재사용한다. **진행 중 Promise 도 캐시**(single-flight) — 첫 응답 전 동시 호출
+// (StrictMode 이중 마운트 등)에도 요청은 1회. 사용자 전환·결제 후 재검증 시 무효화(교차사용자 잔존 방지).
+let accessCache: boolean | null = null;
+let accessInflight: Promise<boolean> | null = null;
+
+/** 엔타이틀먼트 캐시 무효화 — auth-provider(로그인/로그아웃) · 결제 후 재검증에서 호출. */
+export function clearAdmissionsAccessCache(): void {
+  accessCache = null;
+  accessInflight = null;
+}
+
+/**
+ * admissions 이용권 보유 여부 — **권위 신호** `GET /me/entitlements` 의 `flags.admissions`(#348).
+ * ≥1 = 보유(진입 허용), 부재/0 = 미보유(free 회원 → 구매 벽). 진입 즉시 사전 판정(403 프로브 대체).
+ * 세션 캐시 + single-flight(중복 요청 방지) — 갱신은 clearAdmissionsAccessCache(). 401/네트워크는 전파.
+ */
+export function hasAdmissionsAccess(): Promise<boolean> {
+  if (accessCache !== null) return Promise.resolve(accessCache);
+  if (accessInflight) return accessInflight;
+  accessInflight = (async () => {
+    try {
+      const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
+      // 응답 형태 검증 — flags 누락(부분 배포·스키마 어긋남)을 "미보유=구매 벽"으로 오분류하면
+      // 유료 사용자가 차단된다 → 판정 불가로 throw(게이트가 error+재시도로 분기, Codex #59).
+      if (!ent || typeof ent.flags !== 'object' || ent.flags === null) {
+        throw Object.assign(new Error('엔타이틀먼트 응답 형식 오류(flags 누락) — 판정 불가'), {
+          status: 0,
+        });
+      }
+      accessCache = (ent.flags.admissions ?? 0) >= 1;
+      return accessCache;
+    } finally {
+      accessInflight = null; // 성공=캐시 확정, 실패=재조회 허용
+    }
+  })();
+  return accessInflight;
+}
+
 // ── 백엔드 DTO(응답) ─────────────────────────────────────────────────────────
 export interface SubmissionDto {
   id: string;

@@ -9,6 +9,7 @@ import { StepIndicator } from '@/components/step-indicator';
 import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
 import { cn } from '@/lib/utils';
 
@@ -132,6 +133,7 @@ export default function ConsentPage() {
 
   return (
     <RequireAuth>
+    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -240,6 +242,7 @@ export default function ConsentPage() {
         </div>
       </div>
     </>
+    </RequireAdmissionsAccess>
     </RequireAuth>
   );
 }
