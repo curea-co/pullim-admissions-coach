@@ -18,7 +18,10 @@ function osPurchaseHref(): string | null {
     // 새는 것을 차단(잘못 설정된 NEXT_PUBLIC_OS_URL 방어).
     // TODO(P0·OS 소관): admissions 상품 결제 딥링크·복귀 파라미터 확정 시 경로 교체(현재는 OS 홈 폴백).
     const url = new URL(OS_URL);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    // 운영은 https 강제 — 인증 사용자를 평문(http) 결제 페이지로 보내지 않는다.
+    // http 는 로컬 개발 호스트(localhost·127.0.0.1·*.pullim.local)만 예외 허용.
+    const isLocalHost = /^(localhost|127\.0\.0\.1|(.+\.)?pullim\.local)$/.test(url.hostname);
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHost)) return null;
     return url.toString();
   } catch {
     return null;
