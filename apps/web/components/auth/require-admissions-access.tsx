@@ -9,18 +9,23 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
 import { hasAdmissionsAccess } from '@/lib/admissions-api';
+import { isPullimAuth } from '@/lib/auth';
 import type { ApiError } from '@/lib/api';
 
 type Access = 'checking' | 'ok' | 'denied' | 'error';
 
 export function RequireAdmissionsAccess({ children }: { children: React.ReactNode }) {
   const { status, refresh } = useAuth();
-  const [access, setAccess] = useState<Access>('checking');
+  // mock/데모 모드(비실 auth)에는 엔타이틀먼트/구매 벽 개념이 없다 — 게이트 무효화(통과).
+  // 실 auth(NEXT_PUBLIC_AUTH_BACKEND=pullim)에서만 /me/entitlements 로 판정(Codex #59):
+  // mock 모드에서 실 API 를 호출하면 NEXT_PUBLIC_PULLIM_API 미설정 시 전 페이지가 막힌다.
+  const [access, setAccess] = useState<Access>(() => (isPullimAuth ? 'checking' : 'ok'));
   // 재검증 트리거(Codex #59) — 결제 완료 후 같은 탭 복귀(denied) 또는 일시 오류(error)에서 재확인.
   const [nonce, setNonce] = useState(0);
   const recheck = () => setNonce((n) => n + 1);
 
   useEffect(() => {
+    if (!isPullimAuth) return; // mock/데모: 초기값 'ok' 유지(통과)
     if (status !== 'authed') return;
     let alive = true;
     setAccess('checking');
