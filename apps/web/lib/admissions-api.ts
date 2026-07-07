@@ -47,7 +47,14 @@ export function hasAdmissionsAccess(): Promise<boolean> {
   accessInflight = (async () => {
     try {
       const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
-      accessCache = (ent.flags?.admissions ?? 0) >= 1;
+      // 응답 형태 검증 — flags 누락(부분 배포·스키마 어긋남)을 "미보유=구매 벽"으로 오분류하면
+      // 유료 사용자가 차단된다 → 판정 불가로 throw(게이트가 error+재시도로 분기, Codex #59).
+      if (!ent || typeof ent.flags !== 'object' || ent.flags === null) {
+        throw Object.assign(new Error('엔타이틀먼트 응답 형식 오류(flags 누락) — 판정 불가'), {
+          status: 0,
+        });
+      }
+      accessCache = (ent.flags.admissions ?? 0) >= 1;
       return accessCache;
     } finally {
       accessInflight = null; // 성공=캐시 확정, 실패=재조회 허용

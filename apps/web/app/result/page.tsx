@@ -10,10 +10,10 @@ import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 // 주의: /result 는 RequireAuth(로그인)만 두고 **admissions 구매 게이트는 두지 않는다** —
 // 로그인 회원이 무료여도 예시 결과(§6 데모, parkJunho)를 볼 수 있어야 하기 때문(랜딩 "전체 예시").
-// 실 결과 데이터는 admissions API(BE EntitlementGuard)가 막고, **실패 시 §6 정직 원칙대로 명시
-// 상태(진행중/실패/unavailable)를 노출한다 — 데모로 가리지 않음**. 예시 데모는 serverState=null
-// (미제출 등)일 때만 렌더. 유료 게이트는 제출·동의·진단 흐름에만. (비로그인까지 공개할지는
-// RequireAuth 유지=별도 제품 결정, 이 PR 미변경 — Codex #59.)
+// 실 결과 데이터는 admissions API(BE EntitlementGuard)가 소유: **403(미보유 free)= 예시(데모)
+// 경로로 폴백**(진입만 가능 정책 — 예시 열람 보장), **그 외 실패(5xx/네트워크)= §6 정직 원칙대로
+// 명시 상태(진행중/실패/unavailable) 노출**(데모로 가리지 않음). 유료 게이트는 제출·동의·진단
+// 흐름에만. (비로그인까지 공개할지는 RequireAuth 유지=별도 제품 결정, 이 PR 미변경 — Codex #59.)
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
@@ -22,6 +22,7 @@ import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
 import type { FitAssessment } from '@/lib/fit';
+import type { ApiError } from '@/lib/api';
 
 const COHORT_LABEL: Record<CohortResult['system'], string> = {
   '2027_old': '2027 대입 · 구체제',
@@ -69,22 +70,36 @@ export default function ResultPage() {
       // 실패할 때만 로컬 id 단건 조회로 폴백한다.
       let dto: DiagnosisDto | null = null;
       let fetchFailed = false;
+      // 403 = admissions 미보유(free 회원, EntitlementGuard) — 서버 장애가 아니라 "실 결과가
+      // 없는 사용자"다. unavailable 로 막지 않고 예시(§6 데모) 경로로 폴백해야 free 회원이
+      // 랜딩 "전체 예시 결과 보기"를 실제로 볼 수 있다(진입만 가능 정책, Codex #59).
+      const isEntitlement403 = (e: unknown) => (e as ApiError | null)?.status === 403;
+      let deniedByEntitlement = false;
       try {
         dto = await fetchLatestDiagnosis();
         if (dto) saveLastResultId(dto.id);
-      } catch {
-        fetchFailed = true;
-        const id = loadLastResultId();
-        if (id) {
-          try {
-            dto = await getDiagnosis(id);
-            fetchFailed = false;
-          } catch {
-            // 단건 폴백도 실패 — 아래 unavailable.
+      } catch (err) {
+        if (isEntitlement403(err)) {
+          deniedByEntitlement = true;
+        } else {
+          fetchFailed = true;
+          const id = loadLastResultId();
+          if (id) {
+            try {
+              dto = await getDiagnosis(id);
+              fetchFailed = false;
+            } catch (err2) {
+              if (isEntitlement403(err2)) deniedByEntitlement = true;
+              // 그 외: 단건 폴백도 실패 — 아래 unavailable.
+            }
           }
         }
       }
       if (cancelled) return;
+      if (deniedByEntitlement) {
+        // serverState=null 유지 → 예시(데모) 렌더(본문 데모 고지 포함).
+        return;
+      }
       if (!dto && fetchFailed) {
         setServerState('unavailable');
         return;

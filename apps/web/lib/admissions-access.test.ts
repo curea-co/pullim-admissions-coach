@@ -37,4 +37,9 @@ describe('hasAdmissionsAccess — /me/entitlements flags.admissions 사전 게�
     mockGet.mockRejectedValue(Object.assign(new Error('expired'), { status: 401, authExpired: true }));
     await expect(hasAdmissionsAccess()).rejects.toMatchObject({ status: 401 });
   });
+
+  it('malformed 응답(flags 누락) → throw — 유료 사용자를 구매 벽으로 오분류하지 않음', async () => {
+    mockGet.mockResolvedValue({ package: 'home', tier: 'free' }); // flags 없음(부분 배포/스키마 어긋남)
+    await expect(hasAdmissionsAccess()).rejects.toThrow('형식 오류');
+  });
 });
