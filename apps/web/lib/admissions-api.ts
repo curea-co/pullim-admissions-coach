@@ -11,9 +11,34 @@
  * FE AnalyzeResult(r.rubric.items 소비)로 되돌릴 때 improvements→rubric 으로 복원한다.
  */
 
-import { api } from '@/lib/api';
+import { api, type ApiError } from '@/lib/api';
 import type { StudentProfile } from '@pullim/shared';
 import type { AnalyzeResult } from './analyze';
+
+// ── 엔타이틀먼트(구매 벽) — 회원플랜: 입시코치는 admissions 이용권 보유자만(유료 전용) ──────
+/**
+ * admissions 접근 거부(구매 벽) 판별 — 지속 403. lib/api 가 CSRF 403은 재부트스트랩·재시도로
+ * 소거하므로, 표면화된 403 = 엔타이틀먼트/인가로 본다(EntitlementGuard, pullim-api #342·#343).
+ * TODO(P0-8 ②): 게이트키퍼가 엔타이틀먼트 403 body 형태 확정해 주면 CSRF/기타 403과 정밀 구분.
+ */
+export function isAccessDenied(err: unknown): boolean {
+  return (err as ApiError | null)?.status === 403;
+}
+
+/**
+ * admissions 이용권 보유 프로브 — GET results(EntitlementGuard 대상)로 확인.
+ * 미보유=403→false, 보유=200→true. 401/네트워크/기타는 전파(상위에서 처리).
+ * TODO(P0-8 ①): /me 가 admissions 보유 플래그를 노출하면 프로브 없이 그 값으로 사전판정.
+ */
+export async function probeAdmissionsAccess(): Promise<boolean> {
+  try {
+    await api.get('/admissions/results');
+    return true;
+  } catch (err) {
+    if (isAccessDenied(err)) return false;
+    throw err;
+  }
+}
 
 // ── 백엔드 DTO(응답) ─────────────────────────────────────────────────────────
 export interface SubmissionDto {
