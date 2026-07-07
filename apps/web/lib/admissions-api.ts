@@ -11,7 +11,7 @@
  * FE AnalyzeResult(r.rubric.items 소비)로 되돌릴 때 improvements→rubric 으로 복원한다.
  */
 
-import { api, type ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { StudentProfile } from '@pullim/shared';
 import type { AnalyzeResult } from './analyze';
 
@@ -22,15 +22,6 @@ interface MeEntitlementsResponse {
   flags: Record<string, number>;
   package: string;
   tier: string;
-}
-
-/**
- * admissions 접근 거부(구매 벽) 판별 — 표면화된 403 = 엔타이틀먼트/인가(EntitlementGuard,
- * pullim-api #342·#343). lib/api 가 CSRF 403은 재시도로 소거. 엔타이틀먼트 403은 generic
- * (VerificationErrors.FORBIDDEN, code 없음 — 코드 실측) 이라 body로 정밀 구분 불가 → 백스톱 용도.
- */
-export function isAccessDenied(err: unknown): boolean {
-  return (err as ApiError | null)?.status === 403;
 }
 
 /**

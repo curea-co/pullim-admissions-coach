@@ -9,11 +9,12 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
 import { hasAdmissionsAccess } from '@/lib/admissions-api';
+import type { ApiError } from '@/lib/api';
 
 type Access = 'checking' | 'ok' | 'denied' | 'error';
 
 export function RequireAdmissionsAccess({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth();
+  const { status, refresh } = useAuth();
   const [access, setAccess] = useState<Access>('checking');
 
   useEffect(() => {
@@ -22,11 +23,20 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
     setAccess('checking');
     hasAdmissionsAccess()
       .then((ok) => alive && setAccess(ok ? 'ok' : 'denied'))
-      .catch(() => alive && setAccess('error'));
+      .catch((err: ApiError) => {
+        if (!alive) return;
+        // 세션 만료(401 + refresh 실패)는 로그아웃이 아니라 재인증 대상 — error UI 로 뭉뚱그리지 않는다.
+        // auth 재검증(refresh)으로 넘기면 status→guest 시 상위 RequireAuth 가 OS 로그인으로 redirect.
+        if (err?.authExpired || err?.status === 401) {
+          void refresh();
+          return; // access=checking 유지 → 상위 RequireAuth 가 처리
+        }
+        setAccess('error');
+      });
     return () => {
       alive = false;
     };
-  }, [status]);
+  }, [status, refresh]);
 
   // 인증은 상위 RequireAuth 소유 — 미인증이면 여기선 아무것도 렌더하지 않는다(상위가 처리).
   if (status !== 'authed') return null;

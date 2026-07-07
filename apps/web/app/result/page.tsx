@@ -8,6 +8,7 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
@@ -119,6 +120,7 @@ export default function ResultPage() {
 
   return (
     <RequireAuth>
+    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-4xl px-6 py-10">
@@ -291,6 +293,7 @@ export default function ResultPage() {
         </div>
       </div>
     </>
+    </RequireAdmissionsAccess>
     </RequireAuth>
   );
 }

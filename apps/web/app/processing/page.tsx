@@ -9,6 +9,7 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
 import { studentProfileSchema } from '@pullim/shared';
 import { clearAnalyzeResult } from '@/lib/result-view';
@@ -175,6 +176,7 @@ export default function ProcessingPage() {
 
   return (
     <RequireAuth>
+    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -246,6 +248,7 @@ export default function ProcessingPage() {
         </div>
       </div>
     </>
+    </RequireAdmissionsAccess>
     </RequireAuth>
   );
 }
