@@ -16,7 +16,7 @@ import type { ApiError } from '@/lib/api';
 type Access = 'checking' | 'ok' | 'denied' | 'error';
 
 export function RequireAdmissionsAccess({ children }: { children: React.ReactNode }) {
-  const { status, refresh } = useAuth();
+  const { user, status, refresh } = useAuth();
   // mock/데모 모드(비실 auth)에는 엔타이틀먼트/구매 벽 개념이 없다 — 게이트 무효화(통과).
   // 실 auth(NEXT_PUBLIC_AUTH_BACKEND=pullim)에서만 /me/entitlements 로 판정(Codex #59):
   // mock 모드에서 실 API 를 호출하면 NEXT_PUBLIC_PULLIM_API 미설정 시 전 페이지가 막힌다.
@@ -58,7 +58,9 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
     return () => {
       alive = false;
     };
-  }, [status, refresh, nonce]);
+    // user?.id 구독 — 같은 탭 사용자 전환(A→B, 둘 다 authed)에도 게이트 재평가(auth-provider 가
+    // 캐시를 비우므로 새 사용자로 재조회). status/refresh 만으로는 재실행되지 않던 회귀(Codex #59).
+  }, [status, refresh, nonce, user?.id]);
 
   if (status !== 'authed') return null;
   // 결제 완료 후 같은 탭 복귀 시 "다시 확인"으로 재검증 → 구매 반영되면 통과(구매 벽에 갇히지 않음).

@@ -39,7 +39,7 @@ export function PurchaseWall({ onRecheck }: { onRecheck?: () => void }) {
         <h1 className="text-xl font-bold tracking-tight text-ink-900">유료 회원만 이용할 수 있어요</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-500">
           입시코치 진단은 <span className="font-medium text-ink-700">입시 이용권</span>을 구매한
-          회원만 사용할 수 있습니다. 결제 후 바로 이용할 수 있어요.
+          회원만 사용할 수 있습니다. 구매 후 이 화면에서 다시 확인해 주세요.
         </p>
 
         {href ? (
