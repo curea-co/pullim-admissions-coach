@@ -7,12 +7,15 @@ vi.mock('@/lib/api', () => ({
 }));
 
 import { api } from '@/lib/api';
-import { hasAdmissionsAccess } from './admissions-api';
+import { hasAdmissionsAccess, clearAdmissionsAccessCache } from './admissions-api';
 
 const mockGet = api.get as unknown as ReturnType<typeof vi.fn>;
 
 describe('hasAdmissionsAccess — /me/entitlements flags.admissions 사전 게이트(#348)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAdmissionsAccessCache(); // 세션 캐시가 케이스 간 잔존하지 않게(모듈 전역).
+  });
 
   it('flags.admissions ≥ 1 → true (유료 회원 진입)', async () => {
     mockGet.mockResolvedValue({ flags: { admissions: 2, q: 1 }, package: 'suwon', tier: 'b2g' });
