@@ -5,7 +5,7 @@
 // 권위 신호 = `GET /me/entitlements` 의 flags.admissions(pullim-api #348) — authed 확인 후 사전 판정.
 // 반드시 RequireAuth 하위에서 쓴다(인증 선행 전제). BE EntitlementGuard 403은 백스톱으로 항상 유효.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
@@ -22,9 +22,13 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
   const [access, setAccess] = useState<Access>(() => (isPullimAuth ? 'checking' : 'ok'));
   // 재검증 트리거(Codex #59) — 결제 완료 후 같은 탭 복귀(denied) 또는 일시 오류(error)에서 재확인.
   const [nonce, setNonce] = useState(0);
+  // 401 후 refresh 재검증은 **1회로 제한** — 세션 만료가 아닌 이유로 /me/entitlements 가 계속 401이면
+  // refresh 성공(status 유지)+nonce++ 가 무한 루프가 되므로, 1회 재시도 후에도 401이면 error 로 종료.
+  const authRetryRef = useRef(0);
   // 재검증은 캐시를 비우고(결제 반영·장애 복구 위해 fresh fetch 강제) effect 를 재실행한다.
   const recheck = () => {
     clearAdmissionsAccessCache();
+    authRetryRef.current = 0;
     setNonce((n) => n + 1);
   };
 
@@ -34,13 +38,18 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
     let alive = true;
     setAccess('checking');
     hasAdmissionsAccess()
-      .then((ok) => alive && setAccess(ok ? 'ok' : 'denied'))
+      .then((ok) => {
+        if (!alive) return;
+        authRetryRef.current = 0; // 성공 → 재시도 카운터 리셋
+        setAccess(ok ? 'ok' : 'denied');
+      })
       .catch((err: ApiError) => {
         if (!alive) return;
-        // 401(세션 만료)은 error 로 뭉뚱그리지 않고 세션 갱신 시도 후 **재검증**한다:
-        //  · 갱신 성공(status 'authed' 유지) → nonce++ 로 effect 재실행해 재확인('checking' 에 갇히지 않음)
-        //  · 갱신 실패 → auth-provider 가 status→guest 로 내려 상위 RequireAuth 가 OS 로그인 redirect
-        if (err?.authExpired || err?.status === 401) {
+        // 401(세션 만료)은 세션 갱신 후 **1회** 재검증. 갱신 성공(status 유지) → nonce++ 재확인,
+        // 갱신 실패 → auth-provider 가 status→guest → 상위 RequireAuth 가 OS 로그인 redirect.
+        // 재시도 후에도 401이면(세션 만료 아님) 무한 루프 방지 위해 error 로 종료.
+        if ((err?.authExpired || err?.status === 401) && authRetryRef.current < 1) {
+          authRetryRef.current += 1;
           void refresh().finally(() => alive && setNonce((n) => n + 1));
           return;
         }

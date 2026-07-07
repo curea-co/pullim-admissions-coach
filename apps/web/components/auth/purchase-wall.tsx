@@ -14,9 +14,12 @@ const OS_URL = process.env.NEXT_PUBLIC_OS_URL ?? '';
 function osPurchaseHref(): string | null {
   if (!OS_URL) return null;
   try {
-    // 절대 URL 검증(스킴 누락 'os.pullim.ai' 등 방어 — os-login.ts 와 동일 패턴).
-    // TODO(P0·OS 소관): admissions 상품 결제 딥링크 확정 시 경로 교체(현재는 OS 홈으로 폴백).
-    return new URL(OS_URL).toString();
+    // 절대 URL + **스킴 제한**(http/https만) — `javascript:` 등 위험 스킴이 클릭 가능한 href 로
+    // 새는 것을 차단(잘못 설정된 NEXT_PUBLIC_OS_URL 방어).
+    // TODO(P0·OS 소관): admissions 상품 결제 딥링크·복귀 파라미터 확정 시 경로 교체(현재는 OS 홈 폴백).
+    const url = new URL(OS_URL);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.toString();
   } catch {
     return null;
   }
