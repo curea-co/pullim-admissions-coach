@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
-import { auth } from '@/lib/auth';
+import { auth, isPullimAuth } from '@/lib/auth';
+import { hasAdmissionsAccess } from '@/lib/admissions-api';
 import { listDiagnoses, type SavedDiagnosis } from '@/lib/result-store';
 import { EmptyState } from '@/components/empty-state';
 import { cn } from '@/lib/utils';
@@ -71,8 +72,24 @@ function MyPageContent() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLogoutPending, startLogoutTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
+  // 입시 이용권(admissions grant) 보유 여부 — 요금제 배지·안내를 계정 tier 가 아니라 실 이용권 기준으로.
+  // 실 auth(pullim) 모드에서만 /me/entitlements 조회. mock/오류는 'unknown'→계정 tier 폴백(오표시 방지).
+  const [admissions, setAdmissions] = useState<'checking' | 'has' | 'none' | 'unknown'>(
+    () => (isPullimAuth ? 'checking' : 'unknown'),
+  );
 
   useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
+
+  useEffect(() => {
+    if (!isPullimAuth) return;
+    let alive = true;
+    hasAdmissionsAccess()
+      .then((ok) => alive && setAdmissions(ok ? 'has' : 'none'))
+      .catch(() => alive && setAdmissions('unknown')); // 일시 오류를 '미보유'로 오표시하지 않음
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function handleLogout() {
     startLogoutTransition(async () => {
@@ -161,12 +178,33 @@ function MyPageContent() {
               </p>
               <p className="mt-0.5 text-sm text-ink-500">현재 사용 중인 플랜</p>
             </div>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              {user.tier === 'free' ? '무료' : user.tier}
+            <span
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold',
+                admissions === 'has'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : admissions === 'none'
+                    ? 'bg-amber-50 text-amber-700'
+                    : admissions === 'checking'
+                      ? 'bg-ink-100 text-ink-400'
+                      : 'bg-brand-50 text-brand-700', // unknown/mock — 계정 tier 폴백
+              )}
+            >
+              {admissions === 'has'
+                ? '입시 이용권 보유'
+                : admissions === 'none'
+                  ? '이용권 미보유'
+                  : admissions === 'checking'
+                    ? '확인 중…'
+                    : user.tier === 'free'
+                      ? '무료'
+                      : user.tier}
             </span>
           </div>
           <p className="mt-4 rounded-xl border border-ink-100 bg-ink-50/50 px-4 py-3 text-sm leading-relaxed text-ink-500">
-            입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.
+            {admissions === 'has'
+              ? '입시 이용권을 보유 중이에요. 생기부를 제출하면 진단을 이용할 수 있어요.'
+              : '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.'}
           </p>
         </div>
       </section>
