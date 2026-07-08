@@ -69,7 +69,7 @@ function DeleteAccountModal({
 // ── 마이페이지 내용 ───────────────────────────────────────────────────────────
 function MyPageContent() {
   const router = useRouter();
-  const { user, logout, refresh } = useAuth();
+  const { user, logout, refresh, status } = useAuth();
   const [diagnoses, setDiagnoses] = useState<SavedDiagnosis[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLogoutPending, startLogoutTransition] = useTransition();
@@ -92,7 +92,8 @@ function MyPageContent() {
   useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
 
   useEffect(() => {
-    if (!isPullimAuth) return;
+    // 인증 상태에서만 조회(게이트와 동일 가드) — 세션 만료/로그아웃 후 불필요·실패 조회 방지.
+    if (!isPullimAuth || status !== 'authed') return;
     let alive = true;
     setAdmissions('checking'); // 사용자 전환 시 이전 상태 잔존 방지(아래 user?.id 구독)
     hasAdmissionsAccess()
@@ -117,7 +118,7 @@ function MyPageContent() {
       alive = false;
     };
     // user?.id 구독 — 같은 탭 사용자 전환(A→B)에도 재조회(auth-provider 가 캐시 비움). Codex #61.
-  }, [user?.id, refresh, nonce]);
+  }, [user?.id, status, refresh, nonce]);
 
   function handleLogout() {
     startLogoutTransition(async () => {
