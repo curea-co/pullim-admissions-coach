@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
@@ -80,6 +80,8 @@ function MyPageContent() {
   const [admissions, setAdmissions] = useState<'checking' | 'has' | 'none' | 'error' | 'mock'>(
     () => (isPullimAuth ? 'checking' : 'mock'),
   );
+  const [nonce, setNonce] = useState(0); // 401 refresh 후 재검증 트리거(RequireAdmissionsAccess 동일)
+  const authRetryRef = useRef(0); // 401 재검증 1회 제한 — 무한 루프 방지
 
   useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
 
@@ -88,13 +90,19 @@ function MyPageContent() {
     let alive = true;
     setAdmissions('checking'); // 사용자 전환 시 이전 상태 잔존 방지(아래 user?.id 구독)
     hasAdmissionsAccess()
-      .then((ok) => alive && setAdmissions(ok ? 'has' : 'none'))
+      .then((ok) => {
+        if (!alive) return;
+        authRetryRef.current = 0;
+        setAdmissions(ok ? 'has' : 'none');
+      })
       .catch((err: ApiError) => {
         if (!alive) return;
-        // 401(세션 만료)은 error 로 두지 않고 refresh — 갱신/guest 강등은 상위 RequireAuth 가 처리
-        // (게이트와 동일한 검증된 결정 로직 재사용). 그 외(5xx/네트워크)만 error(tier 오표시 방지).
-        if (decideAccessOnError(err, 0) === 'retry') {
-          void refresh();
+        // 게이트(RequireAdmissionsAccess)와 동일 결정 로직: 401은 refresh 후 1회 재검증(nonce++)
+        // — 갱신 성공(같은 user) 시 재조회로 '확인 중…' 고착 방지, 실패 시 guest→상위 RequireAuth.
+        // 그 외(5xx/네트워크·재시도 소진)만 error(tier 오표시 대신 중립).
+        if (decideAccessOnError(err, authRetryRef.current) === 'retry') {
+          authRetryRef.current += 1;
+          void refresh().finally(() => alive && setNonce((n) => n + 1));
           return;
         }
         setAdmissions('error');
@@ -103,7 +111,7 @@ function MyPageContent() {
       alive = false;
     };
     // user?.id 구독 — 같은 탭 사용자 전환(A→B)에도 재조회(auth-provider 가 캐시 비움). Codex #61.
-  }, [user?.id, refresh]);
+  }, [user?.id, refresh, nonce]);
 
   function handleLogout() {
     startLogoutTransition(async () => {
