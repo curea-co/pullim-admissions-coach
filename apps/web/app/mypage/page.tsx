@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
-import { auth } from '@/lib/auth';
+import { auth, isPullimAuth } from '@/lib/auth';
+import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
+import { decideAccessOnError } from '@/lib/admissions-access-state';
+import type { ApiError } from '@/lib/api';
 import { listDiagnoses, type SavedDiagnosis } from '@/lib/result-store';
 import { EmptyState } from '@/components/empty-state';
 import { cn } from '@/lib/utils';
@@ -66,13 +69,56 @@ function DeleteAccountModal({
 // ── 마이페이지 내용 ───────────────────────────────────────────────────────────
 function MyPageContent() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refresh, status } = useAuth();
   const [diagnoses, setDiagnoses] = useState<SavedDiagnosis[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isLogoutPending, startLogoutTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
+  // 입시 이용권(admissions grant) 보유 여부 — 요금제 배지·안내를 계정 tier 가 아니라 실 이용권 기준으로.
+  // 실 auth(pullim) 모드에서만 /me/entitlements 조회. mock/오류는 'unknown'→계정 tier 폴백(오표시 방지).
+  // 'mock'=비실auth(데모, 계정 tier 표시) · 'error'=조회 실패(tier 오표시 대신 중립). Codex #61.
+  const [admissions, setAdmissions] = useState<'checking' | 'has' | 'none' | 'error' | 'mock'>(
+    () => (isPullimAuth ? 'checking' : 'mock'),
+  );
+  const [nonce, setNonce] = useState(0); // 401 refresh 후 재검증 트리거(RequireAdmissionsAccess 동일)
+  const authRetryRef = useRef(0); // 401 재검증 1회 제한 — 무한 루프 방지
+  // 재검증 — 결제 완료 후(미보유 잔존) · 일시 오류 복구용. 캐시를 비워 fresh 조회(PurchaseWall 동일).
+  const recheckAdmissions = () => {
+    clearAdmissionsAccessCache();
+    authRetryRef.current = 0;
+    setNonce((n) => n + 1);
+  };
 
   useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
+
+  useEffect(() => {
+    // 인증 상태에서만 조회(게이트와 동일 가드) — 세션 만료/로그아웃 후 불필요·실패 조회 방지.
+    if (!isPullimAuth || status !== 'authed') return;
+    let alive = true;
+    setAdmissions('checking'); // 사용자 전환 시 이전 상태 잔존 방지(아래 user?.id 구독)
+    hasAdmissionsAccess()
+      .then((ok) => {
+        if (!alive) return;
+        authRetryRef.current = 0;
+        setAdmissions(ok ? 'has' : 'none');
+      })
+      .catch((err: ApiError) => {
+        if (!alive) return;
+        // 게이트(RequireAdmissionsAccess)와 동일 결정 로직: 401은 refresh 후 1회 재검증(nonce++)
+        // — 갱신 성공(같은 user) 시 재조회로 '확인 중…' 고착 방지, 실패 시 guest→상위 RequireAuth.
+        // 그 외(5xx/네트워크·재시도 소진)만 error(tier 오표시 대신 중립).
+        if (decideAccessOnError(err, authRetryRef.current) === 'retry') {
+          authRetryRef.current += 1;
+          void refresh().finally(() => alive && setNonce((n) => n + 1));
+          return;
+        }
+        setAdmissions('error');
+      });
+    return () => {
+      alive = false;
+    };
+    // user?.id 구독 — 같은 탭 사용자 전환(A→B)에도 재조회(auth-provider 가 캐시 비움). Codex #61.
+  }, [user?.id, status, refresh, nonce]);
 
   function handleLogout() {
     startLogoutTransition(async () => {
@@ -161,13 +207,51 @@ function MyPageContent() {
               </p>
               <p className="mt-0.5 text-sm text-ink-500">현재 사용 중인 플랜</p>
             </div>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              {user.tier === 'free' ? '무료' : user.tier}
+            <span
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold',
+                admissions === 'has'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : admissions === 'none'
+                    ? 'bg-amber-50 text-amber-700'
+                    : admissions === 'mock'
+                      ? 'bg-brand-50 text-brand-700' // 데모 — 계정 tier
+                      : 'bg-ink-100 text-ink-400', // checking/error — 중립(tier 오표시 금지)
+              )}
+            >
+              {admissions === 'has'
+                ? '입시 이용권 보유'
+                : admissions === 'none'
+                  ? '이용권 미보유'
+                  : admissions === 'checking'
+                    ? '확인 중…'
+                    : admissions === 'error'
+                      ? '확인 불가'
+                      : user.tier === 'free' // mock(데모)만 계정 tier 노출
+                        ? '무료'
+                        : user.tier}
             </span>
           </div>
           <p className="mt-4 rounded-xl border border-ink-100 bg-ink-50/50 px-4 py-3 text-sm leading-relaxed text-ink-500">
-            입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.
+            {admissions === 'has'
+              ? '입시 이용권을 보유 중이에요. 생기부를 제출하면 진단을 이용할 수 있어요.'
+              : admissions === 'none'
+                ? '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.'
+                : admissions === 'error'
+                  ? '이용권 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'
+                  : // checking/mock — 유료 사용자를 '미보유'로 오안내하지 않도록 정책 사실만.
+                    '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요.'}
           </p>
+          {/* 재검증(PurchaseWall 동일) — 결제 후 미보유 잔존/오류 복구. 새로고침 없이 최신화. */}
+          {(admissions === 'none' || admissions === 'error') && (
+            <button
+              type="button"
+              onClick={recheckAdmissions}
+              className="mt-2 text-sm text-ink-500 underline decoration-ink-200 underline-offset-2 transition hover:text-ink-700"
+            >
+              {admissions === 'error' ? '다시 시도' : '구매를 완료했다면 다시 확인'}
+            </button>
+          )}
         </div>
       </section>
 
