@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
 import { auth, isPullimAuth } from '@/lib/auth';
-import { hasAdmissionsAccess } from '@/lib/admissions-api';
+import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
 import { listDiagnoses, type SavedDiagnosis } from '@/lib/result-store';
@@ -82,6 +82,12 @@ function MyPageContent() {
   );
   const [nonce, setNonce] = useState(0); // 401 refresh 후 재검증 트리거(RequireAdmissionsAccess 동일)
   const authRetryRef = useRef(0); // 401 재검증 1회 제한 — 무한 루프 방지
+  // 재검증 — 결제 완료 후(미보유 잔존) · 일시 오류 복구용. 캐시를 비워 fresh 조회(PurchaseWall 동일).
+  const recheckAdmissions = () => {
+    clearAdmissionsAccessCache();
+    authRetryRef.current = 0;
+    setNonce((n) => n + 1);
+  };
 
   useEffect(() => { setDiagnoses(listDiagnoses()); }, []);
 
@@ -230,9 +236,21 @@ function MyPageContent() {
               ? '입시 이용권을 보유 중이에요. 생기부를 제출하면 진단을 이용할 수 있어요.'
               : admissions === 'none'
                 ? '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.'
-                : // checking/error/mock — 유료 사용자를 '미보유'로 오안내하지 않도록 정책 사실만.
-                  '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요.'}
+                : admissions === 'error'
+                  ? '이용권 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'
+                  : // checking/mock — 유료 사용자를 '미보유'로 오안내하지 않도록 정책 사실만.
+                    '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요.'}
           </p>
+          {/* 재검증(PurchaseWall 동일) — 결제 후 미보유 잔존/오류 복구. 새로고침 없이 최신화. */}
+          {(admissions === 'none' || admissions === 'error') && (
+            <button
+              type="button"
+              onClick={recheckAdmissions}
+              className="mt-2 text-sm text-ink-500 underline decoration-ink-200 underline-offset-2 transition hover:text-ink-700"
+            >
+              {admissions === 'error' ? '다시 시도' : '구매를 완료했다면 다시 확인'}
+            </button>
+          )}
         </div>
       </section>
 
