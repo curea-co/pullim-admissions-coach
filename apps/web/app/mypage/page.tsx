@@ -166,7 +166,7 @@ function MyPageContent() {
             </span>
           </div>
           <p className="mt-4 rounded-xl border border-ink-100 bg-ink-50/50 px-4 py-3 text-sm leading-relaxed text-ink-500">
-            요금제 변경은 곧 제공될 예정입니다. 베타 기간 동안 무료로 이용 가능합니다.
+            입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 요금제·결제 안내는 순차 제공될 예정입니다.
           </p>
         </div>
       </section>
