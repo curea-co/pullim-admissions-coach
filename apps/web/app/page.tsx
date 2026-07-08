@@ -5,6 +5,9 @@ import { StartCta } from '@/components/auth/start-cta';
 
 // ── 데이터 ─────────────────────────────────────────────────────────────
 
+// 베타 오픈일 — 노출면(히어로 배지·FAQ)에서 문자열 중복 시 드리프트 방지 위해 단일 상수(Codex #60).
+const BETA_OPEN_DATE = '2026-07-13';
+
 const steps = [
   {
     n: '01',
@@ -73,7 +76,7 @@ const promises = [
 const faqs = [
   {
     q: '비용이 드나요?',
-    a: '2026-07-13 베타 서비스 오픈 예정입니다. 요금 정책은 베타 오픈 시 안내합니다.',
+    a: `${BETA_OPEN_DATE} 베타 서비스 오픈 예정입니다. 요금 정책은 베타 오픈 시 안내합니다.`,
   },
   {
     q: '제 개인정보는 어디에 저장되나요?',
@@ -101,7 +104,7 @@ export default function LandingPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
               <span className="size-1.5 rounded-full bg-brand-500" />
-              베타 서비스 · 2026-07-13 오픈
+              베타 서비스 · {BETA_OPEN_DATE} 오픈
             </span>
             <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-[2.6rem] sm:leading-[1.18]">
               생기부를 넣으면

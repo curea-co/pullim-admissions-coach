@@ -166,7 +166,7 @@ function MyPageContent() {
             </span>
           </div>
           <p className="mt-4 rounded-xl border border-ink-100 bg-ink-50/50 px-4 py-3 text-sm leading-relaxed text-ink-500">
-            입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 요금제·결제 안내는 순차 제공될 예정입니다.
+            입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권이 없으면 진단을 시작할 때 구매 안내가 표시됩니다.
           </p>
         </div>
       </section>
