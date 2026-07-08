@@ -83,13 +83,15 @@ function MyPageContent() {
   useEffect(() => {
     if (!isPullimAuth) return;
     let alive = true;
+    setAdmissions('checking'); // 사용자 전환 시 이전 상태 잔존 방지(아래 user?.id 구독)
     hasAdmissionsAccess()
       .then((ok) => alive && setAdmissions(ok ? 'has' : 'none'))
       .catch(() => alive && setAdmissions('unknown')); // 일시 오류를 '미보유'로 오표시하지 않음
     return () => {
       alive = false;
     };
-  }, []);
+    // user?.id 구독 — 같은 탭 사용자 전환(A→B)에도 재조회(auth-provider 가 캐시 비움). Codex #61.
+  }, [user?.id]);
 
   function handleLogout() {
     startLogoutTransition(async () => {
@@ -204,7 +206,10 @@ function MyPageContent() {
           <p className="mt-4 rounded-xl border border-ink-100 bg-ink-50/50 px-4 py-3 text-sm leading-relaxed text-ink-500">
             {admissions === 'has'
               ? '입시 이용권을 보유 중이에요. 생기부를 제출하면 진단을 이용할 수 있어요.'
-              : '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.'}
+              : admissions === 'none'
+                ? '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요. 이용권 구매는 진단 시작 화면에서 안내됩니다.'
+                : // checking/unknown — 유료 사용자를 '미보유'로 오안내하지 않도록 정책 사실만.
+                  '입시코치 진단은 입시 이용권을 구매한 회원만 이용할 수 있어요.'}
           </p>
         </div>
       </section>
