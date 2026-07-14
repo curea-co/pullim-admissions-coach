@@ -18,12 +18,8 @@ concurrency:
 jobs:
   review:
     name: Review
-    runs-on:
-      # default group (visibility=all) 의존성 격리 — pullim-planner 전용 group 명시.
-      # group 미지정 시 다른 group 후보까지 잡혀 다른 레포 부하와 큐 경합 발생.
-      # labels로 self-hosted 한정해 group에 hosted larger runner 추가돼도 자동 배제.
-      group: curea-runner-groups-2
-      labels: [self-hosted]
+    # 공용 풀 전환(2026-07-14): 세 러너(curea-runner~3) 동일 환경 확인 — 그룹 격리 해제.
+    runs-on: self-hosted
     # 사전 sweep: workflow hang 방지 — 15분 상한.
     timeout-minutes: 15
     # 포크 PR 차단 — curea-co 소속 브랜치만 self-hosted runner 실행.
