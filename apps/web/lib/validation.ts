@@ -5,6 +5,21 @@ import type { ZodError, ZodSchema } from 'zod';
 
 export type FieldErrors = Record<string, string>;
 
+const FIELD_LABELS: Record<string, string> = {
+  'record.text': '생기부 본문',
+  'record.maskingApplied': '개인정보 마스킹 확인',
+  targetTrack: '지원 학부',
+  'currentStanding.grade': '학년',
+  'currentStanding.semester': '학기',
+  'currentStanding.schoolType': '학교 유형',
+  targetUniversities: '목표 대학',
+  selfReportedWeakAreas: '보완이 필요한 영역',
+};
+
+export function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? FIELD_LABELS[key.split('.')[0]] ?? '입력 항목';
+}
+
 export function flattenErrors(err: ZodError): FieldErrors {
   const out: FieldErrors = {};
   for (const issue of err.issues) {

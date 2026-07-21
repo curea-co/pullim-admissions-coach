@@ -19,7 +19,7 @@ import { PiiScanPanel } from '@/components/pii-scan-panel';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
-import { validate, type FieldErrors } from '@/lib/validation';
+import { fieldLabel, validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { saveSubmittedPayload } from '@/lib/submitted-payload';
@@ -233,7 +233,7 @@ export default function SubmitPage() {
       const first = Object.keys(result.errors)[0];
       setSubmitError(
         `${Object.keys(result.errors).length}개 항목을 확인해주세요.${
-          first ? ` (예: ${first})` : ''
+          first ? ` (${fieldLabel(first)})` : ''
         }`
       );
       // 첫 에러 필드로 포커스 이동
