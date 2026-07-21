@@ -12,6 +12,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { useAuth } from '@/components/auth/auth-provider';
 import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
+import { resolveIsMinor, isConsentGateMet } from '@/lib/consent-gate';
 import { cn } from '@/lib/utils';
 
 // Phase B: 클라이언트 차단 로직.
@@ -56,7 +57,7 @@ export default function ConsentPage() {
   // 미성년 여부 = 가입 시 생년월일로 산정된 **권위값**(user.isMinor) — 화면에서 임의 변경 불가.
   // 미성년자가 스스로 성인으로 바꿔 법정대리인 동의를 우회하는 것을 막는다(#52). unknown 시 보수적으로 미성년.
   const { user } = useAuth();
-  const isMinor = user?.isMinor ?? true;
+  const isMinor = resolveIsMinor(user?.isMinor);
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
@@ -73,10 +74,13 @@ export default function ConsentPage() {
   }
 
   function allRequiredMet(): boolean {
-    if (!checked.terms || !checked.privacy) return false;
-    // 미성년자가 아니면 guardian 동의는 면제. 미성년자면 필수.
-    if (isMinor && !checked.guardian) return false;
-    return true;
+    // 게이트 로직은 lib/consent-gate(순수·테스트됨)로 위임 — 성인 면제/미성년 필수 회귀 고정(#65).
+    return isConsentGateMet({
+      isMinor,
+      terms: checked.terms,
+      privacy: checked.privacy,
+      guardian: checked.guardian,
+    });
   }
 
   function handleProceed() {
