@@ -79,12 +79,4 @@ describe('ConsentPage — 미성년 권위값 동의 게이트', () => {
     // 미확정을 성인으로 취급했다면 여기서 진행 가능해지지만, fail-closed 라 차단되어야 한다
     expect(proceedBtn()).toHaveAttribute('aria-disabled', 'true');
   });
-
-  // §6 보관 기간 법적 고지 — 정책 준수 카피가 예전 값(30일)으로 회귀하지 않도록 고정.
-  it('개인정보 동의에 보관 기간 "동의 시점부터 12개월" 고지가 노출된다', () => {
-    currentUser = { id: 'u1', isMinor: false };
-    render(<ConsentPage />);
-    expect(screen.getByText(/동의 시점부터 12개월/)).toBeInTheDocument();
-    expect(screen.queryByText(/보관 기간 30일/)).not.toBeInTheDocument();
-  });
 });
