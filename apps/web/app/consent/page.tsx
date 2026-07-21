@@ -11,7 +11,11 @@ import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { useAuth } from '@/components/auth/auth-provider';
-import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
+import {
+  loadSubmittedPayload,
+  saveSubmittedPayload,
+  mergeConsentIntoPayload,
+} from '@/lib/submitted-payload';
 import { resolveIsMinor, isConsentGateMet } from '@/lib/consent-gate';
 import { cn } from '@/lib/utils';
 
@@ -127,7 +131,7 @@ export default function ConsentPage() {
       setSubmitError('제출 데이터를 찾을 수 없어요. 처음부터 다시 제출해주세요.');
       return;
     }
-    const merged = { ...(existing as Record<string, unknown>), consent: payload };
+    const merged = mergeConsentIntoPayload(existing, payload);
     if (!saveSubmittedPayload(merged)) {
       setSubmitError('동의 정보를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
       return;
