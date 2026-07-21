@@ -39,6 +39,23 @@ export function loadSubmittedPayload(): unknown | null {
   }
 }
 
+/**
+ * 이번 제출 payload에 동의 화면에서 받은 *실제* consent를 덮어써 병합한다.
+ * record 등 다른 필드는 유지하고 consent만 갱신 — 서버(admissions consents)가 올바른
+ * 동의 상태로 적재하게 한다. 이전/타 학생 record는 호출부(handleProceed)가 존재 검증으로
+ * 차단하며, 이 함수는 병합 규칙(record 보존 + consent 덮어쓰기)만 담당한다.
+ */
+export function mergeConsentIntoPayload(
+  existing: unknown,
+  consent: unknown
+): Record<string, unknown> {
+  const base =
+    existing && typeof existing === 'object'
+      ? (existing as Record<string, unknown>)
+      : {};
+  return { ...base, consent };
+}
+
 export function clearSubmittedPayload(): void {
   if (typeof window === 'undefined') return;
   try {
