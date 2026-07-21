@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Hero3D } from '@/components/hero-3d';
 import { StartCta } from '@/components/auth/start-cta';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 // ── 데이터 ─────────────────────────────────────────────────────────────
 
@@ -96,7 +97,9 @@ const seasons = [
 // ── 페이지 ─────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  // §7-1 게스트는 어떤 화면에도 진입 불가 — 홈(소개)도 로그인 벽. 무료 회원은 진입 가능(§7-2).
   return (
+    <RequireAuth>
     <div className="bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Hero */}
       <section className="w-full max-w-6xl px-6 pb-12 pt-8 sm:pt-12">
@@ -325,5 +328,6 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+    </RequireAuth>
   );
 }

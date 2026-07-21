@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { useAuth } from '@/components/auth/auth-provider';
+import { RequireAuth } from '@/components/auth/require-auth';
 import { getParentSummary, type ParentSummaryDto } from '@/lib/admissions-api';
 
 // 정의 §6.3 가드: 자녀 생기부 원문·결과물 전문 미노출. 진행 요약만.
@@ -69,7 +70,9 @@ function RealSummaryCard() {
 
 export default function ParentReportPage() {
   const r = parkJunho.parentReport;
+  // §7-1 게스트 진입 불가 — 학부모 리포트도 로그인 벽.
   return (
+    <RequireAuth>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -147,6 +150,7 @@ export default function ParentReportPage() {
         </div>
       </div>
     </>
+    </RequireAuth>
   );
 }
 
