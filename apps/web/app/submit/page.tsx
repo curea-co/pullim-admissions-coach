@@ -19,7 +19,7 @@ import { PiiScanPanel } from '@/components/pii-scan-panel';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
-import { validate, type FieldErrors } from '@/lib/validation';
+import { fieldLabel, validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { saveSubmittedPayload } from '@/lib/submitted-payload';
@@ -43,21 +43,6 @@ const tracks: { value: TargetTrack; label: string }[] = (
 const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
 ).map(([value, label]) => ({ value, label }));
-
-// 검증 에러 노출용 — 스키마 키 → 한국어 라벨(내부 필드명 `record.maskingApplied` 등 노출 방지, #51).
-const FIELD_LABELS: Record<string, string> = {
-  'record.text': '생기부 본문',
-  'record.maskingApplied': '개인정보 마스킹 확인',
-  targetTrack: '지원 학부',
-  'currentStanding.grade': '학년',
-  'currentStanding.semester': '학기',
-  'currentStanding.schoolType': '학교 유형',
-  targetUniversities: '목표 대학',
-  selfReportedWeakAreas: '보완이 필요한 영역',
-};
-// 완전 일치 우선, 없으면 배열 경로(`targetUniversities.0.name`)를 최상위 키로 폴백(Codex #64).
-const fieldLabel = (key: string): string =>
-  FIELD_LABELS[key] ?? FIELD_LABELS[key.split('.')[0]] ?? '입력 항목';
 
 export default function SubmitPage() {
   const router = useRouter();
