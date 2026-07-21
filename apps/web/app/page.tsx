@@ -6,7 +6,7 @@ import { StartCta } from '@/components/auth/start-cta';
 // ── 데이터 ─────────────────────────────────────────────────────────────
 
 // 베타 오픈일 — 노출면(히어로 배지·FAQ)에서 문자열 중복 시 드리프트 방지 위해 단일 상수(Codex #60).
-const BETA_OPEN_DATE = '2026-07-13';
+const BETA_OPEN_DATE = '2026-07-27';
 
 const steps = [
   {
