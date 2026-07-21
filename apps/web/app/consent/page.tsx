@@ -70,7 +70,9 @@ export default function ConsentPage() {
   }
 
   function toggleAll(v: boolean) {
-    setChecked({ terms: v, privacy: v, guardian: v });
+    // 성인은 보호자 동의가 필수 항목이 아니므로 "전체 동의"에서 제외(guardian 유지) —
+    // 성인이 전체 동의해도 guardian 미체크로 진행버튼과 어긋나던 불일치 해소(Codex #65).
+    setChecked((prev) => ({ terms: v, privacy: v, guardian: isMinor ? v : prev.guardian }));
   }
 
   function allRequiredMet(): boolean {
@@ -136,7 +138,8 @@ export default function ConsentPage() {
     });
   }
 
-  const allChecked = checked.terms && checked.privacy && checked.guardian;
+  // 성인은 보호자 동의 제외 — "전체 동의" 표시를 진행 가능 조건(필수 항목)과 일치시킨다(Codex #65).
+  const allChecked = checked.terms && checked.privacy && (!isMinor || checked.guardian);
   const canProceed = allRequiredMet();
 
   return (
