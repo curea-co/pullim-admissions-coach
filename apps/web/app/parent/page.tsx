@@ -142,7 +142,7 @@ export default function ParentReportPage() {
             ← 처음으로
           </Link>
           <span className="text-xs text-ink-500">
-            주간 리포트는 매주 일요일 이메일로도 발송됩니다 (Phase E)
+            주간 리포트 이메일 발송 기능은 준비 중이에요
           </span>
         </div>
       </div>

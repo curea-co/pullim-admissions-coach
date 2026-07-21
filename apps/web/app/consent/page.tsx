@@ -10,7 +10,9 @@ import { ErrorState } from '@/components/error-state';
 import { validate } from '@/lib/validation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
+import { useAuth } from '@/components/auth/auth-provider';
 import { loadSubmittedPayload, saveSubmittedPayload } from '@/lib/submitted-payload';
+import { resolveIsMinor, isConsentGateMet } from '@/lib/consent-gate';
 import { cn } from '@/lib/utils';
 
 // Phase B: 클라이언트 차단 로직.
@@ -52,7 +54,10 @@ export default function ConsentPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [isMinor, setIsMinor] = useState(true);
+  // 미성년 여부 = 가입 시 생년월일로 산정된 **권위값**(user.isMinor) — 화면에서 임의 변경 불가.
+  // 미성년자가 스스로 성인으로 바꿔 법정대리인 동의를 우회하는 것을 막는다(#52). unknown 시 보수적으로 미성년.
+  const { user } = useAuth();
+  const isMinor = resolveIsMinor(user?.isMinor);
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
@@ -65,14 +70,19 @@ export default function ConsentPage() {
   }
 
   function toggleAll(v: boolean) {
-    setChecked({ terms: v, privacy: v, guardian: v });
+    // 성인은 보호자 동의가 필수 항목이 아니므로 "전체 동의"에서 제외(guardian 유지) —
+    // 성인이 전체 동의해도 guardian 미체크로 진행버튼과 어긋나던 불일치 해소(Codex #65).
+    setChecked((prev) => ({ terms: v, privacy: v, guardian: isMinor ? v : prev.guardian }));
   }
 
   function allRequiredMet(): boolean {
-    if (!checked.terms || !checked.privacy) return false;
-    // 미성년자가 아니면 guardian 동의는 면제. 미성년자면 필수.
-    if (isMinor && !checked.guardian) return false;
-    return true;
+    // 게이트 로직은 lib/consent-gate(순수·테스트됨)로 위임 — 성인 면제/미성년 필수 회귀 고정(#65).
+    return isConsentGateMet({
+      isMinor,
+      terms: checked.terms,
+      privacy: checked.privacy,
+      guardian: checked.guardian,
+    });
   }
 
   function handleProceed() {
@@ -128,7 +138,8 @@ export default function ConsentPage() {
     });
   }
 
-  const allChecked = checked.terms && checked.privacy && checked.guardian;
+  // 성인은 보호자 동의 제외 — "전체 동의" 표시를 진행 가능 조건(필수 항목)과 일치시킨다(Codex #65).
+  const allChecked = checked.terms && checked.privacy && (!isMinor || checked.guardian);
   const canProceed = allRequiredMet();
 
   return (
@@ -146,7 +157,7 @@ export default function ConsentPage() {
           한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
 
-        {/* 미성년자 여부 토글 — 실 서비스에서는 회원가입 단계에서 결정. 데모용 토글. */}
+        {/* 미성년 여부는 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-ink-900">미성년자(만 19세 미만)인가요?</p>
@@ -154,13 +165,9 @@ export default function ConsentPage() {
               미성년자라면 법정대리인 동의가 필수로 추가됩니다.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsMinor((v) => !v)}
-            className="rounded-md border border-ink-100 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-          >
-            {isMinor ? '미성년 · 변경' : '성인 · 변경'}
-          </button>
+          <span className="rounded-md border border-ink-100 bg-ink-50 px-3 py-1.5 text-xs font-medium text-ink-700">
+            {isMinor ? '미성년' : '성인'}
+          </span>
         </div>
 
         <div className="mb-4 flex items-center justify-between rounded-xl bg-ink-100/50 px-4 py-2.5 text-sm">
@@ -302,7 +309,7 @@ function BlockerNote() {
       <p className="mt-1 text-amber-900/80">
         본 서비스는 미성년자 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두
         가동된 이후에만 실제 사용자 데이터를 받습니다. 본 화면은 그 절차를 사용자에게
-        가시화한 Phase B 검증 시각 셸입니다.
+        가시화한 베타 미리보기입니다.
       </p>
     </aside>
   );
