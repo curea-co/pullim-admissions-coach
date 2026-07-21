@@ -7,11 +7,12 @@ import ParentReportPage from '../app/parent/page';
 // §7-1 게스트는 어떤 화면에도 진입 불가 — 홈(소개)·학부모 리포트의 로그인 벽 회귀 고정.
 // 레이아웃/인증 리팩터링으로 RequireAuth 가 빠져 게스트가 다시 진입해도 CI 가 잡도록 한다.
 let authStatus: 'guest' | 'authed' = 'guest';
+let currentPath = '/';
 const replace = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: vi.fn() }),
-  usePathname: () => '/',
+  usePathname: () => currentPath,
 }));
 
 vi.mock('@/components/auth/auth-provider', () => ({
@@ -32,13 +33,15 @@ vi.mock('@/lib/admissions-api', () => ({
 describe('§7-1 게스트 로그인 벽 — 홈/학부모', () => {
   beforeEach(() => {
     replace.mockClear();
+    currentPath = '/';
   });
 
-  it('홈(/): 게스트는 본문을 볼 수 없고 로그인으로 리다이렉트된다', () => {
+  it('홈(/): 게스트는 본문을 볼 수 없고 next=/ 를 보존해 로그인으로 리다이렉트된다', () => {
     authStatus = 'guest';
+    currentPath = '/';
     render(<LandingPage />);
     expect(screen.queryByText(/면접 준비 팩/)).not.toBeInTheDocument();
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining('/login?next='));
+    expect(replace).toHaveBeenCalledWith('/login?next=%2F');
   });
 
   it('홈(/): 로그인 회원은 본문을 볼 수 있다', () => {
@@ -47,11 +50,12 @@ describe('§7-1 게스트 로그인 벽 — 홈/학부모', () => {
     expect(screen.getByText(/면접 준비 팩/)).toBeInTheDocument();
   });
 
-  it('학부모(/parent): 게스트는 본문을 볼 수 없고 로그인으로 리다이렉트된다', () => {
+  it('학부모(/parent): 게스트는 본문을 볼 수 없고 next=/parent 를 보존해 로그인으로 리다이렉트된다', () => {
     authStatus = 'guest';
+    currentPath = '/parent';
     render(<ParentReportPage />);
     expect(screen.queryByText('자녀 진행 요약')).not.toBeInTheDocument();
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining('/login?next='));
+    expect(replace).toHaveBeenCalledWith('/login?next=%2Fparent');
   });
 
   it('학부모(/parent): 로그인 회원은 본문(진행 요약)을 볼 수 있다', () => {
