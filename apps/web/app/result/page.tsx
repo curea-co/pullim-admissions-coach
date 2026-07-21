@@ -236,7 +236,7 @@ export default function ResultPage() {
         {/* Tabs */}
         <div
           role="tablist"
-          className="mb-6 flex flex-wrap gap-1 rounded-xl bg-ink-100/60 p-1"
+          className="sticky top-[60px] z-30 mb-6 flex flex-wrap gap-1 rounded-xl bg-ink-100/90 p-1 backdrop-blur-sm"
         >
           {tabs.map((t) => {
             const active = t.id === tab;

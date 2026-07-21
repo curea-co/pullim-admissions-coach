@@ -320,7 +320,7 @@ export default function LandingPage() {
         <div className="w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
           <p>© Curea · Pullim Admissions Coach</p>
           <p className="mt-1">
-            본 페이지는 Phase A 시각 프로토타입이며, 실제 사용자 데이터는 수집하지 않습니다.
+            본 페이지는 베타 미리보기이며, 실제 사용자 데이터는 수집하지 않습니다.
           </p>
         </div>
       </footer>

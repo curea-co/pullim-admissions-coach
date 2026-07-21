@@ -78,7 +78,7 @@ export default function SubmitPage() {
   );
   const [universities, setUniversities] = useState<
     { name: string; department?: string }[]
-  >(parkJunho.profile.targetUniversities.map((u) => ({ ...u })));
+  >([{ name: '' }, { name: '' }, { name: '' }]);
   const [grade, setGrade] = useState<number>(parkJunho.identity.grade);
   const [semester, setSemester] = useState<1 | 2>(
     parkJunho.identity.semester as 1 | 2
