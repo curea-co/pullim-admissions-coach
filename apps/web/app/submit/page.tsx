@@ -53,8 +53,11 @@ const FIELD_LABELS: Record<string, string> = {
   'currentStanding.semester': '학기',
   'currentStanding.schoolType': '학교 유형',
   targetUniversities: '목표 대학',
+  selfReportedWeakAreas: '보완이 필요한 영역',
 };
-const fieldLabel = (key: string): string => FIELD_LABELS[key] ?? '입력 항목';
+// 완전 일치 우선, 없으면 배열 경로(`targetUniversities.0.name`)를 최상위 키로 폴백(Codex #64).
+const fieldLabel = (key: string): string =>
+  FIELD_LABELS[key] ?? FIELD_LABELS[key.split('.')[0]] ?? '입력 항목';
 
 export default function SubmitPage() {
   const router = useRouter();
