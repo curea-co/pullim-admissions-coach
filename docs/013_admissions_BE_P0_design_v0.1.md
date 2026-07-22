@@ -1,7 +1,7 @@
 # 013 · 입시코치 BE P0 구현 설계 (v0.1)
 
 - 작성일: 2026-07-21
-- 착수 예정: **2026-07-22**
+- **상태(2026-07-22 갱신): 게이트키퍼 논의 결과 BE 구현 보류. 본 문서는 설계 기록(재개 시 참조)으로 보존.**
 - 대상: `pullim-api` (admissions 서비스, `src/admissions/**`)
 - 범위: 정책 v2.0 출시 차단 조건(§2-3·§6·§7) 관련 P0 — **B1 보관 12개월 · B2 저장 암호화 · B3 마스킹 확대 · B10 동의 후 저장**
 - 상위 계획: `012_policy_v2_screen_and_backend_plan`
@@ -86,7 +86,8 @@
 
 ### 목표(정책 §4 하드차단+경고 8종)
 - 하드차단: 전화·주민번호·이메일·**학교명**. 경고: 이름·교사·주소·생년월일.
-- FE `packages/shared/src/pii.ts`(8종·11 규칙)가 SoT. **단, `@pullim/shared`는 pullim-api 의존성 아님** → 규칙을 `engine/mask.ts`에 **포팅(재구현)**.
+- FE `packages/shared/src/pii.ts`(8종·11 규칙)가 SoT. **단, `@pullim/shared`는 pullim-api 의존성 아님**.
+- **드리프트 위험(중요)**: 가장 민감한 PII 판별 로직을 FE/BE로 **이중화하면**, 한쪽 정규식만 고쳐질 때 "FE는 차단, BE는 미마스킹 통과"라는 정합성 버그가 발생한다. 단순 포팅은 이 위험을 남긴다 → **규칙 원본 단일화 장치를 설계에 포함**(아래 Q6).
 
 ### 설계
 1. `engine/mask.ts`의 PATTERNS를 FE 11 규칙과 정합되게 확장(주민 `\d{6}-?[1-4]\d{6}`, 유선전화 포함, 학교 `[가-힣]{2,}(?:초·중·고)`, 이름/교사 라벨 인접 2종, 생년월일, 주소).
@@ -95,13 +96,16 @@
 
 ### 리스크
 - 과탐(정상 텍스트 오마스킹) — FE와 동일 규칙이라 동등 수준. 회귀 테스트로 고정.
-- FE/BE 규칙 드리프트 — 동일 케이스 픽스처를 양쪽 테스트에 공유(장기: shared 패키지화 검토).
+- **FE/BE 규칙 드리프트(핵심 리스크)** — 픽스처 공유만으로는 부족. **규칙 정의(정규식+카테고리)를 단일 소스**에서 파생시켜야 한다:
+  (a) `@pullim/shared`를 pullim-api 의존성으로 추가해 규칙을 직접 공유(권장, cross-repo 배포 가능 시), 또는
+  (b) 규칙을 언어중립 산출물(JSON 등)로 코드젠해 양 리포가 소비, 또는
+  (c) 불가피하게 포팅 시 **드리프트 감지 계약 테스트**(동일 입력셋에 대해 FE·BE redact 결과 일치 검증)를 CI 게이트로. — 착수 시 Q6로 확정.
 
 ### 테스트
 - `engine/mask.test.ts`: 8종 각 1+ 케이스 + 미탐/과탐 경계. FE `pii.test`와 동일 입력 픽스처.
 
 ### 게이트키퍼 확인
-- Q6. `@pullim/shared`를 pullim-api 의존성으로 추가(드리프트 제거) vs 포팅(격리)? (권장: 우선 포팅, 장기 공유화)
+- Q6. 규칙 단일 소스 방식: (a) `@pullim/shared` 직접 의존 / (b) 언어중립 코드젠 / (c) 포팅 + 드리프트 감지 계약 테스트 중 택. **민감 로직 이중화 위험상 (a)/(b) 우선, 불가 시 (c) 필수** — 단순 포팅(감지장치 없음)은 비권장.
 
 ---
 
@@ -121,6 +125,7 @@
 - BE: `submission-request.dto`에 `consents` 추가, `submission.service.create`가 `ConsentService`의 검증 로직 재사용해 동일 tx에 저장. 실패 시 롤백(저장 안 됨).
 - FE: consent 화면에서 이미 동의를 수집하므로, `submitAndDiagnose`를 **①(본문+동의) → ②diagnose 2콜**로 축소. 재시도 지문 재사용 로직 정합.
 - purgeAfter 앵커(B1)도 이 tx에서 확정 가능(동의 시각 존재) → B1·B10 결합 시 앵커 문제 자연 해소.
+- **서버측 멱등(필수)**: 2콜 축소만으로는 재시도 정합성이 해결되지 않는다. `POST /submissions`가 **DB 커밋 후 응답 전에 끊기면** 클라이언트는 submissionId 없이 동일 payload를 재전송 → **동일 민감 본문 + append-only consent 레코드 중복 생성**(저장량·감사 정합성 악화). 대응: 요청 단위 **Idempotency-Key 헤더** 또는 **payload fingerprint(마스킹 본문 해시 + userId)** 기반 서버측 dedupe — 동일 지문의 재요청은 기존 submissionId를 반환(신규 저장 안 함). FE에 이미 있는 재시도 지문 로직을 서버 계약으로 승격.
 
 ### 대안 B(비원자적, 소변경)
 `POST /submissions`는 본문 저장을 보류(메타만)하고 diagnose 시 동의 확인 후 본문 확정 — 데이터 모델 변경 커 비권장.
@@ -130,9 +135,11 @@
 
 ### 테스트
 - 동의 누락 요청 → 저장 안 됨(403, DB에 submission 없음). 미성년 guardian 누락 → 저장 안 됨. 정상 → submission+consents 동시 존재.
+- **멱등**: 동일 지문 재요청 2회 → submission 1건만 존재(중복 저장·consent 중복 없음), 두 응답이 동일 submissionId 반환.
 
 ### 게이트키퍼/FE 확인
 - Q7. 권장안 A(원자적 제출, `POST /submissions`에 consents 포함)로 확정? → BE 계약 변경 + FE 2콜 리팩터 동반. (B1 앵커와 함께 처리하면 이득)
+- Q8. 멱등 방식: Idempotency-Key 헤더 vs payload fingerprint(본문해시+userId) 서버 dedupe 중 택.
 
 ---
 
@@ -145,7 +152,7 @@
 브랜치/PR: pullim-api는 게이트키퍼 브랜치 모델 따름(마이그레이션은 게이트키퍼 적용). FE 동반 변경은 admissions-coach feature→dev.
 
 ## 게이트키퍼 오픈 질문 요약
-Q1 앵커 시각 / Q2 12개월 정의 / Q3 AES vs KMS / Q4 암호화 키 프로비저닝 / Q5 백필 오너십 / Q6 shared 의존성 vs 포팅 / Q7 원자적 제출 계약 변경 승인.
+Q1 앵커 시각 / Q2 12개월 정의 / Q3 AES vs KMS / Q4 암호화 키 프로비저닝 / Q5 백필 오너십 / Q6 규칙 단일소스(드리프트 방지) / Q7 원자적 제출 계약 변경 승인 / Q8 멱등 방식.
 
 ## 부록 · 참조 파일(file:line)
 - 보관: `submission.constant.ts:4`, `submission.service.ts:44`, `diagnosis.service.ts:58`, `submission-purge.scheduler.ts:25`, `submission.repository.ts:30`, `consent.entity.ts:57`
