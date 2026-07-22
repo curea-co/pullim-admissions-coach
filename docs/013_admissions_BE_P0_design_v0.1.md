@@ -29,7 +29,7 @@
 1. 상수 교체: `SUBMISSION_RETENTION_DAYS = 30` → `SUBMISSION_RETENTION_MONTHS = 12` (일 단위 산식 제거).
    - `purgeAfter` 계산 헬퍼 `addMonths(base, 12)`(달력 월 연산; `date-fns` 사용 여부는 레포 관례 확인).
 2. **앵커를 동의 완결로 이동**: `ConsentService.record()`(`consent.service.ts:40-79`)에서 **필수 동의(terms+privacy, 미성년이면 guardian)가 모두 채워지는 순간** 해당 submission의 `purgeAfter = addMonths(완결 grantedAt, 12)`를 **재계산·update**한다(동일 트랜잭션).
-   - submission-create의 `purgeAfter`는 **임시값(now + 12개월)**으로 두되, 동의 완결 update가 정본. (동의 없이 방치된 submission도 파기되도록 임시값 부여)
+   - 동의 전 임시 저장분의 `purgeAfter`는 **12개월이 아니라 짧은 quarantine TTL**(예: 24~48h)로 둔다. 12개월 앵커는 동의 완결 update에서만 부여 — 그렇지 않으면 B10 미적용 상태에서 동의 없이 저장된 `recordText`의 보관을 30일→12개월로 **되레 늘려** 정책 위반 폭을 키운다. **B1은 B10과 동일 배포 단위로 강제**(부분 반영 금지).
 3. diagnosis_results: 자체 크론 없음(CASCADE로만 파기). `diagnosis.service.ts:58`의 `purgeAfter`도 submission 기준과 정합되게 12개월로. (실질 파기는 CASCADE이므로 인덱스·값은 일관성 목적)
 
 ### 마이그레이션
@@ -39,7 +39,7 @@
 - 단위: `addMonths` 12개월 경계(윤달·월말). ConsentService.record 완결 시 purgeAfter 재계산. 스위퍼가 cutoff 미달 행 보존/초과 행 삭제.
 
 ### 게이트키퍼 확인
-- Q1. 앵커 권위 시각 = **skew 검증한 클라이언트 `consentTimestamp`**(권장) vs 서버 `grantedAt`? 허용 skew 범위는?
+- Q1. 앵커 권위 시각 = **서버 수신 `grantedAt`**(권장·법적 감사 신뢰경계) 확정? 클라 `consentTimestamp`는 참고 메타로만. 동의 전 quarantine TTL 값?
 - Q2. 12개월 = 달력 월(권장) vs 365일?
 
 ---
@@ -65,7 +65,8 @@
 4. 워커는 `findById` 경유이므로 복호는 투명. `analyze()`가 마스킹을 멱등 재적용(무해).
 
 ### 마이그레이션 / 롤백
-- 스키마 변경 없음(값 포맷만). 기존 평문 행: 운영 데이터 없음 가정 → 백필 불필요. 있으면 **read-both-format 가드**(복호 실패 시 평문으로 간주) 또는 1회 백필 — 착수 시 행 수 확인 후 결정.
+- 스키마 변경 없음(값 포맷만). 기존 평문 행: 운영 데이터 없음 가정 → 백필 불필요. 있으면 **1회성 백필** 또는 **명시적 버전 마커**(예: `enc:v1:` 프리픽스)로 평문/암호문 구분.
+- **복호 실패를 평문 legacy로 일괄 간주 금지** — 키 오배포·ciphertext 손상·구현 버그를 조용히 숨기고 평문을 downstream에 흘릴 수 있다. 마커 없는 예기치 못한 복호 실패는 **fail-fast(또는 격리·경고)** 로 처리해 조기 탐지.
 - `PII_FIELD_ENCRYPTION_KEY` 시크릿 존재 확인(부팅 fail-fast). 로컬/스테이징 키 프로비저닝 = 게이트키퍼.
 
 ### 테스트
@@ -123,11 +124,11 @@
 ### 설계 — 원자적 제출(권장안 A)
 `POST /admissions/submissions`가 **본문 + 동의를 함께 받아 한 트랜잭션**에서 submission + consents를 생성. 동의 검증(terms+privacy, 미성년 guardian, 서버 권위 isMinor)을 통과해야만 `recordText` 영속.
 - BE: `submission-request.dto`에 `consents`(각 항목 + **클라이언트 `consentTimestamp`**) 추가, `submission.service.create`가 `ConsentService`의 검증 로직 재사용해 동일 tx에 저장. 실패 시 롤백(저장 안 됨).
-- **동의 시각 권위값**: FE `/consent`·shared schema가 이미 사용자 체크 완료 시각(`consentTimestamp`)을 payload에 담는다. `grantedAt @CreateDateColumn`(서버 수신 시각)만 쓰면 네트워크·재시도·큐 적체만큼 앵커·감사 로그가 **실제 동의 시각보다 뒤로** 밀린다. → **권위 동의 시각 = 서버가 허용 skew(예: 미래 금지·과거 N분 이내) 검증한 클라이언트 `consentTimestamp`**. `grantedAt`은 서버 기록 시각으로 병행 보존(감사). B1 앵커도 이 권위 시각 기준.
+- **동의 시각 권위값(보안 경계)**: 법적 동의·보관 기준 시각은 **서버 수신 시각(`grantedAt @CreateDateColumn`)을 권위값**으로 유지한다. 단말 시계는 사용자가 임의 조작 가능해 서버가 실제 동의 시점을 독립 입증할 수 없으므로, FE의 `consentTimestamp`는 **참고 메타데이터로만 별도 저장**(권위값 아님). B1 앵커도 서버 `grantedAt` 기준. (수신 지연은 동의→저장을 원자적 tx로 묶어 최소화.)
 - FE: consent 화면에서 이미 동의를 수집하므로, `submitAndDiagnose`를 **①(본문+동의) → ②diagnose 2콜**로 축소. 재시도 지문 재사용 로직 정합.
 - purgeAfter 앵커(B1)도 이 tx에서 확정 가능(동의 시각 존재) → B1·B10 결합 시 앵커 문제 자연 해소.
 - **서버측 멱등(필수)**: 2콜 축소만으로는 재시도 정합성이 해결되지 않는다. `POST /submissions`가 **DB 커밋 후 응답 전에 끊기면** 클라이언트는 submissionId 없이 동일 payload를 재전송 → **동일 민감 본문 + append-only consent 레코드 중복 생성**(저장량·감사 정합성 악화).
-  - **대응(권장)**: 요청 단위 **명시적 `Idempotency-Key` 헤더 + 짧은 TTL 저장**(응답 유실 재시도만 복구). 동일 키의 재요청은 기존 submissionId 반환.
+  - **대응(권장)**: 요청 단위 **명시적 `Idempotency-Key` 헤더 + 짧은 TTL 저장**(응답 유실 재시도만 복구). 키는 **인증 userId + 정규화 요청 fingerprint에 바인딩**해 저장한다. 동일 키+동일 payload 재요청만 기존 submissionId 반환, **동일 키+다른 payload는 409 충돌로 거절**(다른 제출이 잘못 합쳐지거나, 키를 아는 다른 요청이 남의 submissionId를 받는 정합성·보안 문제 방지).
   - **payload fingerprint(본문해시+userId)는 dedupe 키로 승격 금지** — 그것은 세션 내 재시도 복구용 보조 수단일 뿐. 전역 유일키로 쓰면 **며칠 뒤 동일 생기부로 재진단하는 정상 재제출을 영구 중복으로 오인**한다. fingerprint는 관측/보조 매칭 용도로만.
 
 ### 대안 B(비원자적, 소변경)
