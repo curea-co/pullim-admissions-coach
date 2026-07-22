@@ -39,7 +39,7 @@
 - 단위: `addMonths` 12개월 경계(윤달·월말). ConsentService.record 완결 시 purgeAfter 재계산. 스위퍼가 cutoff 미달 행 보존/초과 행 삭제.
 
 ### 게이트키퍼 확인
-- Q1. 앵커 시각 = **필수 동의 완결의 grantedAt(최댓값)** 로 확정? (대안: 완결 처리 시각)
+- Q1. 앵커 권위 시각 = **skew 검증한 클라이언트 `consentTimestamp`**(권장) vs 서버 `grantedAt`? 허용 skew 범위는?
 - Q2. 12개월 = 달력 월(권장) vs 365일?
 
 ---
@@ -122,10 +122,13 @@
 
 ### 설계 — 원자적 제출(권장안 A)
 `POST /admissions/submissions`가 **본문 + 동의를 함께 받아 한 트랜잭션**에서 submission + consents를 생성. 동의 검증(terms+privacy, 미성년 guardian, 서버 권위 isMinor)을 통과해야만 `recordText` 영속.
-- BE: `submission-request.dto`에 `consents` 추가, `submission.service.create`가 `ConsentService`의 검증 로직 재사용해 동일 tx에 저장. 실패 시 롤백(저장 안 됨).
+- BE: `submission-request.dto`에 `consents`(각 항목 + **클라이언트 `consentTimestamp`**) 추가, `submission.service.create`가 `ConsentService`의 검증 로직 재사용해 동일 tx에 저장. 실패 시 롤백(저장 안 됨).
+- **동의 시각 권위값**: FE `/consent`·shared schema가 이미 사용자 체크 완료 시각(`consentTimestamp`)을 payload에 담는다. `grantedAt @CreateDateColumn`(서버 수신 시각)만 쓰면 네트워크·재시도·큐 적체만큼 앵커·감사 로그가 **실제 동의 시각보다 뒤로** 밀린다. → **권위 동의 시각 = 서버가 허용 skew(예: 미래 금지·과거 N분 이내) 검증한 클라이언트 `consentTimestamp`**. `grantedAt`은 서버 기록 시각으로 병행 보존(감사). B1 앵커도 이 권위 시각 기준.
 - FE: consent 화면에서 이미 동의를 수집하므로, `submitAndDiagnose`를 **①(본문+동의) → ②diagnose 2콜**로 축소. 재시도 지문 재사용 로직 정합.
 - purgeAfter 앵커(B1)도 이 tx에서 확정 가능(동의 시각 존재) → B1·B10 결합 시 앵커 문제 자연 해소.
-- **서버측 멱등(필수)**: 2콜 축소만으로는 재시도 정합성이 해결되지 않는다. `POST /submissions`가 **DB 커밋 후 응답 전에 끊기면** 클라이언트는 submissionId 없이 동일 payload를 재전송 → **동일 민감 본문 + append-only consent 레코드 중복 생성**(저장량·감사 정합성 악화). 대응: 요청 단위 **Idempotency-Key 헤더** 또는 **payload fingerprint(마스킹 본문 해시 + userId)** 기반 서버측 dedupe — 동일 지문의 재요청은 기존 submissionId를 반환(신규 저장 안 함). FE에 이미 있는 재시도 지문 로직을 서버 계약으로 승격.
+- **서버측 멱등(필수)**: 2콜 축소만으로는 재시도 정합성이 해결되지 않는다. `POST /submissions`가 **DB 커밋 후 응답 전에 끊기면** 클라이언트는 submissionId 없이 동일 payload를 재전송 → **동일 민감 본문 + append-only consent 레코드 중복 생성**(저장량·감사 정합성 악화).
+  - **대응(권장)**: 요청 단위 **명시적 `Idempotency-Key` 헤더 + 짧은 TTL 저장**(응답 유실 재시도만 복구). 동일 키의 재요청은 기존 submissionId 반환.
+  - **payload fingerprint(본문해시+userId)는 dedupe 키로 승격 금지** — 그것은 세션 내 재시도 복구용 보조 수단일 뿐. 전역 유일키로 쓰면 **며칠 뒤 동일 생기부로 재진단하는 정상 재제출을 영구 중복으로 오인**한다. fingerprint는 관측/보조 매칭 용도로만.
 
 ### 대안 B(비원자적, 소변경)
 `POST /submissions`는 본문 저장을 보류(메타만)하고 diagnose 시 동의 확인 후 본문 확정 — 데이터 모델 변경 커 비권장.
@@ -135,11 +138,12 @@
 
 ### 테스트
 - 동의 누락 요청 → 저장 안 됨(403, DB에 submission 없음). 미성년 guardian 누락 → 저장 안 됨. 정상 → submission+consents 동시 존재.
-- **멱등**: 동일 지문 재요청 2회 → submission 1건만 존재(중복 저장·consent 중복 없음), 두 응답이 동일 submissionId 반환.
+- **멱등**: 동일 `Idempotency-Key` 재요청 2회 → submission 1건만(중복 없음), 동일 submissionId 반환.
+- **재제출 허용 경계**: 키 없이(또는 TTL 경과 후) 동일 생기부 재제출 → **신규 submission 생성 허용**(정상 재진단 차단 안 됨).
 
 ### 게이트키퍼/FE 확인
 - Q7. 권장안 A(원자적 제출, `POST /submissions`에 consents 포함)로 확정? → BE 계약 변경 + FE 2콜 리팩터 동반. (B1 앵커와 함께 처리하면 이득)
-- Q8. 멱등 방식: Idempotency-Key 헤더 vs payload fingerprint(본문해시+userId) 서버 dedupe 중 택.
+- Q8. 멱등: 명시적 `Idempotency-Key`(짧은 TTL, 권장) 확정 + TTL 값? (payload fingerprint는 dedupe 키 아님 — 관측용). 재제출 허용 경계 정책.
 
 ---
 
