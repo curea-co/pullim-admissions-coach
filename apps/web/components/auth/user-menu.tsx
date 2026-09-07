@@ -100,6 +100,9 @@ type Plan = 'idle' | 'has' | 'none';
 function ProfileMenu({ user, className }: { user: User; className?: string }) {
   const { logout } = useAuth();
   const [open, setOpen] = useState(false);
+  // 열릴 때 어느 끝으로 포커스할지 — ARIA menu button 규약상 트리거의 ArrowDown 은 첫 항목,
+  // **ArrowUp 은 마지막 항목**으로 연다(Codex #70 3차).
+  const [openFocus, setOpenFocus] = useState<'first' | 'last'>('first');
   const [plan, setPlan] = useState<Plan>('idle');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,13 +130,14 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
     };
   }, [open]);
 
-  // 열릴 때 첫 항목으로 포커스 이동(메뉴 표준 동작).
+  // 열릴 때 포커스 이동 — 여는 방식에 따라 첫/마지막 항목.
   useEffect(() => {
     if (!open) return;
-    menuItems()[0]?.focus();
-    // menuItems 는 ref 만 읽는 안정 함수 — open 변화에만 반응하면 된다.
+    const list = menuItems();
+    (openFocus === 'last' ? list[list.length - 1] : list[0])?.focus();
+    // menuItems 는 ref 만 읽는 안정 함수 — open/openFocus 변화에만 반응하면 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, openFocus]);
 
   function menuItems(): HTMLElement[] {
     return Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
@@ -212,11 +216,15 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="프로필 메뉴 열기"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpenFocus('first');
+          setOpen((v) => !v);
+        }}
         onKeyDown={(e) => {
-          // 닫힌 상태에서 ArrowDown → 열고 첫 항목으로(메뉴 표준 동작).
+          // 닫힌 상태에서 ArrowDown → 첫 항목, ArrowUp → 마지막 항목(ARIA menu button 규약).
           if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
             e.preventDefault();
+            setOpenFocus(e.key === 'ArrowUp' ? 'last' : 'first');
             setOpen(true);
           }
         }}

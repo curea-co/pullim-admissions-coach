@@ -115,10 +115,29 @@ describe('UserMenu — 프로필 메뉴 상태 전이', () => {
     expect(items()[0]).toHaveFocus();
   });
 
-  it('닫힌 상태에서 트리거에 ArrowDown → 열린다', async () => {
+  it('닫힌 상태에서 트리거에 ArrowDown → 열리고 첫 항목으로', async () => {
     render(<UserMenu />);
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    await waitFor(() => expect(items()[0]).toHaveFocus());
+  });
+
+  // ARIA menu button 규약 — 트리거의 ArrowUp 은 마지막 항목으로 연다(Codex #70 3차).
+  it('닫힌 상태에서 트리거에 ArrowUp → 열리고 마지막 항목으로', async () => {
+    render(<UserMenu />);
+    fireEvent.keyDown(trigger(), { key: 'ArrowUp' });
+    await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+    const list = items();
+    await waitFor(() => expect(list[list.length - 1]).toHaveFocus());
+  });
+
+  it('클릭으로 다시 열면 ArrowUp 이력과 무관하게 첫 항목으로', async () => {
+    render(<UserMenu />);
+    fireEvent.keyDown(trigger(), { key: 'ArrowUp' }); // 마지막 항목으로 열기
+    await waitFor(() => expect(items()[items().length - 1]).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    openMenu();
+    await waitFor(() => expect(items()[0]).toHaveFocus());
   });
 
   it('이용권 보유 → 플랜 배지 노출. 조회는 열 때 1회만', async () => {
