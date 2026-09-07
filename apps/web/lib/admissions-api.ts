@@ -29,11 +29,17 @@ interface MeEntitlementsResponse {
 // (StrictMode 이중 마운트 등)에도 요청은 1회. 사용자 전환·결제 후 재검증 시 무효화(교차사용자 잔존 방지).
 let accessCache: boolean | null = null;
 let accessInflight: Promise<boolean> | null = null;
+// 캐시 세대 — 무효화할 때마다 증가한다. 무효화 시점에 **이미 날아간 요청은 취소되지 않으므로**,
+// 그 응답이 늦게 도착해 이전 사용자의 판정을 캐시에 쓰는 경합이 있었다(A 조회 중 A→B 전환 시
+// B 가 A 의 이용권으로 판정됨 — Codex #70 P1). 요청 시작 시 세대를 찍어두고, 응답 시점에 세대가
+// 바뀌었으면 **캐시에 쓰지 않고 버린다**.
+let accessGeneration = 0;
 
 /** 엔타이틀먼트 캐시 무효화 — auth-provider(로그인/로그아웃) · 결제 후 재검증에서 호출. */
 export function clearAdmissionsAccessCache(): void {
   accessCache = null;
   accessInflight = null;
+  accessGeneration += 1;
 }
 
 /**
@@ -44,6 +50,7 @@ export function clearAdmissionsAccessCache(): void {
 export function hasAdmissionsAccess(): Promise<boolean> {
   if (accessCache !== null) return Promise.resolve(accessCache);
   if (accessInflight) return accessInflight;
+  const generation = accessGeneration; // 이 요청이 속한 세대(사용자) 고정
   accessInflight = (async () => {
     try {
       const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
@@ -54,10 +61,14 @@ export function hasAdmissionsAccess(): Promise<boolean> {
           status: 0,
         });
       }
-      accessCache = (ent.flags.admissions ?? 0) >= 1;
-      return accessCache;
+      const has = (ent.flags.admissions ?? 0) >= 1;
+      // 세대가 바뀌었다면 응답이 도착하기 전에 사용자가 전환된 것 — 캐시 오염을 막기 위해
+      // 쓰지 않는다(호출자는 자기 세대의 값을 그대로 받는다).
+      if (generation === accessGeneration) accessCache = has;
+      return has;
     } finally {
-      accessInflight = null; // 성공=캐시 확정, 실패=재조회 허용
+      // 내 세대일 때만 비운다 — 전환 후 새로 시작된 요청의 single-flight 를 덮어쓰지 않게.
+      if (generation === accessGeneration) accessInflight = null;
     }
   })();
   return accessInflight;

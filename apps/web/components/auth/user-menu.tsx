@@ -130,8 +130,42 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
   // 열릴 때 첫 항목으로 포커스 이동(메뉴 표준 동작).
   useEffect(() => {
     if (!open) return;
-    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    menuItems()[0]?.focus();
+    // menuItems 는 ref 만 읽는 안정 함수 — open 변화에만 반응하면 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  function menuItems(): HTMLElement[] {
+    return Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+  }
+
+  // ARIA menu 키보드 규약 — role="menu" 를 선언한 이상 방향키 이동을 제공해야 한다(Codex #70 P2).
+  // 항목은 roving tabindex(-1)로 두고 포커스를 프로그램적으로 옮긴다. Tab 은 메뉴를 벗어나는
+  // 네이티브 동작 그대로 두되, 벗어나면 메뉴를 닫는다.
+  function onMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const items = menuItems();
+    if (items.length === 0) return;
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    let next: number;
+    switch (e.key) {
+      case 'ArrowDown':
+        next = current < 0 ? 0 : (current + 1) % items.length;
+        break;
+      case 'ArrowUp':
+        next = current <= 0 ? items.length - 1 : current - 1;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = items.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    items[next]?.focus();
+  }
 
   // 플랜 배지 — **열 때 1회만** 조회(모든 페이지 로드마다 /me/entitlements 를 치지 않는다).
   // 실 auth 모드에서만. 실패는 조용히 무시하고 배지를 숨긴 채 둔다(게이트가 아니라 표시일 뿐).
@@ -179,6 +213,13 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
         aria-expanded={open}
         aria-label="프로필 메뉴 열기"
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          // 닫힌 상태에서 ArrowDown → 열고 첫 항목으로(메뉴 표준 동작).
+          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         className={AVATAR_CLASS}
       >
         {initial ?? <IconUser className="h-4 w-4" />}
@@ -189,6 +230,11 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
           ref={menuRef}
           role="menu"
           aria-label="프로필"
+          onKeyDown={onMenuKeyDown}
+          onBlur={(e) => {
+            // Tab 으로 메뉴 밖으로 나가면 닫는다(포커스가 메뉴 안에 남아 있으면 유지).
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+          }}
           className="absolute right-0 top-full z-50 mt-2 min-w-[16rem] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-raised)] py-1 shadow-[var(--shadow-lg)]"
         >
           <div className="px-3 py-2">
@@ -210,6 +256,7 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
 
           <Link
             role="menuitem"
+            tabIndex={-1}
             href="/mypage"
             onClick={() => setOpen(false)}
             className={MENU_ITEM_CLASS}
@@ -219,7 +266,7 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
 
           {/* 설정은 앱이 소유하지 않고 OS 가 정본 — 미설정 환경에서는 항목째 숨긴다. */}
           {settingsHref && (
-            <a role="menuitem" href={settingsHref} className={MENU_ITEM_CLASS}>
+            <a role="menuitem" tabIndex={-1} href={settingsHref} className={MENU_ITEM_CLASS}>
               설정
             </a>
           )}
@@ -228,6 +275,7 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
 
           <button
             role="menuitem"
+            tabIndex={-1}
             type="button"
             onClick={() => void handleLogout()}
             disabled={pending}
