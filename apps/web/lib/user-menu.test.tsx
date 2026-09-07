@@ -176,6 +176,20 @@ describe('UserMenu — 프로필 메뉴 상태 전이', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  // Codex #70 4차 — 열린 상태에서 트리거를 다시 누르면 닫혀야 한다. 브라우저 실제 순서는
+  // 트리거 mousedown → 메뉴 항목 focusout(relatedTarget=트리거) → click 이라, 메뉴의
+  // 이탈 감지가 트리거를 "바깥"으로 보면 blur 가 먼저 닫고 click 이 다시 여는 깜빡임이 생긴다.
+  it('열린 상태에서 트리거를 다시 클릭하면 닫힌다(다시 열리지 않는다)', async () => {
+    render(<UserMenu />);
+    openMenu();
+    await waitFor(() => expect(items()[0]).toHaveFocus());
+    const btn = trigger();
+    fireEvent.mouseDown(btn);
+    fireEvent.focusOut(screen.getByRole('menu'), { relatedTarget: btn });
+    fireEvent.click(btn);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
   it('guest → 로그인/가입 CTA. 프로필 트리거는 없다', () => {
     authStatus = 'guest';
     render(<UserMenu />);

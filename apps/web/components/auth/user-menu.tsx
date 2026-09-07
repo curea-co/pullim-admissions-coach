@@ -240,8 +240,10 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
           aria-label="프로필"
           onKeyDown={onMenuKeyDown}
           onBlur={(e) => {
-            // Tab 으로 메뉴 밖으로 나가면 닫는다(포커스가 메뉴 안에 남아 있으면 유지).
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+            // Tab 으로 메뉴 밖으로 나가면 닫는다. 판정 기준은 메뉴가 아니라 **루트**(트리거 포함) —
+            // 메뉴만 보면 트리거로 가는 포커스도 "바깥"이 되어, 트리거 클릭 시
+            // focusout 이 먼저 닫고 이어진 click 이 다시 여는 깜빡임이 생긴다(Codex #70 4차).
+            if (!rootRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
           }}
           className="absolute right-0 top-full z-50 mt-2 min-w-[16rem] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-raised)] py-1 shadow-[var(--shadow-lg)]"
         >
