@@ -190,6 +190,25 @@ describe('UserMenu — 프로필 메뉴 상태 전이', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
+  // Codex #70 5차 — Shift+Tab 으로 트리거에 되돌아가는 것도 "메뉴 이탈"이므로 닫혀야 한다.
+  // 4차 수정(트리거를 메뉴 안쪽으로 판정)이 이 경로를 막았던 회귀 고정.
+  it('Shift+Tab 으로 트리거에 되돌아가면 닫힌다', async () => {
+    render(<UserMenu />);
+    openMenu();
+    await waitFor(() => expect(items()[0]).toHaveFocus());
+    // 키보드 경로에는 mousedown 이 없다 — 포커스만 트리거로 이동한다.
+    fireEvent.focusOut(screen.getByRole('menu'), { relatedTarget: trigger() });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('Tab 으로 셸 바깥으로 나가면 닫힌다', async () => {
+    render(<UserMenu />);
+    openMenu();
+    await waitFor(() => expect(items()[0]).toHaveFocus());
+    fireEvent.focusOut(screen.getByRole('menu'), { relatedTarget: document.body });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
   it('guest → 로그인/가입 CTA. 프로필 트리거는 없다', () => {
     authStatus = 'guest';
     render(<UserMenu />);

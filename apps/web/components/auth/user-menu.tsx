@@ -107,6 +107,10 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // 트리거를 **마우스로** 눌렀을 때의 직전 open 상태. focusout 이 click 보다 먼저 닫아버리므로,
+  // click 토글이 "닫힌 상태"를 보고 다시 열어버리는 것을 막기 위해 눌린 시점의 값을 쓴다.
+  // 키보드 활성화(Enter/Space)에는 mousedown 이 없어 null 로 남고, 그때는 현재 상태를 쓴다.
+  const pointerWasOpen = useRef<boolean | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -216,9 +220,15 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="프로필 메뉴 열기"
+        onMouseDown={() => {
+          pointerWasOpen.current = open;
+        }}
         onClick={() => {
+          // 마우스 경로면 눌린 시점의 값을, 키보드 경로(mousedown 없음)면 현재 값을 기준으로 토글.
+          const wasOpen = pointerWasOpen.current ?? open;
+          pointerWasOpen.current = null;
           setOpenFocus('first');
-          setOpen((v) => !v);
+          setOpen(!wasOpen);
         }}
         onKeyDown={(e) => {
           // 닫힌 상태에서 ArrowDown → 첫 항목, ArrowUp → 마지막 항목(ARIA menu button 규약).
@@ -240,10 +250,10 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
           aria-label="프로필"
           onKeyDown={onMenuKeyDown}
           onBlur={(e) => {
-            // Tab 으로 메뉴 밖으로 나가면 닫는다. 판정 기준은 메뉴가 아니라 **루트**(트리거 포함) —
-            // 메뉴만 보면 트리거로 가는 포커스도 "바깥"이 되어, 트리거 클릭 시
-            // focusout 이 먼저 닫고 이어진 click 이 다시 여는 깜빡임이 생긴다(Codex #70 4차).
-            if (!rootRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
+            // 포커스가 **메뉴 밖으로** 나가면 닫는다 — Tab·Shift+Tab 모두 포함하며, 트리거로
+            // 되돌아가는 Shift+Tab 도 이탈로 본다(Codex #70 5차). 트리거를 마우스로 눌러 닫는
+            // 경로는 pointerWasOpen 으로 별도 처리하므로, 여기서 닫혀도 click 이 다시 열지 않는다.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
           }}
           className="absolute right-0 top-full z-50 mt-2 min-w-[16rem] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-raised)] py-1 shadow-[var(--shadow-lg)]"
         >
