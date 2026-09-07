@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DashboardShell } from '@/components/ui/dashboard-shell';
 import { OsRail } from '@/components/ui/os-rail';
@@ -42,10 +43,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <DashboardShell
       brand={{ logo: <PullimLogo size={30} />, title: '풀림', sub: '입시코치', href: '/' }}
-      rail={<OsRail head="입시코치" items={items} collapsed={collapsed} />}
+      rail={<OsRail head="입시코치" items={items} linkComponent={Link} />}
       tabbar={items}
       collapsed={collapsed}
       onToggleCollapsed={toggle}
+      // 레일·탭바·브랜드 로고를 next/link 로 — <a> 하드코딩이면 클릭마다 풀 페이지 리로드가 된다.
+      linkComponent={Link}
       actions={<UserMenu />}
     >
       {children}
