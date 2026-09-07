@@ -40,33 +40,33 @@ jobs:
       # 공용 self-hosted 러너의 /tmp 는 여러 저장소·PR 이 공유한다. concurrency group 은 PR 단위라
       # 다른 PR·다른 저장소의 잡이 동시에 뜰 수 있고, 고정 파일명을 쓰면 서로의 diff·결과 JSON 을
       # 덮어써 **다른 PR 의 diff 로 만든 리뷰가 게시**될 수 있다(Codex #71).
-      # → 이름 규칙에 기대지 않고 mktemp 로 실행마다 고유 디렉터리를 만들어 전 스텝이 공유한다.
-      #   잡 종료 시 통째로 지우므로 러너에 잔여 파일도 쌓이지 않는다.
+      # → 경로를 run_id + run_attempt 로 짓는다. GitHub 전역에서 유일하므로 저장소·PR·재실행
+      #   어느 축으로도 충돌하지 않는다. **Actions 표현식이라** 런타임 env( $GITHUB_ENV )를 거치지
+      #   않고 인용 heredoc·with:·env: 어디서나 동일하게 치환된다. 잡 종료 시 통째로 지운다.
       - name: Prepare Codex workspace
         run: |
           set -euo pipefail
-          dir="$(mktemp -d /tmp/codex-review-XXXXXXXXXX)"
-          echo "CODEX_DIR=$dir" >> "$GITHUB_ENV"
-          echo "작업 디렉터리: $dir"
+          mkdir -p "/tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "작업 디렉터리: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}"
 
       - name: Extract PR diff
         run: |
           set -euo pipefail
           # base.sha · head.sha 직접 사용 — base.ref 가 force-push 시 흔들리지 않음.
           git diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" \
-            > "$CODEX_DIR/pr-diff.txt"
-          echo "PR diff: $(wc -l < "$CODEX_DIR/pr-diff.txt") lines"
+            > "/tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/pr-diff.txt"
+          echo "PR diff: $(wc -l < "/tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/pr-diff.txt") lines"
 
       # safety_strategy=unsafe 정당화:
-      # Codex CLI 가 $CODEX_DIR/pr-diff.txt 읽기 · $CODEX_DIR/codex-review.json 쓰기 필요.
+      # Codex CLI 가 잡 전용 디렉터리의 pr-diff.txt 읽기 · codex-review.json 쓰기 필요.
       # workspace-write sandbox + unsafe = 워크스페이스 외부 파일 시스템 접근 허용.
       # 쓰기 범위는 이 잡 전용 mktemp 디렉터리뿐이고 잡 종료 시 삭제 → 영향 격리됨.
       - name: Codex Review
         id: codex
         env:
-          PROMPT_FILE: ${{ env.CODEX_DIR }}/codex-prompt.txt
-          CODEX_STDOUT: ${{ env.CODEX_DIR }}/codex-stdout.log
-          CODEX_STDERR: ${{ env.CODEX_DIR }}/codex-stderr.log
+          PROMPT_FILE: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-prompt.txt
+          CODEX_STDOUT: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-stdout.log
+          CODEX_STDERR: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-stderr.log
         run: |
           set -uo pipefail
           # 실패 진단(2026-09-07): codex exec 가 아무 출력 없이 비정상 종료해 원인 파악이
@@ -79,7 +79,7 @@ jobs:
           # 명령 치환으로 실행돼(`— Reviewed by Codex` → "—: command not found")
           # 서명 규칙 문장이 프롬프트에서 조용히 사라졌다.
           cat <<'PROMPT' > "$PROMPT_FILE"
-          ${{ env.CODEX_DIR }}/pr-diff.txt 파일에 이 PR의 변경 diff가 있다.
+          /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/pr-diff.txt 파일에 이 PR의 변경 diff가 있다.
           이 diff를 대상으로 일반 코드 리뷰 best practice (보안·성능·정합성·테스트 커버리지·하드코딩 secret·error handling) 를 적용해 리뷰해라.
           # Codex review PR #11 [P2] 반영: admissions base 에 AGENTS.md/CLAUDE.md 부재 → PR-controlled 권위 docs 의존 제거.
           # writing-coach 와 의도적 divergence — 두 파일이 base 에 잠긴 시점에 다시 복구 검토.
@@ -88,7 +88,7 @@ jobs:
           변경된 코드의 맥락 이해가 필요하면 워크스페이스의 관련 파일을 참조해라.
           단, 전체 파일을 읽지 말고 필요한 부분만 확인해라.
 
-          리뷰 결과를 ${{ env.CODEX_DIR }}/codex-review.json 파일에 아래 JSON 형식으로 출력해라:
+          리뷰 결과를 /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-review.json 파일에 아래 JSON 형식으로 출력해라:
           {
             "action": "COMMENT" 또는 "APPROVE",
             "body": "전체 리뷰 요약 (한국어)",
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: codex-review-${{ github.event.pull_request.number }}
-          path: ${{ env.CODEX_DIR }}/codex-review.json
+          path: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-review.json
           retention-days: 7
 
       - name: Generate App Token
@@ -145,7 +145,7 @@ jobs:
         if: always() && steps.codex.outcome == 'success'
         uses: actions/github-script@v7
         env:
-          REVIEW_PATH: ${{ env.CODEX_DIR }}/codex-review.json
+          REVIEW_PATH: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}/codex-review.json
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -271,7 +271,5 @@ jobs:
       - name: Clean up Codex workspace
         if: always()
         run: |
-          if [ -n "${CODEX_DIR:-}" ] && [ -d "$CODEX_DIR" ]; then
-            rm -rf "$CODEX_DIR"
-            echo "정리 완료: $CODEX_DIR"
-          fi
+          rm -rf "/tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "정리 완료: /tmp/codex-review-${{ github.run_id }}-${{ github.run_attempt }}"
