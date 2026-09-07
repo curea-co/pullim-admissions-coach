@@ -38,7 +38,12 @@ jobs:
         run: rm -f ~/.codex/config.toml
 
       - name: Clean previous review
-        run: rm -f /tmp/codex-review-${{ github.event.repository.name }}.json /tmp/pr-diff-${{ github.event.repository.name }}.txt
+        run: |
+          rm -f /tmp/codex-review-${{ github.event.repository.name }}.json \
+                /tmp/pr-diff-${{ github.event.repository.name }}.txt \
+                /tmp/codex-prompt-${{ github.event.repository.name }}.txt \
+                /tmp/codex-stdout-${{ github.event.repository.name }}.log \
+                /tmp/codex-stderr-${{ github.event.repository.name }}.log
 
       - name: Extract PR diff
         run: |
@@ -54,8 +59,22 @@ jobs:
       # /tmp 만 사용 + concurrency group 으로 PR 격리 → 실제 영향 격리됨.
       - name: Codex Review
         id: codex
+        env:
+          PROMPT_FILE: /tmp/codex-prompt-${{ github.event.repository.name }}.txt
+          CODEX_STDOUT: /tmp/codex-stdout-${{ github.event.repository.name }}.log
+          CODEX_STDERR: /tmp/codex-stderr-${{ github.event.repository.name }}.log
         run: |
-          cat <<PROMPT | codex exec --model gpt-5.6-terra --sandbox workspace-write -c safety_strategy=unsafe -
+          set -uo pipefail
+          # 실패 진단(2026-09-07): codex exec 가 아무 출력 없이 비정상 종료해 원인 파악이
+          # 불가능했다(PR #70). CLI 버전·종료코드·stdout/stderr 를 반드시 로그에 남긴다.
+          echo "::group::codex 환경"
+          codex --version || echo "codex --version 실패 (exit $?)"
+          echo "::endgroup::"
+
+          # heredoc 구분자를 인용한다(<<'PROMPT'). 인용이 없으면 프롬프트 안의 백틱이
+          # 명령 치환으로 실행돼(`— Reviewed by Codex` → "—: command not found")
+          # 서명 규칙 문장이 프롬프트에서 조용히 사라졌다.
+          cat <<'PROMPT' > "$PROMPT_FILE"
           /tmp/pr-diff-${{ github.event.repository.name }}.txt 파일에 이 PR의 변경 diff가 있다.
           이 diff를 대상으로 일반 코드 리뷰 best practice (보안·성능·정합성·테스트 커버리지·하드코딩 secret·error handling) 를 적용해 리뷰해라.
           # Codex review PR #11 [P2] 반영: admissions base 에 AGENTS.md/CLAUDE.md 부재 → PR-controlled 권위 docs 의존 제거.
@@ -84,6 +103,21 @@ jobs:
           - 모든 인라인 코멘트 body 끝에 반드시 `— Reviewed by Codex` 서명 포함
           - JSON 파일에는 순수 JSON만 출력 (마크다운 펜스나 부가 텍스트 금지)
           PROMPT
+
+          set +e
+          codex exec --model gpt-5.6-terra --sandbox workspace-write -c safety_strategy=unsafe - \
+            < "$PROMPT_FILE" > "$CODEX_STDOUT" 2> "$CODEX_STDERR"
+          code=$?
+          set -e
+
+          echo "codex exec exit code: $code"
+          echo "::group::codex stdout (마지막 60줄)"
+          tail -60 "$CODEX_STDOUT" || true
+          echo "::endgroup::"
+          echo "::group::codex stderr (마지막 60줄)"
+          tail -60 "$CODEX_STDERR" || true
+          echo "::endgroup::"
+          exit $code
 
       # 사전 sweep: Codex 산출 JSON 보관 — 디버깅·감사·회귀 추적용.
       - name: Upload Codex review artifact
