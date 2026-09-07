@@ -59,7 +59,7 @@ jobs:
       - name: Codex Review
         id: codex
         run: |
-          cat <<PROMPT | codex exec --model gpt-5.4 --sandbox workspace-write -c safety_strategy=unsafe -
+          cat <<PROMPT | codex exec --model gpt-5.6-terra --sandbox workspace-write -c safety_strategy=unsafe -
           /tmp/pr-diff-${{ github.event.repository.name }}.txt 파일에 이 PR의 변경 diff가 있다.
           이 diff를 대상으로 일반 코드 리뷰 best practice (보안·성능·정합성·테스트 커버리지·하드코딩 secret·error handling) 를 적용해 리뷰해라.
           # Codex review PR #11 [P2] 반영: admissions base 에 AGENTS.md/CLAUDE.md 부재 → PR-controlled 권위 docs 의존 제거.
