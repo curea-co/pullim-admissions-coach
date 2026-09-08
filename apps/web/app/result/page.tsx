@@ -54,6 +54,9 @@ const tabs: { id: Tab; label: string }[] = [
 // `lib/shell-search.ts` 의 href(`/result?tab=diagnosis` …)와 값이 같아야 한다.
 const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
 
+/** 파라미터가 없거나 알 수 없는 값일 때의 탭. `tabs` 의 첫 항목과 같아야 한다. */
+const DEFAULT_TAB: Tab = 'interview';
+
 /** 알 수 없는 값은 조용히 null → 기본 탭. 잘못된 링크로 에러 화면을 띄우지 않는다. */
 function parseTabParam(search: string): Tab | null {
   try {
@@ -67,7 +70,7 @@ function parseTabParam(search: string): Tab | null {
 export default function ResultPage() {
   // 초기값은 서버 렌더와 동일한 기본 탭 — URL 을 렌더 중에 읽으면 서버/클라이언트 초기 HTML 이
   // 달라져 hydration mismatch 가 난다. 실제 보정은 아래 effect 에서 한다.
-  const [tab, setTab] = useState<Tab>('interview');
+  const [tab, setTab] = useState<Tab>(DEFAULT_TAB);
   // 이미 반영한 window.location.search. effect 가 URL 의 **값**이 아니라 **변화**에만 반응하게
   // 하는 표식이다 — 값에 반응하면 주소 갱신이 실패했을 때(아래 selectTab 참고) 방금 누른 탭을
   // 옛 URL 로 되감아 버린다.
@@ -95,8 +98,11 @@ export default function ResultPage() {
     const search = window.location.search;
     if (search === syncedSearchRef.current) return;
     syncedSearchRef.current = search;
-    const fromUrl = parseTabParam(search);
-    if (fromUrl) setTab(fromUrl);
+    // 파라미터가 사라지거나 알 수 없는 값이 되면 **기본 탭으로 되돌린다**(Codex PR #74 P1).
+    // 팔레트의 "진단 결과" href 가 파라미터 없는 `/result` 라, ?tab=diagnosis 를 보던 중에
+    // 그걸 고르면 remount 없이 URL 만 `/result` 가 된다 — 이때 이전 탭이 남아 있으면
+    // 주소와 화면이 어긋난다. 진입 시점만이 아니라 **전이**도 URL 을 따라야 한다.
+    setTab(parseTabParam(search) ?? DEFAULT_TAB);
   });
 
   useEffect(() => {
