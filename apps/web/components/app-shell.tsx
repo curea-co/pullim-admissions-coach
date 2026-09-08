@@ -7,6 +7,9 @@ import { DashboardShell } from '@/components/ui/dashboard-shell';
 import { OsRail } from '@/components/ui/os-rail';
 import { PullimLogo } from '@/components/pullim-logo';
 import { UserMenu } from '@/components/auth/user-menu';
+import { ServiceSwitcher } from '@/components/shell/service-switcher';
+import { CommandSearch } from '@/components/shell/command-search';
+import { NotificationsMenu } from '@/components/shell/notifications-menu';
 
 // 입시 코치 대시보드 구조 — 풀림 OS/classbot 패턴(좌측 레일 + 상단 바 + 콘텐츠).
 const NAV: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -49,7 +52,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       onToggleCollapsed={toggle}
       // 레일·탭바·브랜드 로고를 next/link 로 — <a> 하드코딩이면 클릭마다 풀 페이지 리로드가 된다.
       linkComponent={Link}
-      actions={<UserMenu />}
+      // topbar 좌측 [브랜드][스위처] — OS `OsShell` 순서. 스위처는 카탈로그가 비면(= OS URL 미설정)
+      // 스스로 null 을 반환하므로 여기서 조건부로 감싸지 않는다.
+      switcher={<ServiceSwitcher />}
+      // topbar 우측 [검색][알림][프로필]. 세 버튼은 각자 자립형(트리거+패널+리스너 포함)이라
+      // 여기서는 정렬만 준다. gap 은 헤더 자체 gap(2.5)보다 좁게 — 셋이 한 덩어리로 읽혀야 한다.
+      actions={
+        <div className="flex items-center gap-0.5 min-[921px]:gap-1">
+          <CommandSearch />
+          <NotificationsMenu />
+          <UserMenu />
+        </div>
+      }
     >
       {children}
     </DashboardShell>

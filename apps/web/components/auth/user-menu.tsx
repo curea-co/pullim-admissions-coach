@@ -15,11 +15,12 @@
 // OS 원본 값(#1F89F5 → #004BB9)을 그대로 옮긴다 — 서비스 간 아바타가 같아 보여야 하므로.
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { hasAdmissionsAccess } from '@/lib/admissions-api';
 import { isPullimAuth, type User } from '@/lib/auth';
 import { osLoginHref, osSettingsHref, osSignupHref } from '@/lib/auth/os-login';
+import { useDropdown } from '@/lib/use-dropdown';
 import { cn } from '@/lib/utils';
 
 const LOGIN_CTA_CLASS =
@@ -99,81 +100,12 @@ type Plan = 'idle' | 'has' | 'none';
 
 function ProfileMenu({ user, className }: { user: User; className?: string }) {
   const { logout } = useAuth();
-  const [open, setOpen] = useState(false);
-  // 열릴 때 어느 끝으로 포커스할지 — ARIA menu button 규약상 트리거의 ArrowDown 은 첫 항목,
-  // **ArrowUp 은 마지막 항목**으로 연다(Codex #70 3차).
-  const [openFocus, setOpenFocus] = useState<'first' | 'last'>('first');
+  // 열기/닫기·포커스(바깥 클릭·Esc·방향키 로빙·트리거 재클릭·focusout)는 useDropdown 이 소유한다.
+  // Codex #70 3~5차에서 다듬어진 경로가 그대로 훅 안에 있다 — lib/use-dropdown.ts 주석 참고.
+  const { open, close, rootProps, triggerProps, menuProps } = useDropdown();
   const [plan, setPlan] = useState<Plan>('idle');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  // 트리거를 **마우스로** 눌렀을 때의 직전 open 상태. focusout 이 click 보다 먼저 닫아버리므로,
-  // click 토글이 "닫힌 상태"를 보고 다시 열어버리는 것을 막기 위해 눌린 시점의 값을 쓴다.
-  // 키보드 활성화(Enter/Space)에는 mousedown 이 없어 null 로 남고, 그때는 현재 상태를 쓴다.
-  const pointerWasOpen = useRef<boolean | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // 바깥 클릭·Esc 로 닫기. Esc 는 트리거로 포커스를 되돌린다(키보드 사용자가 길을 잃지 않게).
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  // 열릴 때 포커스 이동 — 여는 방식에 따라 첫/마지막 항목.
-  useEffect(() => {
-    if (!open) return;
-    const list = menuItems();
-    (openFocus === 'last' ? list[list.length - 1] : list[0])?.focus();
-    // menuItems 는 ref 만 읽는 안정 함수 — open/openFocus 변화에만 반응하면 된다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, openFocus]);
-
-  function menuItems(): HTMLElement[] {
-    return Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
-  }
-
-  // ARIA menu 키보드 규약 — role="menu" 를 선언한 이상 방향키 이동을 제공해야 한다(Codex #70 P2).
-  // 항목은 roving tabindex(-1)로 두고 포커스를 프로그램적으로 옮긴다. Tab 은 메뉴를 벗어나는
-  // 네이티브 동작 그대로 두되, 벗어나면 메뉴를 닫는다.
-  function onMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const items = menuItems();
-    if (items.length === 0) return;
-    const current = items.indexOf(document.activeElement as HTMLElement);
-    let next: number;
-    switch (e.key) {
-      case 'ArrowDown':
-        next = current < 0 ? 0 : (current + 1) % items.length;
-        break;
-      case 'ArrowUp':
-        next = current <= 0 ? items.length - 1 : current - 1;
-        break;
-      case 'Home':
-        next = 0;
-        break;
-      case 'End':
-        next = items.length - 1;
-        break;
-      default:
-        return;
-    }
-    e.preventDefault();
-    items[next]?.focus();
-  }
 
   // 플랜 배지 — **열 때 1회만** 조회(모든 페이지 로드마다 /me/entitlements 를 치지 않는다).
   // 실 auth 모드에서만. 실패는 조용히 무시하고 배지를 숨긴 채 둔다(게이트가 아니라 표시일 뿐).
@@ -213,31 +145,12 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
   const planLabel = plan === 'has' ? '입시 이용권 보유' : plan === 'none' ? '이용권 미보유' : null;
 
   return (
-    <div ref={rootRef} className={cn('relative flex items-center', className)}>
+    <div {...rootProps} className={cn('relative flex items-center', className)}>
       <button
-        ref={triggerRef}
+        {...triggerProps}
         type="button"
         aria-haspopup="menu"
-        aria-expanded={open}
         aria-label="프로필 메뉴 열기"
-        onMouseDown={() => {
-          pointerWasOpen.current = open;
-        }}
-        onClick={() => {
-          // 마우스 경로면 눌린 시점의 값을, 키보드 경로(mousedown 없음)면 현재 값을 기준으로 토글.
-          const wasOpen = pointerWasOpen.current ?? open;
-          pointerWasOpen.current = null;
-          setOpenFocus('first');
-          setOpen(!wasOpen);
-        }}
-        onKeyDown={(e) => {
-          // 닫힌 상태에서 ArrowDown → 첫 항목, ArrowUp → 마지막 항목(ARIA menu button 규약).
-          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-            e.preventDefault();
-            setOpenFocus(e.key === 'ArrowUp' ? 'last' : 'first');
-            setOpen(true);
-          }
-        }}
         className={AVATAR_CLASS}
       >
         {initial ?? <IconUser className="h-4 w-4" />}
@@ -245,16 +158,9 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
 
       {open && (
         <div
-          ref={menuRef}
+          {...menuProps}
           role="menu"
           aria-label="프로필"
-          onKeyDown={onMenuKeyDown}
-          onBlur={(e) => {
-            // 포커스가 **메뉴 밖으로** 나가면 닫는다 — Tab·Shift+Tab 모두 포함하며, 트리거로
-            // 되돌아가는 Shift+Tab 도 이탈로 본다(Codex #70 5차). 트리거를 마우스로 눌러 닫는
-            // 경로는 pointerWasOpen 으로 별도 처리하므로, 여기서 닫혀도 click 이 다시 열지 않는다.
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
-          }}
           className="absolute right-0 top-full z-50 mt-2 min-w-[16rem] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-raised)] py-1 shadow-[var(--shadow-lg)]"
         >
           <div className="px-3 py-2">
@@ -278,7 +184,7 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
             role="menuitem"
             tabIndex={-1}
             href="/mypage"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className={MENU_ITEM_CLASS}
           >
             마이페이지
