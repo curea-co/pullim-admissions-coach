@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
@@ -50,13 +50,60 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'improvements', label: '부족 활동 보완안' },
 ];
 
+// ?tab= 딥링크 — ⌘K 팔레트/외부 링크가 특정 탭을 지목할 수 있게 한다.
+// `lib/shell-search.ts` 의 href(`/result?tab=diagnosis` …)와 값이 같아야 한다.
+const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
+
+/** 파라미터가 없거나 알 수 없는 값일 때의 탭. `tabs` 의 첫 항목과 같아야 한다. */
+const DEFAULT_TAB: Tab = 'interview';
+
+/** 알 수 없는 값은 조용히 null → 기본 탭. 잘못된 링크로 에러 화면을 띄우지 않는다. */
+function parseTabParam(search: string): Tab | null {
+  try {
+    const raw = new URLSearchParams(search).get('tab');
+    return raw && TAB_IDS.has(raw) ? (raw as Tab) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ResultPage() {
-  const [tab, setTab] = useState<Tab>('interview');
+  // 초기값은 서버 렌더와 동일한 기본 탭 — URL 을 렌더 중에 읽으면 서버/클라이언트 초기 HTML 이
+  // 달라져 hydration mismatch 가 난다. 실제 보정은 아래 effect 에서 한다.
+  const [tab, setTab] = useState<Tab>(DEFAULT_TAB);
+  // 이미 반영한 window.location.search. effect 가 URL 의 **값**이 아니라 **변화**에만 반응하게
+  // 하는 표식이다 — 값에 반응하면 주소 갱신이 실패했을 때(아래 selectTab 참고) 방금 누른 탭을
+  // 옛 URL 로 되감아 버린다.
+  const syncedSearchRef = useRef<string | null>(null);
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
   const [resultIsDemo, setResultIsDemo] = useState(false);
   // 서버 진단이 아직 완료 전/실패인 상태 — 데모로 가리지 않고 명시 분기(§6 정직).
   const [serverState, setServerState] = useState<'in_progress' | 'failed' | 'unavailable' | null>(null);
+
+  // URL → 탭 동기화.
+  // useSearchParams() 를 쓰지 않는다: 클라이언트 컴포넌트가 이걸 쓰면 Next 14 App Router 가
+  // 정적 렌더 시 Suspense 경계를 요구해 빌드가 깨진다. 대신 window.location.search 를 읽는다.
+  // 의존성 배열이 없는 이유 — 이미 /result 에 있는 상태에서 팔레트가 router.push('/result?tab=…')
+  // 하면 컴포넌트가 remount 되지 않아 마운트 1회 effect(`[]`)로는 탭이 바뀌지 않는다. 매 렌더마다
+  // URL 을 확인하되, 직전에 반영한 search 문자열과 같으면 아무것도 하지 않는다.
+  // 이 두 가지(의존성 배열 없음 · search 문자열 비교)는 app/result/tab-deeplink.test.tsx 가
+  // 변이 검사로 고정한다 — 손대기 전에 그 테스트를 먼저 읽을 것.
+  //
+  // exhaustive-deps 를 끄는 이유: 이 규칙은 "[] 를 넣어라"고 권하는데, 그게 바로 위에서 설명한
+  // 회귀다(remount 없는 URL 변경에 탭이 안 따라옴). 경고를 남겨두면 다음 사람이 규칙 조언을
+  // 그대로 따라 고쳐서 기능을 깨뜨린다 — 무한 갱신은 규칙이 걱정하는 방식이 아니라 위 ref 로 막는다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const search = window.location.search;
+    if (search === syncedSearchRef.current) return;
+    syncedSearchRef.current = search;
+    // 파라미터가 사라지거나 알 수 없는 값이 되면 **기본 탭으로 되돌린다**(Codex PR #74 P1).
+    // 팔레트의 "진단 결과" href 가 파라미터 없는 `/result` 라, ?tab=diagnosis 를 보던 중에
+    // 그걸 고르면 remount 없이 URL 만 `/result` 가 된다 — 이때 이전 탭이 남아 있으면
+    // 주소와 화면이 어긋난다. 진입 시점만이 아니라 **전이**도 URL 을 따라야 한다.
+    setTab(parseTabParam(search) ?? DEFAULT_TAB);
+  });
 
   useEffect(() => {
     setProfile(loadSubmittedProfile());
@@ -132,6 +179,25 @@ export default function ResultPage() {
       cancelled = true;
     };
   }, []);
+
+  // 탭 전환 시 URL 만 갱신. router.replace 대신 history.replaceState 를 쓰는 이유 —
+  // 탭 전환은 새 페이지가 아니라 같은 화면의 상태라 RSC 왕복·스크롤 리셋이 낭비다.
+  // Next 14.1+ 는 window.history.pushState/replaceState 를 패치해 App Router 주소 상태까지
+  // 같이 맞춰준다(공식 권장 형태). replaceState 라 뒤로가기 이력도 탭 수만큼 쌓이지 않는다.
+  const selectTab = (id: Tab) => {
+    setTab(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', id);
+      window.history.replaceState(null, '', url.toString());
+      // 우리가 만든 URL 변경은 위 effect 가 다시 처리하지 않도록 표식을 앞당겨 찍는다.
+      syncedSearchRef.current = window.location.search;
+    } catch {
+      // 주소 갱신 실패(예: Safari 의 history API 호출 빈도 제한)는 치명적이지 않다.
+      // 표식을 갱신하지 않았으므로 effect 는 "URL 이 안 바뀌었다"고 보고 아무것도 하지 않는다 —
+      // 방금 누른 탭이 옛 주소의 값으로 되감기지 않는다(사용자 클릭이 주소보다 우선).
+    }
+  };
 
   // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.
   // 후자는 viewModel이 있어도 본문이 예시이므로 반드시 고지해야 함(§6 정직).
@@ -245,7 +311,7 @@ export default function ResultPage() {
                 key={t.id}
                 role="tab"
                 aria-selected={active}
-                onClick={() => setTab(t.id)}
+                onClick={() => selectTab(t.id)}
                 className={cn(
                   'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition',
                   active
