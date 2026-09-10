@@ -136,6 +136,74 @@ describe('POST /api/feedback — 수집처 구성', () => {
   });
 });
 
+// 인증이 없는 라우트라 CSRF 토큰이 없다. 남의 사이트가 방문자 브라우저로 이 주소에 POST 해서
+// **피해자 IP 의 버킷을 대신 소모**시키는 경로를 막는다(모으면 호출자별 한도 우회 + 수집처 스팸).
+describe('POST /api/feedback — 교차 출처 차단', () => {
+  beforeEach(() => vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK));
+
+  it.each([['cross-site'], ['same-site'], ['cross-origin' as string]])(
+    'Sec-Fetch-Site: %s → 403, 레이트리밋도 소비하지 않는다',
+    async (site) => {
+      const res = await POST(
+        post({ category: 'general', content: '내용' }, { 'sec-fetch-site': site }),
+      );
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe('CROSS_ORIGIN_REJECTED');
+      expect(sendMock).not.toHaveBeenCalled();
+      // 같은 IP 의 정상 요청은 여전히 3회 통과해야 한다(버킷이 소모되지 않았다).
+      for (let i = 0; i < 3; i++) {
+        expect((await POST(post({ category: 'general', content: '내용' }))).status).toBe(202);
+      }
+    },
+  );
+
+  it.each([['same-origin'], ['none']])('Sec-Fetch-Site: %s 는 통과', async (site) => {
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'sec-fetch-site': site }),
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it('Origin 이 다른 호스트면 403(Sec-Fetch-Site 없는 구형 브라우저 폴백)', async () => {
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { origin: 'https://evil.example.com' }),
+    );
+    expect(res.status).toBe(403);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('Origin 이 같은 호스트면 통과', async () => {
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { origin: 'http://localhost:3007' }),
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it.each([
+    ['text/plain', 'text/plain'],
+    ['form 인코딩', 'application/x-www-form-urlencoded'],
+    ['multipart', 'multipart/form-data'],
+    ['빈 값', ''],
+  ])('CORS 프리플라이트 없이 보낼 수 있는 타입(%s)은 415', async (_l, type) => {
+    const req = new Request('http://localhost:3007/api/feedback', {
+      method: 'POST',
+      headers: type ? { 'content-type': type } : {},
+      body: JSON.stringify({ category: 'general', content: '내용' }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(415);
+    expect((await res.json()).code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('charset 이 붙은 application/json 은 통과', async () => {
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'content-type': 'application/json; charset=utf-8' }),
+    );
+    expect(res.status).toBe(202);
+  });
+});
+
 describe('POST /api/feedback — 입력 검증', () => {
   beforeEach(() => vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK));
 
@@ -223,6 +291,19 @@ describe('POST /api/feedback — 전달', () => {
     expect(url.href).toBe(WEBHOOK);
     expect(payload.text).toContain('버그 신고'); // 선택한 카테고리가 라벨로 실린다
     expect(payload.text).toContain('탭을 바꾸면 스크롤이 맨 위로 올라가요.');
+  });
+
+  it('Slack 멘션 토큰은 이스케이프해서 보낸다(한 줄로 채널 전원 알림을 울리지 못하게)', async () => {
+    await POST(
+      post({ category: 'general', content: '<!channel> <@U12345> 급해요 & <!here>' }),
+    );
+    const [, , payload] = sendMock.mock.calls[0] as [URL, string, { text: string; mrkdwn: boolean }];
+    expect(payload.text).not.toContain('<!channel>');
+    expect(payload.text).not.toContain('<@U12345>');
+    expect(payload.text).toContain('&lt;!channel&gt;');
+    expect(payload.text).toContain('&lt;@U12345&gt;');
+    expect(payload.text).toContain('&amp;');
+    expect(payload.mrkdwn).toBe(false); // 수집처가 지원하면 서식 해석 자체를 끈다
   });
 
   it('선언하지 않은 키는 수집처로 새어 나가지 않는다', async () => {

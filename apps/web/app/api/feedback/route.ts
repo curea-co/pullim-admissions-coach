@@ -74,6 +74,40 @@ function limiterUnavailable() {
 }
 
 /**
+ * 이 요청이 우리 화면에서 온 것인가(교차 출처 차단).
+ *
+ * 인증이 없는 라우트라 CSRF 토큰이 없다. 그대로 두면 공격 사이트가 방문자 브라우저로 이 주소에
+ * POST 해서 **피해자 IP 의 버킷을 대신 소모**시킬 수 있다(방문자를 여러 명 모으면 호출자별
+ * 한도를 우회한다). 브라우저가 스스로 붙이는 신호로 막는다:
+ *   - `Sec-Fetch-Site`: 최신 브라우저가 항상 붙이고 **스크립트가 위조할 수 없다.**
+ *   - `Origin`: 교차 출처 POST 에는 반드시 붙는다(구형 폴백).
+ * 둘 다 없으면 브라우저發이 아니므로 여기서는 판단하지 않는다(그런 호출은 레이트리밋 소관).
+ */
+function isSameOriginRequest(req: Request): boolean {
+  const site = req.headers.get('sec-fetch-site');
+  if (site) return site === 'same-origin' || site === 'none';
+  const origin = req.headers.get('origin');
+  if (origin) {
+    try {
+      return new URL(origin).host === new URL(req.url).host;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Slack mrkdwn 특수 토큰 무력화.
+ * `<!channel>`·`<@U123>` 같은 토큰이 그대로 들어가면 사용자가 적은 한 줄로 운영 채널 전원에게
+ * 알림을 울릴 수 있다. Slack 문서가 지정한 세 글자(&, <, >)를 이스케이프해 **텍스트로** 만든다.
+ * (`mrkdwn: false` 도 함께 보내지만, 수집처가 그 필드를 무시할 수 있으므로 이스케이프가 본선이다.)
+ */
+function escapeSinkText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
  * 레이트리밋 키(호출자 식별자).
  *
  * `x-forwarded-for` 는 **클라이언트가 직접 넣을 수 있다.** 프록시가 그 값을 덮어쓴다는 보장이
@@ -151,6 +185,26 @@ export async function POST(req: Request) {
       413,
       'PAYLOAD_TOO_LARGE',
       `보낸 내용이 너무 큽니다. 내용은 ${FEEDBACK_CONTENT_MAX}자 이하로 줄여 주세요.`,
+    );
+  }
+
+  // ── 1.5) 교차 출처 차단 — **레이트리밋보다 먼저.** ──
+  // 남의 사이트가 방문자 브라우저로 보낸 요청이 피해자의 버킷을 소모하면 안 된다.
+  if (!isSameOriginRequest(req)) {
+    return fail(
+      403,
+      'CROSS_ORIGIN_REJECTED',
+      '다른 사이트에서 보낸 요청은 접수하지 않습니다.',
+    );
+  }
+  // JSON 만 받는다. `text/plain` 등을 허용하면 CORS 프리플라이트 없이 보낼 수 있는
+  // "simple request" 가 되어 교차 출처 POST 가 그대로 들어온다.
+  const contentType = req.headers.get('content-type') ?? '';
+  if (!contentType.split(';')[0].trim().toLowerCase().startsWith('application/json')) {
+    return fail(
+      415,
+      'UNSUPPORTED_MEDIA_TYPE',
+      '요청 본문은 application/json 이어야 합니다.',
     );
   }
 
@@ -251,15 +305,18 @@ export async function POST(req: Request) {
   // ── 7) 전달 ──
   // Slack incoming webhook 호환 형태(`{ text }`) 한 가지만 보낸다. 수집처가 모르는 키를
   // 거절하는 경우가 있어 구조화 필드를 덧붙이지 않고, 카테고리는 본문 첫 줄에 적는다.
+  // 사용자가 적은 내용은 **이스케이프해서** 넣는다 — 그대로 넣으면 `<!channel>` 한 줄로
+  // 운영 채널 전원 알림을 울릴 수 있다. 앞뒤 줄은 우리가 만든 문자열이라 그대로 둔다.
   const text = [
     `[입시코치 건의] ${feedbackCategoryLabel[category]}`,
-    content,
+    escapeSinkText(content),
     `— ${new Date().toISOString()}`,
   ].join('\n');
 
   try {
     // 연결은 위에서 확인한 IP 로 고정한다(TLS 검증은 호스트명 기준 그대로).
-    const status = await postJsonPinned(sink, sinkAddress, { text }, {
+    // `mrkdwn: false` — 수집처가 지원하면 서식 해석 자체를 끈다(이스케이프와 이중 방어).
+    const status = await postJsonPinned(sink, sinkAddress, { text, mrkdwn: false }, {
       timeoutMs: WEBHOOK_TIMEOUT_MS,
     });
     if (status < 200 || status >= 300) {

@@ -25,6 +25,7 @@ const MESSAGE = {
   tooLong: '내용이 너무 길어 보내지 못했어요. 1000자 이하로 줄여서 다시 보내 주세요.',
   invalid: '보낸 내용이 형식에 맞지 않아 접수되지 않았어요. 내용을 1자 이상 1000자 이하로 적어 주세요.',
   tooOften: '짧은 시간에 너무 여러 번 보냈어요. 잠시 뒤에 다시 시도해 주세요.',
+  blocked: '요청이 서버 검사에서 막혀 접수되지 않았어요. 페이지를 새로고침한 뒤 다시 보내 주세요.',
   server: '서버로 전달하는 중 문제가 생겨 접수되지 않았어요. 잠시 뒤 다시 보내 주세요.',
   network:
     '네트워크에 연결하지 못해 보내지 못했어요. 연결 상태를 확인한 뒤 다시 보내 주세요. 작성한 내용은 그대로 남아 있어요.',
@@ -34,6 +35,8 @@ function messageForStatus(status: number): string {
   if (status === 501) return MESSAGE.notConfigured;
   if (status === 413) return MESSAGE.tooLong;
   if (status === 429) return MESSAGE.tooOften;
+  // 우리 화면에서 보낸 요청은 여기 걸리지 않는다 — 확장 프로그램·오래된 탭 등 비정상 맥락 신호다.
+  if (status === 403 || status === 415) return MESSAGE.blocked;
   if (status === 400 || status === 422) return MESSAGE.invalid;
   return MESSAGE.server;
 }

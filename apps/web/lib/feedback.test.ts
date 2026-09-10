@@ -93,6 +93,13 @@ describe('submitFeedback — 실패는 실패로', () => {
     if (!result.ok) expect(result.message).toContain('여러 번');
   });
 
+  it.each([403, 415])('%s(교차 출처·형식 거절) → 새로고침 안내', async (status) => {
+    fetchMock.mockResolvedValue(json(status));
+    const result = await submitFeedback({ category: 'general', content: '내용' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain('새로고침');
+  });
+
   it('502 → 서버 전달 실패', async () => {
     fetchMock.mockResolvedValue(json(502));
     const result = await submitFeedback({ category: 'general', content: '내용' });
@@ -108,7 +115,7 @@ describe('submitFeedback — 실패는 실패로', () => {
   });
 
   it('어떤 실패 문구에도 §6 금칙어(정답·합격·대본)가 없다', async () => {
-    for (const status of [400, 413, 429, 500, 501, 502, 503]) {
+    for (const status of [400, 403, 413, 415, 429, 500, 501, 502, 503]) {
       fetchMock.mockResolvedValue(json(status));
       const result = await submitFeedback({ category: 'general', content: '내용' });
       if (!result.ok) {
