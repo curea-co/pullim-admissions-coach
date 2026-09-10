@@ -8,7 +8,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
+import { DevBypassBadge } from './dev-bypass-badge';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
+import { devBypassAvailable, readDevBypass, writeDevBypass } from '@/lib/dev-bypass';
 import { isPullimAuth } from '@/lib/auth';
 import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
@@ -26,16 +28,37 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
   // 401 후 refresh 재검증은 **1회로 제한** — 세션 만료가 아닌 이유로 /me/entitlements 가 계속 401이면
   // refresh 성공(status 유지)+nonce++ 가 무한 루프가 되므로, 1회 재시도 후에도 401이면 error 로 종료.
   const authRetryRef = useRef(0);
+  // 개발용 우회로 통과한 상태인가(lib/dev-bypass.ts). true 면 실제 이용권이 아니므로 배지를 붙인다.
+  const [bypassed, setBypassed] = useState(false);
   // 재검증은 캐시를 비우고(결제 반영·장애 복구 위해 fresh fetch 강제) effect 를 재실행한다.
   const recheck = () => {
     clearAdmissionsAccessCache();
     authRetryRef.current = 0;
     setNonce((n) => n + 1);
   };
+  // 개발용 우회 on/off — 기존 recheck() 배관을 그대로 탄다(캐시 비우고 nonce++ → effect 재실행).
+  // 별도 경로를 만들면 우회 해제 후 상태가 어긋날 수 있어, 판정은 항상 effect 한 곳에서만 한다.
+  const enableDevBypass = () => {
+    writeDevBypass(true);
+    recheck();
+  };
+  const disableDevBypass = () => {
+    writeDevBypass(false);
+    recheck();
+  };
 
   useEffect(() => {
     if (!isPullimAuth) return; // mock/데모: 초기값 'ok' 유지(통과)
     if (status !== 'authed') return;
+    // 개발용 엔타이틀먼트 우회 — 창구가 열린 개발 환경에서만 true(운영은 호스트 잠금으로 항상 false).
+    // 이 경우 hasAdmissionsAccess() 를 **아예 호출하지 않는다**: dev 는 flags 에 admissions 자리가
+    // 없어 어차피 denied 로 떨어지고, 불필요한 /me/entitlements 왕복도 없앤다.
+    if (readDevBypass()) {
+      setBypassed(true);
+      setAccess('ok');
+      return;
+    }
+    setBypassed(false);
     let alive = true;
     setAccess('checking');
     hasAdmissionsAccess()
@@ -64,7 +87,15 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
 
   if (status !== 'authed') return null;
   // 결제 완료 후 같은 탭 복귀 시 "다시 확인"으로 재검증 → 구매 반영되면 통과(구매 벽에 갇히지 않음).
-  if (access === 'denied') return <PurchaseWall onRecheck={recheck} />;
+  // devBypassAvailable() 을 렌더 중에 부르지만 hydration mismatch 는 없다 — status 초기값이
+  // 'loading' 이라 서버 렌더에서는 이 줄 위의 `status !== 'authed'` 에서 null 로 끝난다.
+  if (access === 'denied')
+    return (
+      <PurchaseWall
+        onRecheck={recheck}
+        onDevBypass={devBypassAvailable() ? enableDevBypass : undefined}
+      />
+    );
   // 일시 장애(5xx/네트워크) — 유효 유료 사용자가 갇히지 않게 재시도 버튼 제공.
   if (access === 'error') {
     return (
@@ -83,5 +114,11 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
   if (access === 'checking') {
     return <div className="px-6 py-10 text-sm text-ink-500">확인 중…</div>;
   }
-  return <>{children}</>;
+  // 우회로 열린 화면은 실제 권한과 눈으로 구분돼야 한다 — 통과 렌더 앞에 경고 배지를 붙인다.
+  return (
+    <>
+      {bypassed && <DevBypassBadge onDisable={disableDevBypass} />}
+      {children}
+    </>
+  );
 }
