@@ -24,6 +24,7 @@ const MESSAGE = {
     '지금은 건의를 받을 창구가 서버에 연결되어 있지 않아 보내지 못했어요. 운영 설정이 필요한 문제라, 잠시 뒤 다시 시도해 주세요.',
   tooLong: '내용이 너무 길어 보내지 못했어요. 1000자 이하로 줄여서 다시 보내 주세요.',
   invalid: '보낸 내용이 형식에 맞지 않아 접수되지 않았어요. 내용을 1자 이상 1000자 이하로 적어 주세요.',
+  tooOften: '짧은 시간에 너무 여러 번 보냈어요. 잠시 뒤에 다시 시도해 주세요.',
   server: '서버로 전달하는 중 문제가 생겨 접수되지 않았어요. 잠시 뒤 다시 보내 주세요.',
   network:
     '네트워크에 연결하지 못해 보내지 못했어요. 연결 상태를 확인한 뒤 다시 보내 주세요. 작성한 내용은 그대로 남아 있어요.',
@@ -32,6 +33,7 @@ const MESSAGE = {
 function messageForStatus(status: number): string {
   if (status === 501) return MESSAGE.notConfigured;
   if (status === 413) return MESSAGE.tooLong;
+  if (status === 429) return MESSAGE.tooOften;
   if (status === 400 || status === 422) return MESSAGE.invalid;
   return MESSAGE.server;
 }

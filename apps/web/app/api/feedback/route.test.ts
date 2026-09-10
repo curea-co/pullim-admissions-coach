@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { POST } from './route';
 
 // 수신 라우트 계약 고정. 핵심은 **정직성**이다 — 전달되지 않았으면 성공을 돌려주지 않는다.
-// (수집처 미설정 501 / 수집처 실패 502). 그 다음이 입력 방어(크기·JSON·스키마).
+// (수집처 미설정 501 / 수집처 실패 502). 그 다음이 남용 방어(레이트리밋·본문 크기)와 입력 방어.
 
 const WEBHOOK = 'https://hooks.example.test/services/T000/B000/xxx';
 
@@ -18,10 +17,16 @@ function post(body: string | object, headers: Record<string, string> = {}) {
 
 const fetchMock = vi.fn();
 
-beforeEach(() => {
+// 라우트는 프로세스 수명 동안 유지되는 레이트리밋 싱글톤을 쓴다. 테스트마다 모듈을 새로
+// 불러 카운터를 0 에서 시작하게 한다 — 안 그러면 앞 테스트의 호출이 뒤 테스트를 429 로 만든다.
+let POST: (req: Request) => Promise<Response>;
+
+beforeEach(async () => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
+  vi.resetModules();
+  ({ POST } = await import('./route'));
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -89,6 +94,35 @@ describe('POST /api/feedback — 입력 검증', () => {
     expect(res.status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('content-length 없는 대용량 스트림은 **읽는 도중에** 끊긴다(전부 버퍼링하지 않는다)', async () => {
+    // chunked 요청은 content-length 를 아예 보내지 않는다. 다 읽고 나서 재는 구현이면
+    // 이 시점에 이미 수십 MB 가 메모리에 들어와 있다 — 그래서 청크 단위로 끊어야 한다.
+    const CHUNK = 1024;
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 200) {
+          controller.close(); // 테스트가 무한히 돌지 않게 하는 안전장치(정상 경로면 닿지 않는다)
+          return;
+        }
+        controller.enqueue(new Uint8Array(CHUNK).fill(0x61));
+      },
+    });
+    const req = new Request('http://localhost:3007/api/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+    // 8KB 상한 = 청크 9개 언저리에서 취소돼야 한다. 안전장치(200)에 닿았다면 끊지 못한 것이다.
+    expect(pulled).toBeLessThan(20);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/feedback — 전달', () => {
@@ -132,5 +166,58 @@ describe('POST /api/feedback — 전달', () => {
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(502);
     expect((await res.json()).code).toBe('FEEDBACK_SINK_UNREACHABLE');
+  });
+});
+
+// 이 라우트는 인증이 없다 — 누구나 부를 수 있으므로 남용 방어가 유일한 보호막이다.
+// 방어가 사라지면 서버가 외부 발송 프록시가 되므로, 거절 경로를 명시적으로 못박는다.
+describe('POST /api/feedback — 남용 가드', () => {
+  const from = (ip: string) => ({ 'x-forwarded-for': ip });
+
+  beforeEach(() => vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK));
+
+  it('같은 IP 가 버스트 한도(3회/분)를 넘기면 429 + Retry-After, 전달하지 않는다', async () => {
+    const body = { category: 'general', content: '내용' };
+    for (let i = 0; i < 3; i++) {
+      expect((await POST(post(body, from('203.0.113.7')))).status).toBe(202);
+    }
+    const res = await POST(post(body, from('203.0.113.7')));
+    expect(res.status).toBe(429);
+    expect((await res.json()).code).toBe('RATE_LIMITED');
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // 4번째는 수집처로 나가지 않았다
+  });
+
+  it('다른 IP 는 서로의 한도에 걸리지 않는다', async () => {
+    const body = { category: 'general', content: '내용' };
+    for (let i = 0; i < 3; i++) await POST(post(body, from('203.0.113.7')));
+    expect((await POST(post(body, from('198.51.100.9')))).status).toBe(202);
+  });
+
+  it('x-forwarded-for 가 없으면 x-real-ip 를 쓴다', async () => {
+    const body = { category: 'general', content: '내용' };
+    for (let i = 0; i < 3; i++) {
+      await POST(post(body, { 'x-real-ip': '203.0.113.10' }));
+    }
+    expect((await POST(post(body, { 'x-real-ip': '203.0.113.10' }))).status).toBe(429);
+  });
+
+  it('막힌 요청은 전체 상한을 소비하지 않는다(한 IP 의 폭주가 모두를 막지 않게)', async () => {
+    const body = { category: 'general', content: '내용' };
+    // 한 IP 로 20회 시도 → 3회만 통과하고 17회는 429. 그 17회가 전체 카운터를 갉아먹으면 안 된다.
+    for (let i = 0; i < 20; i++) await POST(post(body, from('203.0.113.7')));
+    // 다른 IP 들이 여전히 정상적으로 통과해야 한다.
+    for (let i = 0; i < 5; i++) {
+      const res = await POST(post(body, from(`198.51.100.${i}`)));
+      expect(res.status).toBe(202);
+    }
+  });
+
+  it('프로덕션에서 리미터가 구성되지 않으면 열지 않고 503(fail-closed)', async () => {
+    vi.stubEnv('NODE_ENV', 'production'); // RATE_LIMIT_BACKEND 미설정 → 리미터 init 실패
+    const res = await POST(post({ category: 'general', content: '내용' }, from('203.0.113.7')));
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('RATE_LIMIT_UNAVAILABLE');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
