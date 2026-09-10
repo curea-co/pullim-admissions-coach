@@ -1,4 +1,7 @@
-// 개발용 엔타이틀먼트 우회 — 실 auth 모드에서 입시코치 **구매 벽(FE 게이트)만** 넘기는 개발 스위치.
+// 개발용 게이트 우회 — 실 auth 모드에서 입시코치 FE 게이트를 넘기는 개발 스위치 **두 종**.
+//   ① `NEXT_PUBLIC_DEV_ENTITLEMENT_BYPASS` — 구매 벽만. 로그인은 한 상태에서 구매 벽 버튼으로 opt-in.
+//   ② `NEXT_PUBLIC_DEV_GATE_BYPASS`        — 인증 + 구매 벽 둘 다. 토큰 없이 화면을 연다(클릭 없음).
+// 둘 다 아래 **같은 호스트 allowlist**(isBypassableHost)를 마지막 잠금으로 쓴다.
 //
 // 왜 필요한가: dev 의 `GET /me/entitlements` 가 돌려주는 flags 에는 q·planner·writing·studio·
 // reader·classbot·junior 7종뿐이고 `admissions` 키가 **아예 없다**(값이 0인 게 아니라 자리가 없다).
@@ -53,7 +56,7 @@ export function isBypassableHost(hostname: string): boolean {
   return false;
 }
 
-/** 우회 창구가 열려 있는가 = 빌드 플래그 + 브라우저 컨텍스트 + 호스트 allowlist. */
+/** ①의 우회 창구가 열려 있는가 = 빌드 플래그 + 브라우저 컨텍스트 + 호스트 allowlist. */
 export function devBypassAvailable(): boolean {
   // env 는 **함수 안에서** 읽는다 — 모듈 상수로 굳히면 테스트의 vi.stubEnv 가 먹지 않는다
   // (lib/pullim-services.ts 와 같은 제약). 리터럴 접근이어야 빌드타임 인라인이 된다.
@@ -87,4 +90,27 @@ export function writeDevBypass(on: boolean): void {
   } catch {
     // read 와 같은 이유 — 저장에 실패하면 우회가 켜지지 않는다(게이트 유지 = 안전한 실패).
   }
+}
+
+/**
+ * ② 개발용 **게이트 전체 우회** — 인증(RequireAuth)과 구매 벽(RequireAdmissionsAccess)을 **둘 다**
+ * 넘긴다. ①과 다른 점은 두 가지다.
+ *   - **인증까지 넘는다.** ①은 로그인 뒤에 나오는 구매 벽 안의 버튼이라, 토큰이 없으면 그 화면에
+ *     닿기도 전에 RequireAuth 가 OS 로그인으로 보내 버린다. dev 배포를 로그인 없이 열어 보려면
+ *     인증 게이트도 같이 열려야 한다.
+ *   - **세션 opt-in 이 없다.** 누를 버튼이 안 나오는 상황을 푸는 스위치라 sessionStorage 토글을
+ *     둘 자리가 없다. 대신 플래그를 **별도 이름**으로 분리해, 구매 벽만 열려던 환경이 인증까지
+ *     통째로 열리는 일이 없게 했다(①을 켜도 이 함수는 false).
+ *
+ * ⚠️ 여는 건 **화면뿐**이다. user 는 계속 null 이고 BE 는 401/403 으로 막으므로 실제 제출·진단은
+ *    실패한다. 레이아웃·폼 확인 용도로만 쓴다.
+ */
+export function devGateBypassEnabled(): boolean {
+  // ①과 같은 이유로 env 는 함수 안에서 리터럴로 읽는다(빌드타임 인라인 + 테스트 stubEnv).
+  if (process.env.NEXT_PUBLIC_DEV_GATE_BYPASS !== 'true') return false;
+  // SSR 에서는 호스트를 알 수 없다 → 판단 불가는 닫는 쪽으로(소비처의 hydration 처리도 이에 맞춘다).
+  if (typeof window === 'undefined') return false;
+  // 운영을 지키는 마지막 잠금 — ①과 **같은 allowlist** 를 쓴다. 판정을 복제하면 한쪽만 고쳐지는
+  // 사고가 나므로 운영 잠금은 이 저장소에서 오직 isBypassableHost 한 곳에만 있다.
+  return isBypassableHost(window.location.hostname);
 }

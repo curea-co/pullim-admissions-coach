@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isBypassableHost, devBypassAvailable, readDevBypass, writeDevBypass } from './dev-bypass';
+import {
+  isBypassableHost,
+  devBypassAvailable,
+  devGateBypassEnabled,
+  readDevBypass,
+  writeDevBypass,
+} from './dev-bypass';
 
 // 개발용 엔타이틀먼트 우회의 **이중 잠금**(빌드 플래그 + 호스트 allowlist) 회귀 고정.
 // 가장 중요한 단언은 "플래그가 켜져도 운영 호스트에서는 열리지 않는다" — 플래그가 실수로 운영
@@ -109,6 +115,51 @@ describe('devBypassAvailable — 플래그 × 호스트', () => {
       expect(devBypassAvailable()).toBe(false);
     },
   );
+});
+
+describe('devGateBypassEnabled — 인증까지 넘기는 전체 게이트 우회', () => {
+  it('플래그 미설정이면 로컬에서도 false', () => {
+    expect(devGateBypassEnabled()).toBe(false);
+  });
+
+  it("플래그가 'true' 가 아닌 값('1')이면 false", () => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', '1');
+    expect(devGateBypassEnabled()).toBe(false);
+  });
+
+  it.each([
+    'localhost',
+    '127.0.0.1',
+    'admissions.pullim.local',
+    'dev-admissions.pullim.ai',
+    'dev.pullim.ai',
+  ])('플래그 on + %s → true', (h) => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', 'true');
+    setHost(h);
+    expect(devGateBypassEnabled()).toBe(true);
+  });
+
+  it.each(['pullim.ai', 'admissions.pullim.ai', 'www.pullim.ai', 'dev-preview.vercel.app'])(
+    '플래그가 실수로 켜진 운영 빌드여도 %s 에서는 false — 인증 게이트가 열리는 사고를 막는 잠금',
+    (h) => {
+      vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', 'true');
+      setHost(h);
+      expect(devGateBypassEnabled()).toBe(false);
+    },
+  );
+
+  // 두 스위치는 **별개 플래그**다 — 구매 벽만 열려던 환경이 인증까지 통째로 열리면 안 되고,
+  // 반대로 게이트 우회를 켰다고 sessionStorage opt-in 이 켜진 것으로 오인돼도 안 된다.
+  it('엔타이틀먼트 우회 플래그만 켜진 상태로는 게이트 우회가 열리지 않는다', () => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_ENTITLEMENT_BYPASS', 'true');
+    expect(devGateBypassEnabled()).toBe(false);
+  });
+
+  it('게이트 우회 플래그만 켜진 상태로는 엔타이틀먼트 우회 창구가 열리지 않는다', () => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', 'true');
+    expect(devBypassAvailable()).toBe(false);
+    expect(readDevBypass()).toBe(false);
+  });
 });
 
 describe('readDevBypass / writeDevBypass', () => {

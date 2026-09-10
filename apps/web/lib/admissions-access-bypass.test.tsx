@@ -13,7 +13,8 @@ const clearAdmissionsAccessCache = vi.fn();
 // useAuth 반환값은 **렌더마다 같은 객체**여야 한다 — 게이트 effect 의 deps 에 refresh 가 들어 있어
 // 매 렌더 새 함수를 돌려주면 effect 가 무한 재실행된다(테스트가 조용히 루프로 죽는다).
 const auth = vi.hoisted(() => ({
-  status: 'authed' as const,
+  // 게이트 우회(②) 케이스가 'guest' 로 갈아끼우므로 리터럴로 굳히지 않는다(beforeEach 에서 복원).
+  status: 'authed' as 'authed' | 'guest',
   user: { id: 'u1', displayName: '박준호', email: 'a@b.test', tier: 'free', package: 'home' },
   logout: vi.fn(),
   refresh: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.sessionStorage.clear();
   setHost('localhost');
+  auth.status = 'authed';
   hasAdmissionsAccess.mockResolvedValue(false); // 미보유 = dev 의 실제 상태(admissions 키 없음)
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -111,5 +113,41 @@ describe('RequireAdmissionsAccess — 개발용 엔타이틀먼트 우회 배선
     // 해제 후에는 원래 경로(권위 신호 재조회)로 복귀해야 한다.
     expect(hasAdmissionsAccess).toHaveBeenCalledTimes(1);
     expect(clearAdmissionsAccessCache).toHaveBeenCalled();
+  });
+});
+
+// ② 게이트 전체 우회 — 토큰 없이(status='guest') 화면이 열려야 한다.
+// 이 배선이 끊기면 status 검사(`status !== 'authed'` → null)에 걸려 흰 화면이 되므로,
+// dev 배포를 로그인 없이 확인하는 경로가 조용히 사라진다.
+describe('RequireAdmissionsAccess — 개발용 게이트 우회(미인증 통과)', () => {
+  it('플래그 on(로컬) + guest → 엔타이틀먼트 조회 없이 children + 게이트 우회 배지', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', 'true');
+    auth.status = 'guest';
+    renderGate();
+
+    await waitFor(() => expect(child()).toBeInTheDocument());
+    expect(screen.getByText('개발 게이트 우회 중 · 인증·이용권 검사 꺼짐')).toBeInTheDocument();
+    expect(hasAdmissionsAccess).not.toHaveBeenCalled();
+    // 빌드 플래그라 화면에서 끌 수 없다 — 아무 일도 안 하는 해제 버튼을 두지 않는다.
+    expect(screen.queryByRole('button', { name: '해제' })).not.toBeInTheDocument();
+  });
+
+  it('운영 호스트에서는 플래그가 켜져 있어도 guest 를 통과시키지 않는다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEV_GATE_BYPASS', 'true');
+    setHost('admissions.pullim.ai');
+    auth.status = 'guest';
+    renderGate();
+
+    await waitFor(() => expect(hasAdmissionsAccess).not.toHaveBeenCalled());
+    expect(child()).not.toBeInTheDocument();
+    expect(screen.queryByText('개발 게이트 우회 중 · 인증·이용권 검사 꺼짐')).not.toBeInTheDocument();
+  });
+
+  it('플래그 off + guest → 아무것도 렌더하지 않는다(기존 동작 유지)', async () => {
+    auth.status = 'guest';
+    renderGate();
+
+    await waitFor(() => expect(hasAdmissionsAccess).not.toHaveBeenCalled());
+    expect(child()).not.toBeInTheDocument();
   });
 });
