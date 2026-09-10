@@ -79,7 +79,19 @@ describe('createMemoryRateLimiter', () => {
     expect(first.limit).toBe(3);
   });
 
-  it('maxKeys 초과 시 가장 오래된 key evict(메모리 상한)', async () => {
+  it('재사용한 key 는 축출되지 않는다(계속 쓰는 사용자의 카운터가 지워지면 한도가 풀린다)', async () => {
+    const c = clock();
+    const rl = createMemoryRateLimiter({ now: c.now, maxKeys: 2 });
+    await rl.check('victim', BURST); // 1회 사용
+    await rl.check('other', BURST);
+    await rl.check('victim', BURST); // 재사용 — 여기서 "최근 사용"으로 올라와야 한다
+    await rl.check('new', BURST); // 용량 초과 → 가장 오래 안 쓴 'other' 가 나간다
+    // victim 은 살아 있어야 한다: 이미 2회 썼으므로 3회째만 허용되고 4회째는 막힌다.
+    expect((await rl.check('victim', BURST)).allowed).toBe(true);
+    expect((await rl.check('victim', BURST)).allowed).toBe(false);
+  });
+
+  it('maxKeys 초과 시 가장 오래 쓰이지 않은 key evict(메모리 상한)', async () => {
     const c = clock();
     const rl = createMemoryRateLimiter({ now: c.now, maxKeys: 2 });
     await rl.check('k1', BURST);

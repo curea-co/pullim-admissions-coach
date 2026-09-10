@@ -174,10 +174,18 @@ export async function POST(req: Request) {
   // ── 3) 수집처 구성 — 없으면 여기서 끝낸다 ──
   // 검증보다 앞에 두는 이유: 어차피 전달할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
   // 입력을 고치려 들지만 실제 원인은 서버 구성이다. 원인을 그대로 말한다.
-  const sink = parseWebhookTarget(
-    process.env.FEEDBACK_WEBHOOK_URL,
-    process.env.FEEDBACK_WEBHOOK_ALLOWED_HOSTS,
-  );
+  const allowlist = process.env.FEEDBACK_WEBHOOK_ALLOWED_HOSTS?.trim();
+  // 프로덕션은 allowlist 를 **요구한다.** 이름 검사와 DNS 확인만으로는 확인 시점과 연결 시점
+  // 사이의 리바인딩을 닫지 못한다(연결을 확인한 IP 에 고정해야 닫힌다). allowlist 를 강제하면
+  // 그 경로를 쓰려면 허용된 공급자의 DNS 자체를 장악해야 한다 — 실무에서 이 틈이 닫힌다.
+  if (process.env.NODE_ENV === 'production' && !allowlist) {
+    return fail(
+      501,
+      'FEEDBACK_SINK_ALLOWLIST_REQUIRED',
+      '수집처 호스트 allowlist 가 설정되지 않아 전송하지 않았습니다. 운영자가 FEEDBACK_WEBHOOK_ALLOWED_HOSTS 를 설정해야 합니다.',
+    );
+  }
+  const sink = parseWebhookTarget(process.env.FEEDBACK_WEBHOOK_URL, allowlist);
   if (!sink) {
     return fail(
       501,

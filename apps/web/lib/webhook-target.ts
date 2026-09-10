@@ -58,14 +58,38 @@ function parseIpv6(host: string): number[] | null {
   return [...head, ...Array(fill).fill(0), ...rest];
 }
 
-/** 사설·루프백·링크로컬 IPv4 인가. */
-function isInternalIpv4([a, b]: number[]): boolean {
-  if (a === 10 || a === 127 || a === 0) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 169 && b === 254) return true; // 클라우드 메타데이터(169.254.169.254) 포함
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT(100.64/10)
-  return false;
+/**
+ * IANA special-purpose IPv4 대역(= 전역 유니캐스트가 아닌 것) 전부.
+ * 사설·루프백만 막으면 멀티캐스트(224/4)·예약(240/4)·벤치마킹(198.18/15) 같은 비전역 주소가
+ * 그대로 빠져나간다. 이 함수는 공개 엔드포인트의 차단 경계이므로 목록으로 못박는다.
+ */
+const RESERVED_V4: ReadonlyArray<readonly [string, number]> = [
+  ['0.0.0.0', 8], // this network
+  ['10.0.0.0', 8], // private
+  ['100.64.0.0', 10], // CGNAT
+  ['127.0.0.0', 8], // loopback
+  ['169.254.0.0', 16], // link-local(클라우드 메타데이터 169.254.169.254 포함)
+  ['172.16.0.0', 12], // private
+  ['192.0.0.0', 24], // IETF protocol assignments
+  ['192.0.2.0', 24], // TEST-NET-1
+  ['192.88.99.0', 24], // 6to4 relay anycast
+  ['192.168.0.0', 16], // private
+  ['198.18.0.0', 15], // benchmarking
+  ['198.51.100.0', 24], // TEST-NET-2
+  ['203.0.113.0', 24], // TEST-NET-3
+  ['224.0.0.0', 4], // multicast
+  ['240.0.0.0', 4], // reserved(255.255.255.255 포함)
+];
+
+const toUint32 = ([a, b, c, d]: number[]) => ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+
+/** 전역 유니캐스트가 아닌 IPv4 인가. */
+function isInternalIpv4(octets: number[]): boolean {
+  const value = toUint32(octets);
+  return RESERVED_V4.some(([base, bits]) => {
+    const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+    return (value & mask) === (toUint32(base.split('.').map(Number)) & mask);
+  });
 }
 
 /**
@@ -88,15 +112,18 @@ export function isInternalHost(hostname: string): boolean {
   const v6 = parseIpv6(host);
   if (v6) {
     const isZeroPrefix = (n: number) => v6.slice(0, n).every((h) => h === 0);
-    if (v6.every((h) => h === 0)) return true; // :: (unspecified)
-    if (isZeroPrefix(7) && v6[7] === 1) return true; // ::1 (loopback)
     // IPv4-mapped(::ffff:a.b.c.d) · IPv4-compatible(::a.b.c.d) — 안에 든 IPv4 규칙을 그대로 적용.
     if (isZeroPrefix(5) && (v6[5] === 0xffff || v6[5] === 0)) {
-      const mapped = [v6[6] >> 8, v6[6] & 0xff, v6[7] >> 8, v6[7] & 0xff];
-      return isInternalIpv4(mapped);
+      const embedded = [v6[6] >> 8, v6[6] & 0xff, v6[7] >> 8, v6[7] & 0xff];
+      // `::`(unspecified)·`::1`(loopback) 은 0.0.0.0/8·0.0.0.1 로 접혀 v4 표에서 걸린다.
+      return isInternalIpv4(embedded);
     }
-    if ((v6[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 링크로컬
-    if ((v6[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 ULA
+    // IPv6 는 **허용 대역을 명시**한다: 전역 유니캐스트는 2000::/3 뿐이다.
+    // 이렇게 두면 링크로컬(fe80::/10)·ULA(fc00::/7)·멀티캐스트(ff00::/8)·미지정이 한 줄에 걸린다.
+    if ((v6[0] & 0xe000) !== 0x2000) return true;
+    // 전역 대역 안의 특수 용도 — 문서용·전이 기술(안에 IPv4 를 실어 나른다).
+    if (v6[0] === 0x2001 && (v6[1] === 0x0db8 || v6[1] === 0x0000)) return true; // 2001:db8::/32, Teredo
+    if (v6[0] === 0x2002) return true; // 6to4
     return false;
   }
 

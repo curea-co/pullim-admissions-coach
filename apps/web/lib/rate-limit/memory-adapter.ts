@@ -34,13 +34,17 @@ export function createMemoryRateLimiter(opts: MemoryOpts = {}): RateLimiter {
       const t = now();
       const maxWindowMs = Math.max(...rules.map((r) => r.windowSec)) * 1000;
 
-      // LRU 유사 evict: 용량 초과 시 첫(가장 오래된 삽입) key 제거.
-      if (!hits.has(key) && hits.size >= maxKeys) {
+      // LRU evict: 용량 초과 시 **가장 오래 쓰이지 않은** key 제거.
+      // Map#set 은 기존 키의 삽입 순서를 갱신하지 않는다 — 지우고 다시 넣어야 "최근 사용"이 된다.
+      // 그러지 않으면 계속 요청하는 사용자의 카운터가 신규 키에 밀려 초기화되고, 그 순간 한도가
+      // 통째로 풀린다(공격자가 새 키를 뿌리는 것만으로 남의 카운터를 지울 수 있다).
+      const existing = prune(hits.get(key) ?? [], maxWindowMs, t);
+      if (hits.delete(key)) {
+        // 재사용된 키 — 뒤로 보내 축출 대상에서 멀어진다.
+      } else if (hits.size >= maxKeys) {
         const oldest = hits.keys().next().value;
         if (oldest !== undefined) hits.delete(oldest);
       }
-
-      const existing = prune(hits.get(key) ?? [], maxWindowMs, t);
 
       // 가장 빡빡한 규칙(최소 max) 기준 remaining 계산용
       let tightestRemaining = Infinity;

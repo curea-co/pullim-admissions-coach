@@ -109,6 +109,19 @@ describe('POST /api/feedback — 수집처 구성', () => {
     vi.stubEnv('FEEDBACK_WEBHOOK_ALLOWED_HOSTS', 'hooks.slack.com');
     expect((await POST(post({ category: 'general', content: '내용' }))).status).toBe(202);
   });
+
+  it('프로덕션에서 allowlist 미설정이면 보내지 않는다 — DNS 리바인딩 틈을 닫는 최소 조건', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for');
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'x-vercel-forwarded-for': '203.0.113.7' }),
+    );
+    expect(res.status).toBe(501);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_ALLOWLIST_REQUIRED');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/feedback — 입력 검증', () => {
@@ -316,6 +329,7 @@ describe('POST /api/feedback — 남용 가드', () => {
 describe('POST /api/feedback — 호출자 식별자의 신뢰 경계', () => {
   beforeEach(() => {
     vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    vi.stubEnv('FEEDBACK_WEBHOOK_ALLOWED_HOSTS', 'hooks.example.test'); // 프로덕션 필수 조건
     vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
   });
 
