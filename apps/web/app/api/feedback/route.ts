@@ -8,6 +8,7 @@ import {
   FEEDBACK_GLOBAL_KEY,
   FEEDBACK_GLOBAL_RATE_RULES,
   FEEDBACK_RATE_RULES,
+  globalRateLimiter,
   rateLimiter,
 } from '@/lib/rate-limit';
 
@@ -44,15 +45,64 @@ function fail(status: number, code: string, message: string, extra?: Record<stri
   return NextResponse.json({ ok: false, code, message, ...extra }, { status });
 }
 
-/** 스킴까지 유효한 URL 인가 — 형식이 깨진 값은 "설정되지 않음"과 같이 취급한다(health 와 동일 판정). */
-function isValidUrl(value: string | undefined): boolean {
-  if (!value) return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
+function rateLimited(retryAfterSec: number) {
+  return NextResponse.json(
+    {
+      ok: false,
+      code: 'RATE_LIMITED',
+      message: '건의를 너무 자주 보냈습니다. 잠시 뒤에 다시 시도해 주세요.',
+    },
+    { status: 429, headers: { 'retry-after': String(retryAfterSec) } },
+  );
+}
+
+/**
+ * 프로덕션에서 리미터가 구성되지 않았거나(fail-closed) 저장소에 닿지 못한 경우.
+ * 보호 없이 여는 대신 거절한다 — 열어 두면 그 순간 외부 발송 프록시가 된다.
+ */
+function limiterUnavailable() {
+  return fail(
+    503,
+    'RATE_LIMIT_UNAVAILABLE',
+    '남용 방지 장치를 사용할 수 없어 접수를 잠시 중단했습니다. 잠시 뒤 다시 시도해 주세요.',
+  );
+}
+
+/** 내부망을 가리키는 호스트인지 — IP 리터럴(사설·루프백·링크로컬)과 내부 도메인 관용 접미. */
+function isInternalHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, ''); // IPv6 는 대괄호로 온다
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.home.arpa')) return true;
+  if (h === '::1' || h === '0.0.0.0') return true;
+  if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80:')) return true; // ULA·링크로컬
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 10 || a === 127) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true; // 클라우드 메타데이터(169.254.169.254) 포함
   }
+  return false;
+}
+
+/**
+ * 수집처로 **보내도 되는** URL 인가.
+ * `new URL()` 만 통과시키면 `http:`·`file:` 이나 내부 주소도 유효로 판정돼, 구성 실수 하나로
+ * 이 공개 라우트가 내부망을 향한 SSRF 통로가 된다. https 로 한정하고 내부 호스트를 거른다.
+ * ⚠️ DNS 리바인딩(공인 도메인 → 사설 IP)까지는 이 계층에서 막을 수 없다 — 수집처 URL 은
+ * 운영자가 설정하는 값이므로 최종 방어는 그 값의 관리다.
+ */
+function isAllowedWebhookUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false; // 스킴 누락 등 형식 오류
+  }
+  if (url.protocol !== 'https:') return false;
+  return !isInternalHost(url.hostname);
 }
 
 /**
@@ -120,46 +170,25 @@ export async function POST(req: Request) {
     );
   }
 
-  // ── 2) 남용 가드 — 본문을 읽기 전에 건다 ──
-  // 순서가 중요하다: 읽고 나서 재면 이미 자원을 쓴 뒤다. 호출자별 한도와 전체 상한을 둘 다 본다.
+  // ── 2) 호출자별 남용 가드 — 본문을 읽기 전에 건다 ──
+  // 순서가 중요하다: 읽고 나서 재면 이미 자원을 쓴 뒤다.
+  // (전체 상한은 여기서 보지 않는다 — 아래 5)의 설명 참조.)
   try {
-    // 호출자 한도를 **먼저** 본다. 순서를 바꿔 둘을 동시에 소비하면, 한 IP 가 계속 막히면서도
-    // 전체 상한을 갉아먹어 결국 모두를 막는 자해가 된다(막힌 요청은 전체 카운터를 쓰지 않는다).
     const caller = await rateLimiter.check(callerKey(req), FEEDBACK_RATE_RULES);
-    const blocked = caller.allowed
-      ? await rateLimiter
-          .check(FEEDBACK_GLOBAL_KEY, FEEDBACK_GLOBAL_RATE_RULES)
-          .then((r) => (r.allowed ? null : r))
-      : caller;
-    if (blocked) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: 'RATE_LIMITED',
-          message: '건의를 너무 자주 보냈습니다. 잠시 뒤에 다시 시도해 주세요.',
-        },
-        { status: 429, headers: { 'retry-after': String(blocked.retryAfterSec) } },
-      );
-    }
+    if (!caller.allowed) return rateLimited(caller.retryAfterSec);
   } catch {
-    // 프로덕션에서 리미터가 구성되지 않았거나(fail-closed) 저장소에 닿지 못한 경우.
-    // 보호 없이 여는 대신 거절한다 — 열어 두면 그 순간 외부 발송 프록시가 된다.
-    return fail(
-      503,
-      'RATE_LIMIT_UNAVAILABLE',
-      '남용 방지 장치를 사용할 수 없어 접수를 잠시 중단했습니다. 잠시 뒤 다시 시도해 주세요.',
-    );
+    return limiterUnavailable();
   }
 
   // ── 3) 수집처 구성 — 없으면 여기서 끝낸다 ──
   // 검증보다 앞에 두는 이유: 어차피 전달할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
   // 입력을 고치려 들지만 실제 원인은 서버 구성이다. 원인을 그대로 말한다.
   const webhookUrl = process.env.FEEDBACK_WEBHOOK_URL;
-  if (!isValidUrl(webhookUrl)) {
+  if (!isAllowedWebhookUrl(webhookUrl)) {
     return fail(
       501,
       'FEEDBACK_SINK_NOT_CONFIGURED',
-      '건의 내용을 전달할 수집처가 이 환경에 설정되어 있지 않습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 설정해야 전송됩니다.',
+      '건의 내용을 전달할 수집처가 이 환경에 설정되어 있지 않습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 설정해야 전송됩니다(내부 주소가 아닌 https URL).',
     );
   }
 
@@ -194,7 +223,18 @@ export async function POST(req: Request) {
   }
   const { category, content } = parsed.data;
 
-  // ── 6) 전달 ──
+  // ── 6) 전체 상한 — **유효한 제출로 확인된 뒤에** 소비한다 ──
+  // 이 카운터의 목적은 "수집처로 나가는 총량"을 묶는 것이다. 검증 전에 깎으면, 깨진 JSON 을
+  // IP 만 바꿔 가며 보내는 것만으로 전체 quota 를 태워 정상 사용자를 한 시간 막을 수 있다.
+  // 유효하지 않은 요청의 비용은 호출자별 한도 + 본문 크기 상한이 이미 묶고 있다.
+  try {
+    const overall = await globalRateLimiter.check(FEEDBACK_GLOBAL_KEY, FEEDBACK_GLOBAL_RATE_RULES);
+    if (!overall.allowed) return rateLimited(overall.retryAfterSec);
+  } catch {
+    return limiterUnavailable();
+  }
+
+  // ── 7) 전달 ──
   // Slack incoming webhook 호환 형태(`{ text }`) 한 가지만 보낸다. 수집처가 모르는 키를
   // 거절하는 경우가 있어 구조화 필드를 덧붙이지 않고, 카테고리는 본문 첫 줄에 적는다.
   const text = [
@@ -212,6 +252,8 @@ export async function POST(req: Request) {
       body: JSON.stringify({ text }),
       signal: controller.signal,
       cache: 'no-store',
+      // 리다이렉트를 따라가지 않는다 — 허용된 https 호스트가 내부 주소로 튕겨 보내는 경로를 막는다.
+      redirect: 'error',
     });
     if (!res.ok) {
       // 수집처의 응답 본문은 그대로 흘리지 않는다(내부 주소·토큰이 섞여 나올 수 있다).

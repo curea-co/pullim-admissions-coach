@@ -45,11 +45,30 @@ describe('POST /api/feedback — 수집처 구성', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('스킴 없는 값도 미설정과 같이 501 — 형식이 깨진 URL 로는 전달할 수 없다', async () => {
-    vi.stubEnv('FEEDBACK_WEBHOOK_URL', 'hooks.example.test/abc');
+  it.each([
+    ['스킴 누락', 'hooks.example.test/abc'],
+    ['http(평문)', 'http://hooks.example.test/abc'],
+    ['file 스킴', 'file:///etc/passwd'],
+    ['localhost', 'https://localhost:9000/hook'],
+    ['루프백 IP', 'https://127.0.0.1/hook'],
+    ['사설 IP(10/8)', 'https://10.1.2.3/hook'],
+    ['사설 IP(172.16/12)', 'https://172.20.0.5/hook'],
+    ['사설 IP(192.168/16)', 'https://192.168.0.9/hook'],
+    ['클라우드 메타데이터', 'https://169.254.169.254/latest/meta-data'],
+    ['IPv6 루프백', 'https://[::1]/hook'],
+    ['내부 도메인', 'https://redis.internal/hook'],
+  ])('보내면 안 되는 수집처(%s)는 미설정과 같이 501 — SSRF 통로가 되지 않게', async (_l, url) => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', url);
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('리다이렉트를 따라가지 않는다(허용 호스트가 내부로 튕기는 경로 차단)', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    await POST(post({ category: 'general', content: '내용' }));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.redirect).toBe('error');
   });
 });
 
@@ -211,6 +230,32 @@ describe('POST /api/feedback — 남용 가드', () => {
       const res = await POST(post(body, from(`198.51.100.${i}`)));
       expect(res.status).toBe(202);
     }
+  });
+
+  it('유효하지 않은 요청은 전체 상한을 소비하지 않는다(IP 를 갈아 끼운 쓰레기 요청으로 서비스를 막을 수 없다)', async () => {
+    // 전체 상한(60/시간)을 검증 전에 깎으면, 깨진 요청을 IP 만 바꿔 65번 보내는 것만으로
+    // 정상 사용자를 한 시간 막을 수 있다. 전체 카운터는 **유효한 제출**에서만 줄어야 한다.
+    for (let i = 0; i < 65; i++) {
+      const ip = `192.0.2.${i % 200}`;
+      const res =
+        i % 2 === 0
+          ? await POST(post('not json', from(ip))) // JSON 아님
+          : await POST(post({ category: 'nope', content: '' }, from(ip))); // 스키마 위반
+      expect(res.status).toBe(400);
+    }
+    const ok = await POST(post({ category: 'general', content: '내용' }, from('198.51.100.77')));
+    expect(ok.status).toBe(202);
+  });
+
+  it('전체 상한(60회/시간)을 넘기면 유효한 제출도 429', async () => {
+    const body = { category: 'general', content: '내용' };
+    // IP 를 바꿔 가며 60회 통과 → 61번째는 전체 상한에 걸린다.
+    for (let i = 0; i < 60; i++) {
+      expect((await POST(post(body, from(`192.0.2.${i}`)))).status).toBe(202);
+    }
+    const res = await POST(post(body, from('192.0.2.200')));
+    expect(res.status).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(60); // 61번째는 수집처로 나가지 않았다
   });
 
   it('프로덕션에서 리미터가 구성되지 않으면 열지 않고 503(fail-closed)', async () => {

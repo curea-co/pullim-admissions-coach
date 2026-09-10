@@ -13,6 +13,21 @@ async function freshLimiter() {
   return (await import('./index')).rateLimiter;
 }
 
+describe('globalRateLimiter (전체 상한 전용)', () => {
+  it('호출자 리미터와 저장소를 공유하지 않는다 — 키 축출로 상한을 초기화할 수 없다', async () => {
+    vi.resetModules();
+    const { rateLimiter, globalRateLimiter } = await import('./index');
+    const ONE: RateLimitRule[] = [{ windowSec: 60, max: 1 }];
+
+    expect((await rateLimiter.check('k', ONE)).allowed).toBe(true);
+    expect((await rateLimiter.check('k', ONE)).allowed).toBe(false); // 호출자 쪽 소진
+
+    // 같은 키인데도 전역 쪽은 영향을 받지 않는다(= 저장소가 다르다).
+    expect((await globalRateLimiter.check('k', ONE)).allowed).toBe(true);
+    expect((await globalRateLimiter.check('k', ONE)).allowed).toBe(false);
+  });
+});
+
 describe('rateLimiter (싱글톤 지연 init)', () => {
   it('개발/테스트(NODE_ENV!=production)는 memory로 바로 동작', async () => {
     const rl = await freshLimiter();

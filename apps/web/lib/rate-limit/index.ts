@@ -73,17 +73,31 @@ async function selectLimiter(): Promise<RateLimiter> {
   return createMemoryRateLimiter();
 }
 
-let _limiterPromise: Promise<RateLimiter> | null = null;
-export const rateLimiter: RateLimiter = {
-  check(key, rules) {
-    if (!_limiterPromise) {
-      _limiterPromise = selectLimiter();
-      // 초기화 실패(콜드스타트 Upstash 일시 장애·동적 import 실패 등)가 프로세스 수명 동안
-      // 캐시돼 영구 500이 되지 않도록, reject 시 캐시를 비워 다음 호출에서 재시도하게 한다.
-      _limiterPromise.catch(() => {
-        _limiterPromise = null;
-      });
-    }
-    return _limiterPromise.then((l) => l.check(key, rules));
-  },
-};
+/** 지연 init + 실패 미캐시를 감싼 싱글톤 하나. 인스턴스마다 **자기 저장소**를 갖는다. */
+function createLazySingleton(): RateLimiter {
+  let promise: Promise<RateLimiter> | null = null;
+  return {
+    check(key, rules) {
+      if (!promise) {
+        promise = selectLimiter();
+        // 초기화 실패(콜드스타트 Upstash 일시 장애·동적 import 실패 등)가 프로세스 수명 동안
+        // 캐시돼 영구 500이 되지 않도록, reject 시 캐시를 비워 다음 호출에서 재시도하게 한다.
+        promise.catch(() => {
+          promise = null;
+        });
+      }
+      return promise.then((l) => l.check(key, rules));
+    },
+  };
+}
+
+/** 호출자(IP)별 한도용. */
+export const rateLimiter: RateLimiter = createLazySingleton();
+
+/**
+ * 전체 상한 전용 — 호출자 리미터와 **저장소를 분리한다.**
+ * in-memory 어댑터는 키가 maxKeys 를 넘으면 오래된 키부터 밀어낸다. 호출자 키는 위조 가능한
+ * 헤더에서 오므로, 같은 저장소를 쓰면 공격자가 서로 다른 헤더 값을 대량으로 밀어 넣어
+ * **전체 카운터를 축출**하고 상한을 초기화할 수 있다. 저장소가 다르면 그 경로가 사라진다.
+ */
+export const globalRateLimiter: RateLimiter = createLazySingleton();
