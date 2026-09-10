@@ -14,7 +14,10 @@ import type { RateLimiter, RateLimitRule, RateLimitResult } from './types';
 
 /** 한 규칙에 대한 리미터(테스트 주입용 최소 계약 — Ratelimit이 이를 충족). */
 export interface RuleLimiter {
+  /** 1회 소비하고 판정. */
   limit(key: string): Promise<{ success: boolean; remaining: number; reset: number }>;
+  /** **소비 없이** 남은 허용량만 본다. 여러 규칙을 함께 볼 때 필요하다. */
+  getRemaining(key: string): Promise<{ remaining: number; reset: number }>;
 }
 export type RuleLimiterFactory = (rule: RateLimitRule) => RuleLimiter;
 
@@ -57,11 +60,26 @@ export function createKvRateLimiter(
 
   return {
     async check(key: string, rules: RateLimitRule[]): Promise<RateLimitResult> {
-      // @upstash/ratelimit의 limit()은 매 호출 quota를 차감한다. memory-adapter 계약
-      // ("막힌 호출은 기록하지 않음")에 맞추려면 **순차 검사 + 첫 차단 시 단락**해야 한다 —
-      // 그래야 한 규칙에서 막힌 요청이 이후 규칙(예: 일일 캡)의 quota를 더 깎지 않는다.
-      // 규칙은 좁은 윈도우(버스트)부터 두는 것을 권장(자주 막히는 규칙을 먼저 단락).
+      // @upstash/ratelimit의 limit()은 매 호출 quota를 차감한다. 규칙이 여러 개면 앞 규칙을
+      // 통과(=소비)한 뒤 뒤 규칙에서 막히는 요청이 생기고, 그러면 **차단된 요청이 앞 규칙의
+      // quota를 깎는다** — memory-adapter 계약("막힌 호출은 기록하지 않음")과 어긋나고, 시간당
+      // 한도에 걸린 사용자가 재시도할수록 버스트 quota까지 태운다.
+      // 그래서 소비 전에 **소비 없는 peek**으로 전부 확인한다.
+      // ⚠️ peek 과 소비 사이의 경합(동시 요청)까지는 닫지 못한다 — 원자적 다중 규칙 평가는
+      //    저장소 측 스크립트가 필요하다. 과허용은 동시 요청 수만큼으로 제한된다.
+      if (rules.length > 1) {
+        const peeks = await Promise.all(
+          rules.map(async (rule) => ({ rule, res: await limiterFor(rule).getRemaining(key) })),
+        );
+        const short = peeks.find((p) => p.res.remaining <= 0);
+        if (short) {
+          const retryAfterSec = Math.max(1, Math.ceil((short.res.reset - now()) / 1000));
+          return { allowed: false, retryAfterSec, limit: short.rule.max, remaining: 0 };
+        }
+      }
+
       const passed: { rule: RateLimitRule; remaining: number }[] = [];
+      // 실제 소비. 순차 + 첫 차단 시 단락 — 경합으로 peek 이후 상황이 바뀐 경우만 여기 걸린다.
       for (const rule of rules) {
         const res = await limiterFor(rule).limit(key);
         if (!res.success) {

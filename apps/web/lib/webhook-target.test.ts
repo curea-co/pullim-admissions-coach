@@ -4,7 +4,7 @@ import {
   isAllowedWebhookUrl,
   isInternalHost,
   parseWebhookTarget,
-  resolvesToPublicOnly,
+  resolvePublicAddress,
 } from './webhook-target';
 
 // 서버가 바깥으로 보내는 요청의 목적지 판정. 이 함수가 느슨해지면 공개 라우트(/api/feedback)가
@@ -136,40 +136,41 @@ describe('parseWebhookTarget', () => {
   });
 });
 
-describe('resolvesToPublicOnly — 이름이 가리키는 주소까지 확인', () => {
+describe('resolvePublicAddress — 이름이 가리키는 주소까지 확인하고 그 주소를 돌려준다', () => {
   const lookupOf = (...addresses: string[]) => async () => addresses;
 
-  it('공인 주소로만 해석되면 통과', async () => {
-    expect(await resolvesToPublicOnly('hooks.slack.com', lookupOf('3.5.7.9'))).toBe(true);
+  it('공인 주소로만 해석되면 **연결에 쓸 주소**를 돌려준다', async () => {
+    // 이 값이 그대로 연결 대상이 되어야 리바인딩이 닫힌다(webhook-post 의 IP 고정).
+    expect(await resolvePublicAddress('hooks.slack.com', lookupOf('3.5.7.9'))).toBe('3.5.7.9');
   });
 
   it('공인 도메인이 루프백으로 해석되면 거절(127.0.0.1.nip.io 류)', async () => {
-    expect(await resolvesToPublicOnly('127.0.0.1.nip.io', lookupOf('127.0.0.1'))).toBe(false);
+    expect(await resolvePublicAddress('127.0.0.1.nip.io', lookupOf('127.0.0.1'))).toBeNull();
   });
 
   it('여러 주소 중 하나라도 내부면 거절', async () => {
-    expect(await resolvesToPublicOnly('mixed.test', lookupOf('3.5.7.9', '10.0.0.1'))).toBe(false);
+    expect(await resolvePublicAddress('mixed.test', lookupOf('3.5.7.9', '10.0.0.1'))).toBeNull();
   });
 
   it('IPv4-mapped 로 해석돼도 거절', async () => {
-    expect(await resolvesToPublicOnly('sneaky.test', lookupOf('::ffff:127.0.0.1'))).toBe(false);
+    expect(await resolvePublicAddress('sneaky.test', lookupOf('::ffff:127.0.0.1'))).toBeNull();
   });
 
   it('해석 결과가 없거나 실패하면 거절(모르면 보내지 않는다)', async () => {
-    expect(await resolvesToPublicOnly('empty.test', lookupOf())).toBe(false);
+    expect(await resolvePublicAddress('empty.test', lookupOf())).toBeNull();
     expect(
-      await resolvesToPublicOnly('boom.test', async () => {
+      await resolvePublicAddress('boom.test', async () => {
         throw new Error('ENOTFOUND');
       }),
-    ).toBe(false);
+    ).toBeNull();
   });
 
   it('IP 리터럴은 DNS 를 보지 않고 문자열 판정으로 끝낸다', async () => {
     const never = async () => {
       throw new Error('DNS 를 보면 안 된다');
     };
-    expect(await resolvesToPublicOnly('8.8.8.8', never)).toBe(true);
-    expect(await resolvesToPublicOnly('127.0.0.1', never)).toBe(false);
-    expect(await resolvesToPublicOnly('[::1]', never)).toBe(false);
+    expect(await resolvePublicAddress('8.8.8.8', never)).toBe('8.8.8.8');
+    expect(await resolvePublicAddress('127.0.0.1', never)).toBeNull();
+    expect(await resolvePublicAddress('[::1]', never)).toBeNull();
   });
 });

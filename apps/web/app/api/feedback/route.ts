@@ -4,7 +4,8 @@ import {
   feedbackCategoryLabel,
   feedbackSubmissionSchema,
 } from '@pullim/shared';
-import { parseWebhookTarget, resolvesToPublicOnly } from '@/lib/webhook-target';
+import { parseWebhookTarget, resolvePublicAddress } from '@/lib/webhook-target';
+import { postJsonPinned } from '@/lib/webhook-post';
 import {
   FEEDBACK_GLOBAL_KEY,
   FEEDBACK_GLOBAL_RATE_RULES,
@@ -194,9 +195,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // 이름이 실제로 가리키는 주소까지 확인한다 — `127.0.0.1.nip.io` 처럼 공인 도메인이 내부를
-  // 가리키면 https 조건만으로는 막히지 않는다. 본문을 읽기 전에 끝낸다.
-  if (!(await resolvesToPublicOnly(sink.hostname))) {
+  // 이름이 실제로 가리키는 주소까지 확인하고, **그 주소로 연결한다**(아래 postJsonPinned).
+  // 확인만 하고 이름으로 다시 연결하면 그 사이에 응답이 바뀌는 DNS 리바인딩을 막지 못한다.
+  const sinkAddress = await resolvePublicAddress(sink.hostname);
+  if (!sinkAddress) {
     return fail(
       501,
       'FEEDBACK_SINK_NOT_ALLOWED',
@@ -255,20 +257,14 @@ export async function POST(req: Request) {
     `— ${new Date().toISOString()}`,
   ].join('\n');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
   try {
-    const res = await fetch(sink.href, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text }),
-      signal: controller.signal,
-      cache: 'no-store',
-      // 리다이렉트를 따라가지 않는다 — 허용된 https 호스트가 내부 주소로 튕겨 보내는 경로를 막는다.
-      redirect: 'error',
+    // 연결은 위에서 확인한 IP 로 고정한다(TLS 검증은 호스트명 기준 그대로).
+    const status = await postJsonPinned(sink, sinkAddress, { text }, {
+      timeoutMs: WEBHOOK_TIMEOUT_MS,
     });
-    if (!res.ok) {
+    if (status < 200 || status >= 300) {
       // 수집처의 응답 본문은 그대로 흘리지 않는다(내부 주소·토큰이 섞여 나올 수 있다).
+      // 3xx 도 여기로 온다 — 리다이렉트를 따라가지 않으므로 성공으로 치지 않는다.
       return fail(
         502,
         'FEEDBACK_SINK_FAILED',
@@ -276,14 +272,12 @@ export async function POST(req: Request) {
       );
     }
   } catch {
-    // 타임아웃(abort)·DNS·연결 실패가 모두 여기로 온다. 어느 쪽이든 전달되지 않았다.
+    // 타임아웃·DNS·연결 실패가 모두 여기로 온다. 어느 쪽이든 전달되지 않았다.
     return fail(
       502,
       'FEEDBACK_SINK_UNREACHABLE',
       '수집처에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
     );
-  } finally {
-    clearTimeout(timer);
   }
 
   // 202 Accepted — 전달은 됐고, 사람이 읽는 것은 그 뒤의 일이다.

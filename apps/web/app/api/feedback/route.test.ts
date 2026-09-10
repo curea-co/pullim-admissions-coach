@@ -15,7 +15,10 @@ function post(body: string | object, headers: Record<string, string> = {}) {
   });
 }
 
-const fetchMock = vi.fn();
+// 수집처로의 실제 전송(고정 IP POST)은 mock 한다 — 여기서 확인할 것은 라우트의 판단이다.
+// 연결이 검증한 IP 로 가는지는 lib/webhook-post.test.ts 가 본다.
+const sendMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/webhook-post', () => ({ postJsonPinned: sendMock }));
 
 // 수집처 이름의 DNS 해석은 테스트에서 실제로 나가면 안 되고, 해석 결과별 동작을 골라 봐야 한다.
 const dnsLookup = vi.hoisted(() => vi.fn());
@@ -26,9 +29,8 @@ vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
 let POST: (req: Request) => Promise<Response>;
 
 beforeEach(async () => {
-  fetchMock.mockReset();
-  fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
-  vi.stubGlobal('fetch', fetchMock);
+  sendMock.mockReset();
+  sendMock.mockResolvedValue(200);
   dnsLookup.mockReset();
   dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // 공인 주소
   vi.resetModules();
@@ -48,7 +50,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     expect(body.ok).toBe(false);
     expect(body.code).toBe('FEEDBACK_SINK_NOT_CONFIGURED');
     expect(body.message).toContain('FEEDBACK_WEBHOOK_URL');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -68,14 +70,24 @@ describe('POST /api/feedback — 수집처 구성', () => {
     vi.stubEnv('FEEDBACK_WEBHOOK_URL', url);
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('리다이렉트를 따라가지 않는다(허용 호스트가 내부로 튕기는 경로 차단)', async () => {
+  it('리다이렉트를 따라가지 않는다 — 3xx 는 성공이 아니다(내부로 튕기는 경로 차단)', async () => {
     vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    sendMock.mockResolvedValue(302);
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(502);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_FAILED');
+  });
+
+  it('연결은 **DNS 로 확인한 그 주소**로 고정해 보낸다(확인 후 재해석 금지)', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     await POST(post({ category: 'general', content: '내용' }));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(init.redirect).toBe('error');
+    const [url, address] = sendMock.mock.calls[0] as [URL, string];
+    expect(url.href).toBe(WEBHOOK);
+    expect(address).toBe('93.184.216.34');
   });
 
   it('공인 도메인이 내부 주소로 해석되면 보내지 않는다(127.0.0.1.nip.io 류)', async () => {
@@ -84,7 +96,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
     expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_ALLOWED');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('DNS 해석이 실패하면 보내지 않는다(모르면 보내지 않는다)', async () => {
@@ -92,7 +104,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     dnsLookup.mockRejectedValue(new Error('ENOTFOUND'));
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('allowlist 를 켜면 그 밖의 호스트는 거절', async () => {
@@ -101,7 +113,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
     expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_CONFIGURED');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('allowlist 안의 호스트는 통과', async () => {
@@ -120,7 +132,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     );
     expect(res.status).toBe(501);
     expect((await res.json()).code).toBe('FEEDBACK_SINK_ALLOWLIST_REQUIRED');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });
 
@@ -140,14 +152,14 @@ describe('POST /api/feedback — 입력 검증', () => {
     const json = await res.json();
     expect(json.code).toBe('INVALID_BODY');
     expect(Array.isArray(json.issues)).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('JSON 이 아니면 400 INVALID_JSON', async () => {
     const res = await POST(post('내용만 덜렁'));
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe('INVALID_JSON');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('content-length 가 상한을 넘으면 읽기 전에 413', async () => {
@@ -156,14 +168,14 @@ describe('POST /api/feedback — 입력 검증', () => {
     );
     expect(res.status).toBe(413);
     expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('헤더가 없어도 실제 본문이 상한을 넘으면 413', async () => {
     // content-length 는 신뢰할 수 없다(없거나 거짓일 수 있다) — 읽은 바이트로 다시 잰다.
     const res = await POST(post({ category: 'general', content: 'a'.repeat(20_000) }));
     expect(res.status).toBe(413);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('content-length 없는 대용량 스트림은 **읽는 도중에** 끊긴다(전부 버퍼링하지 않는다)', async () => {
@@ -192,7 +204,7 @@ describe('POST /api/feedback — 입력 검증', () => {
     expect(res.status).toBe(413);
     // 8KB 상한 = 청크 9개 언저리에서 취소돼야 한다. 안전장치(200)에 닿았다면 끊지 못한 것이다.
     expect(pulled).toBeLessThan(20);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });
 
@@ -206,34 +218,32 @@ describe('POST /api/feedback — 전달', () => {
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ ok: true });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(WEBHOOK);
-    expect(init.method).toBe('POST');
-    const sent = JSON.parse(String(init.body)) as { text: string };
-    expect(sent.text).toContain('버그 신고'); // 선택한 카테고리가 라벨로 실린다
-    expect(sent.text).toContain('탭을 바꾸면 스크롤이 맨 위로 올라가요.');
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    const [url, , payload] = sendMock.mock.calls[0] as [URL, string, { text: string }];
+    expect(url.href).toBe(WEBHOOK);
+    expect(payload.text).toContain('버그 신고'); // 선택한 카테고리가 라벨로 실린다
+    expect(payload.text).toContain('탭을 바꾸면 스크롤이 맨 위로 올라가요.');
   });
 
   it('선언하지 않은 키는 수집처로 새어 나가지 않는다', async () => {
     await POST(post({ category: 'general', content: '내용', sessionToken: 'leak-me' }));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(String(init.body)).not.toContain('leak-me');
+    const [, , payload] = sendMock.mock.calls[0] as [URL, string, unknown];
+    expect(JSON.stringify(payload)).not.toContain('leak-me');
   });
 
   it('수집처가 실패 응답 → 502(성공으로 위장하지 않는다)', async () => {
-    fetchMock.mockResolvedValue(new Response('no_service', { status: 404 }));
+    sendMock.mockResolvedValue(404);
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.code).toBe('FEEDBACK_SINK_FAILED');
     expect(body.ok).toBe(false);
-    // 수집처 응답 본문은 그대로 흘리지 않는다.
-    expect(JSON.stringify(body)).not.toContain('no_service');
+    // 수집처 응답 본문은 그대로 흘리지 않는다(상태 코드만 본다).
+    expect(JSON.stringify(body)).not.toContain('404');
   });
 
   it('수집처 연결 실패 → 502', async () => {
-    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    sendMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(502);
     expect((await res.json()).code).toBe('FEEDBACK_SINK_UNREACHABLE');
@@ -256,7 +266,7 @@ describe('POST /api/feedback — 남용 가드', () => {
     expect(res.status).toBe(429);
     expect((await res.json()).code).toBe('RATE_LIMITED');
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
-    expect(fetchMock).toHaveBeenCalledTimes(3); // 4번째는 수집처로 나가지 않았다
+    expect(sendMock).toHaveBeenCalledTimes(3); // 4번째는 수집처로 나가지 않았다
   });
 
   it('다른 IP 는 서로의 한도에 걸리지 않는다', async () => {
@@ -307,7 +317,7 @@ describe('POST /api/feedback — 남용 가드', () => {
     }
     const res = await POST(post(body, from('192.0.2.200')));
     expect(res.status).toBe(429);
-    expect(fetchMock).toHaveBeenCalledTimes(30); // 31번째는 수집처로 나가지 않았다
+    expect(sendMock).toHaveBeenCalledTimes(30); // 31번째는 수집처로 나가지 않았다
     // 창이 5분이라 막혀도 곧 풀린다 — 한 번의 버스트로 서비스가 한 시간 닫히지 않게.
     expect(Number(res.headers.get('retry-after'))).toBeLessThanOrEqual(300);
   });
@@ -320,7 +330,7 @@ describe('POST /api/feedback — 남용 가드', () => {
     );
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe('RATE_LIMIT_UNAVAILABLE');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });
 
@@ -340,7 +350,7 @@ describe('POST /api/feedback — 호출자 식별자의 신뢰 경계', () => {
     );
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe('CLIENT_IP_SOURCE_NOT_CONFIGURED');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('선언된 헤더만 본다 — x-forwarded-for 를 갈아 끼워도 한도를 벗어나지 못한다', async () => {
