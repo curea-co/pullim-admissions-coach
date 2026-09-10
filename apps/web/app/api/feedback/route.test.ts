@@ -56,6 +56,7 @@ describe('POST /api/feedback — 수집처 구성', () => {
     ['사설 IP(192.168/16)', 'https://192.168.0.9/hook'],
     ['클라우드 메타데이터', 'https://169.254.169.254/latest/meta-data'],
     ['IPv6 루프백', 'https://[::1]/hook'],
+    ['IPv4-mapped IPv6 루프백', 'https://[::ffff:127.0.0.1]/hook'],
     ['내부 도메인', 'https://redis.internal/hook'],
   ])('보내면 안 되는 수집처(%s)는 미설정과 같이 501 — SSRF 통로가 되지 않게', async (_l, url) => {
     vi.stubEnv('FEEDBACK_WEBHOOK_URL', url);

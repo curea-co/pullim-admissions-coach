@@ -4,6 +4,7 @@ import {
   feedbackCategoryLabel,
   feedbackSubmissionSchema,
 } from '@pullim/shared';
+import { isAllowedWebhookUrl } from '@/lib/webhook-target';
 import {
   FEEDBACK_GLOBAL_KEY,
   FEEDBACK_GLOBAL_RATE_RULES,
@@ -66,43 +67,6 @@ function limiterUnavailable() {
     'RATE_LIMIT_UNAVAILABLE',
     '남용 방지 장치를 사용할 수 없어 접수를 잠시 중단했습니다. 잠시 뒤 다시 시도해 주세요.',
   );
-}
-
-/** 내부망을 가리키는 호스트인지 — IP 리터럴(사설·루프백·링크로컬)과 내부 도메인 관용 접미. */
-function isInternalHost(hostname: string): boolean {
-  const h = hostname.toLowerCase().replace(/^\[|\]$/g, ''); // IPv6 는 대괄호로 온다
-  if (h === 'localhost' || h.endsWith('.localhost')) return true;
-  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.home.arpa')) return true;
-  if (h === '::1' || h === '0.0.0.0') return true;
-  if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80:')) return true; // ULA·링크로컬
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 10 || a === 127) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 169 && b === 254) return true; // 클라우드 메타데이터(169.254.169.254) 포함
-  }
-  return false;
-}
-
-/**
- * 수집처로 **보내도 되는** URL 인가.
- * `new URL()` 만 통과시키면 `http:`·`file:` 이나 내부 주소도 유효로 판정돼, 구성 실수 하나로
- * 이 공개 라우트가 내부망을 향한 SSRF 통로가 된다. https 로 한정하고 내부 호스트를 거른다.
- * ⚠️ DNS 리바인딩(공인 도메인 → 사설 IP)까지는 이 계층에서 막을 수 없다 — 수집처 URL 은
- * 운영자가 설정하는 값이므로 최종 방어는 그 값의 관리다.
- */
-function isAllowedWebhookUrl(value: string | undefined): boolean {
-  if (!value) return false;
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false; // 스킴 누락 등 형식 오류
-  }
-  if (url.protocol !== 'https:') return false;
-  return !isInternalHost(url.hostname);
 }
 
 /**
