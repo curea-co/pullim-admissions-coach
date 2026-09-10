@@ -89,12 +89,31 @@ function isSameOriginRequest(req: Request): boolean {
   const origin = req.headers.get('origin');
   if (origin) {
     try {
-      return new URL(origin).host === new URL(req.url).host;
+      // **스킴까지** 비교한다 — host 만 보면 `http://example.com` 이 `https://example.com` 의
+      // 요청으로 통과한다(둘은 서로 다른 origin 이다).
+      return new URL(origin).origin === expectedOrigin(req);
     } catch {
       return false;
     }
   }
   return true;
+}
+
+/**
+ * 클라이언트가 본 우리 origin. TLS 종단이 프록시에 있으면 서버가 보는 `req.url` 은 http 라서
+ * 그대로 비교하면 정상 요청이 스킴 불일치로 막힌다 — 프록시가 넘긴 값을 먼저 본다.
+ * (이 헤더들은 브라우저가 붙일 수 없다: fetch 로 임의 헤더를 붙이면 프리플라이트가 필요해지고,
+ *  이 라우트는 CORS 헤더를 내보내지 않아 교차 출처에서는 그 단계에서 막힌다.)
+ */
+function expectedOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const first = (value: string) => value.split(',')[0].trim();
+  const proto = first(req.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', ''));
+  const host = first(
+    req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? url.host,
+  );
+  // URL 로 한 번 돌려 기본 포트 표기를 양쪽 모두 정규화한다(https://h:443 → https://h).
+  return new URL(`${proto}://${host}`).origin;
 }
 
 /**

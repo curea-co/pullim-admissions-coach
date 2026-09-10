@@ -172,11 +172,44 @@ describe('POST /api/feedback — 교차 출처 차단', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('Origin 이 같은 호스트면 통과', async () => {
+  it('Origin 이 같은 origin 이면 통과', async () => {
     const res = await POST(
       post({ category: 'general', content: '내용' }, { origin: 'http://localhost:3007' }),
     );
     expect(res.status).toBe(202);
+  });
+
+  it('호스트가 같아도 **스킴이 다르면** 403(http://… 는 https://… 와 다른 origin)', async () => {
+    const req = new Request('https://pullim.ai/api/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://pullim.ai' },
+      body: JSON.stringify({ category: 'general', content: '내용' }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('포트가 다르면 403', async () => {
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { origin: 'http://localhost:4000' }),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('TLS 종단이 프록시에 있으면 x-forwarded-proto 를 기준으로 본다(정상 요청을 막지 않게)', async () => {
+    // 서버가 보는 req.url 은 http 지만 클라이언트가 본 origin 은 https 다.
+    const req = new Request('http://internal-host/api/feedback', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://pullim.ai',
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'pullim.ai',
+      },
+      body: JSON.stringify({ category: 'general', content: '내용' }),
+    });
+    expect((await POST(req)).status).toBe(202);
   });
 
   it.each([
