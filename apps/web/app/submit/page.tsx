@@ -271,6 +271,14 @@ export default function SubmitPage() {
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
+        {/* 유료 화면 표시 — 콘텐츠 영역 우측 상단. 제목·단계 표시와 같은 줄에 두면 좁은 화면에서
+            셋이 서로 밀리므로 한 줄을 따로 쓴다(우측 정렬 유지). 개발용 우회로 열려 있어도 이
+            화면이 이용권 전용이라는 사실은 변하지 않으므로 우회 여부와 무관하게 항상 보인다. */}
+        <div className="mb-2 flex justify-end">
+          <span className="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+            유료 화면
+          </span>
+        </div>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             생기부 제출

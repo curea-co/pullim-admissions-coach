@@ -1,13 +1,22 @@
 'use client';
 
-// 개발용 엔타이틀먼트 우회가 켜져 있는 동안 **항상 보이는** 경고 배지.
+// 개발용 우회가 켜져 있는 동안 **항상 보이는** 경고 배지.
 // 우회로 열린 화면은 실제 권한이 아니므로, 진짜 통과와 눈으로 구분되지 않게 두면 안 된다.
 // (그래서 배지는 접거나 숨길 수 없고, 해제 버튼만 제공한다.)
+//
+// `onDisable` 이 선택인 이유: 게이트 전체 우회(NEXT_PUBLIC_DEV_GATE_BYPASS)는 세션 토글이 아니라
+// 빌드 플래그라 화면에서 끌 수 없다 — 누르면 아무 일도 안 하는 버튼을 두느니 문구만 남긴다.
 //
 // z-index: 모바일 하단 탭바가 z-[70](components/ui/os-tabbar.tsx)이라 그 아래인 z-[60] 을 쓰고,
 // 모바일에서는 탭바 높이(62px + safe-area)만큼 띄워 겹치지 않게 한다.
 
-export function DevBypassBadge({ onDisable }: { onDisable: () => void }) {
+export function DevBypassBadge({
+  message = '개발 우회 중 · 실 이용권 아님',
+  onDisable,
+}: {
+  message?: string;
+  onDisable?: () => void;
+}) {
   return (
     <div
       role="status"
@@ -27,14 +36,16 @@ export function DevBypassBadge({ onDisable }: { onDisable: () => void }) {
         <path d="M12 9v4" />
         <path d="M12 17h.01" />
       </svg>
-      <span className="font-medium">개발 우회 중 · 실 이용권 아님</span>
-      <button
-        type="button"
-        onClick={onDisable}
-        className="rounded-full border border-amber-300 px-2 py-1 font-semibold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-      >
-        해제
-      </button>
+      <span className="font-medium">{message}</span>
+      {onDisable && (
+        <button
+          type="button"
+          onClick={onDisable}
+          className="rounded-full border border-amber-300 px-2 py-1 font-semibold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          해제
+        </button>
+      )}
     </div>
   );
 }
