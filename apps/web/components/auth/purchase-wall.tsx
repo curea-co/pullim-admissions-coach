@@ -28,7 +28,15 @@ function osPurchaseHref(): string | null {
   }
 }
 
-export function PurchaseWall({ onRecheck }: { onRecheck?: () => void }) {
+export function PurchaseWall({
+  onRecheck,
+  // 개발용 엔타이틀먼트 우회 핸들러. 이중 잠금(빌드 플래그 + 호스트 allowlist, lib/dev-bypass.ts)이
+  // 열린 개발 환경에서만 넘어온다 — 운영에서는 항상 undefined 라 아래 블록 자체가 렌더되지 않는다.
+  onDevBypass,
+}: {
+  onRecheck?: () => void;
+  onDevBypass?: () => void;
+}) {
   const href = osPurchaseHref();
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
@@ -64,6 +72,28 @@ export function PurchaseWall({ onRecheck }: { onRecheck?: () => void }) {
           >
             구매를 완료했다면 다시 확인
           </button>
+        )}
+
+        {/* 개발자 구역 — 실 구매 CTA 와 확실히 분리한다(구분선 + 낮은 채도 + 작은 글씨).
+            실제 권한처럼 보이면 안 되므로 버튼 톤도 회색 계열로 낮춘다. */}
+        {onDevBypass && (
+          <div className="mt-6 border-t border-dashed border-ink-100 pt-4 text-left">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+              개발 환경 전용
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">
+              이용권 없이 <span className="font-medium text-ink-700">화면만</span> 열어 보는 개발용
+              스위치입니다. 실제 이용권이 생기지는 않으며, 진단 API 는 그대로 403 이라 처리 단계에서
+              실패합니다.
+            </p>
+            <button
+              type="button"
+              onClick={onDevBypass}
+              className="mt-2 rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-medium text-ink-500 transition hover:bg-ink-100/60 hover:text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300"
+            >
+              개발용으로 화면만 열기
+            </button>
+          </div>
         )}
       </div>
     </div>
