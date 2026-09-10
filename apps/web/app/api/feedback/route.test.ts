@@ -281,6 +281,38 @@ describe('POST /api/feedback — 입력 검증', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
+  it('연결만 잡고 본문을 보내지 않으면 마감 시간에 끊고 408(slow loris)', async () => {
+    // 크기만 재고 시간을 재지 않으면 이 요청은 여기서 무기한 대기한다 — 공개 라우트에서는
+    // 호출자 키만 바꿔 반복하는 것만으로 워커·연결이 고갈된다.
+    vi.useFakeTimers();
+    try {
+      let cancelled = false;
+      const stream = new ReadableStream<Uint8Array>({
+        start() {}, // 아무것도 보내지 않고, 닫지도 않는다
+        cancel() {
+          cancelled = true;
+        },
+      });
+      const req = new Request('http://localhost:3007/api/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: stream,
+        duplex: 'half',
+      } as RequestInit & { duplex: 'half' });
+
+      const pending = POST(req);
+      await vi.advanceTimersByTimeAsync(6_000);
+      const res = await pending;
+
+      expect(res.status).toBe(408);
+      expect((await res.json()).code).toBe('BODY_READ_TIMEOUT');
+      expect(cancelled).toBe(true); // 기다리다 만 스트림을 붙잡고 있지 않는다
+      expect(sendMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('content-length 없는 대용량 스트림은 **읽는 도중에** 끊긴다(전부 버퍼링하지 않는다)', async () => {
     // chunked 요청은 content-length 를 아예 보내지 않는다. 다 읽고 나서 재는 구현이면
     // 이 시점에 이미 수십 MB 가 메모리에 들어와 있다 — 그래서 청크 단위로 끊어야 한다.

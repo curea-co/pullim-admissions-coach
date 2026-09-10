@@ -46,6 +46,12 @@ const MAX_BODY_BYTES = 8 * 1024;
 /** 수집처가 응답하지 않을 때 요청이 매달려 있지 않도록 하는 상한. */
 const WEBHOOK_TIMEOUT_MS = 5_000;
 
+/**
+ * 본문을 다 받기까지의 상한. 크기만 재고 시간을 재지 않으면, 연결만 잡고 본문을 보내지 않는
+ * 요청이 여기서 무기한 대기한다(slow loris) — 공개 라우트에서는 그게 곧 워커·연결 고갈이다.
+ */
+const BODY_READ_TIMEOUT_MS = 5_000;
+
 function fail(status: number, code: string, message: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, code, message, ...extra }, { status });
 }
@@ -159,40 +165,67 @@ function callerKey(req: Request): string | null {
  * 누적 바이트가 상한을 넘는 순간 스트림을 취소해 나머지를 받지 않는다.
  * 반환: 본문 문자열, 상한 초과면 null.
  */
-async function readBoundedText(req: Request, maxBytes: number): Promise<string | null> {
-  const stream = req.body;
-  if (!stream) {
-    // 스트림을 노출하지 않는 런타임 폴백 — 최소한 읽은 뒤에는 잰다.
-    const text = await req.text();
-    return new TextEncoder().encode(text).byteLength > maxBytes ? null : text;
-  }
+type BoundedRead =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'too-large' | 'timeout' | 'unreadable' };
 
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+async function readBoundedText(
+  req: Request,
+  maxBytes: number,
+  timeoutMs: number,
+): Promise<BoundedRead> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // 전체 읽기에 걸리는 하나의 마감 — 청크마다 갱신되면 천천히 흘리는 요청을 영원히 기다린다.
+  const deadline = new Promise<'deadline'>((resolve) => {
+    timer = setTimeout(() => resolve('deadline'), timeoutMs);
+  });
+
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel(); // 남은 본문은 받지 않는다 — 여기서 끊는 것이 방어의 핵심이다.
-        return null;
-      }
-      chunks.push(value);
+    const stream = req.body;
+    if (!stream) {
+      // 스트림을 노출하지 않는 런타임 폴백 — 최소한 읽은 뒤에는 잰다.
+      const raced = await Promise.race([req.text().catch(() => null), deadline]);
+      if (raced === 'deadline') return { ok: false, reason: 'timeout' };
+      if (raced === null) return { ok: false, reason: 'unreadable' };
+      return new TextEncoder().encode(raced).byteLength > maxBytes
+        ? { ok: false, reason: 'too-large' }
+        : { ok: true, text: raced };
     }
-  } finally {
-    reader.releaseLock();
-  }
 
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const next = await Promise.race([reader.read(), deadline]);
+        if (next === 'deadline') {
+          await reader.cancel();
+          return { ok: false, reason: 'timeout' };
+        }
+        const { done, value } = next;
+        if (done) break;
+        if (!value) continue;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel(); // 남은 본문은 받지 않는다 — 여기서 끊는 것이 방어의 핵심이다.
+          return { ok: false, reason: 'too-large' };
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return { ok: true, text: new TextDecoder().decode(merged) };
+  } finally {
+    clearTimeout(timer);
   }
-  return new TextDecoder().decode(merged);
 }
 
 export async function POST(req: Request) {
@@ -282,13 +315,20 @@ export async function POST(req: Request) {
   }
 
   // ── 4) 본문 파싱 — 읽어 가면서 상한을 적용한다(content-length 는 없거나 거짓일 수 있다) ──
-  let raw: string | null;
+  let read: BoundedRead;
   try {
-    raw = await readBoundedText(req, MAX_BODY_BYTES);
+    read = await readBoundedText(req, MAX_BODY_BYTES, BODY_READ_TIMEOUT_MS);
   } catch {
     return fail(400, 'BODY_READ_FAILED', '요청 본문을 읽지 못했습니다. 다시 시도해 주세요.');
   }
-  if (raw === null) {
+  if (!read.ok) {
+    if (read.reason === 'timeout') {
+      // 연결만 잡고 본문을 보내지 않는 요청 — 기다려 주지 않는다.
+      return fail(408, 'BODY_READ_TIMEOUT', '요청 본문이 제한 시간 안에 도착하지 않았습니다.');
+    }
+    if (read.reason === 'unreadable') {
+      return fail(400, 'BODY_READ_FAILED', '요청 본문을 읽지 못했습니다. 다시 시도해 주세요.');
+    }
     return fail(
       413,
       'PAYLOAD_TOO_LARGE',
@@ -298,7 +338,7 @@ export async function POST(req: Request) {
 
   let json: unknown;
   try {
-    json = JSON.parse(raw);
+    json = JSON.parse(read.text);
   } catch {
     return fail(400, 'INVALID_JSON', '요청 본문이 JSON 형식이 아닙니다.');
   }

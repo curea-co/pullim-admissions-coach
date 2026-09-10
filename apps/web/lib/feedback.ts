@@ -37,6 +37,8 @@ function messageForStatus(status: number): string {
   if (status === 429) return MESSAGE.tooOften;
   // 우리 화면에서 보낸 요청은 여기 걸리지 않는다 — 확장 프로그램·오래된 탭 등 비정상 맥락 신호다.
   if (status === 403 || status === 415) return MESSAGE.blocked;
+  // 408 = 본문이 제한 시간 안에 도착하지 않음 — 사용자 쪽 연결 문제다.
+  if (status === 408) return MESSAGE.network;
   if (status === 400 || status === 422) return MESSAGE.invalid;
   return MESSAGE.server;
 }
