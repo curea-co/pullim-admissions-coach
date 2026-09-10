@@ -17,6 +17,10 @@ function post(body: string | object, headers: Record<string, string> = {}) {
 
 const fetchMock = vi.fn();
 
+// 수집처 이름의 DNS 해석은 테스트에서 실제로 나가면 안 되고, 해석 결과별 동작을 골라 봐야 한다.
+const dnsLookup = vi.hoisted(() => vi.fn());
+vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
+
 // 라우트는 프로세스 수명 동안 유지되는 레이트리밋 싱글톤을 쓴다. 테스트마다 모듈을 새로
 // 불러 카운터를 0 에서 시작하게 한다 — 안 그러면 앞 테스트의 호출이 뒤 테스트를 429 로 만든다.
 let POST: (req: Request) => Promise<Response>;
@@ -25,6 +29,8 @@ beforeEach(async () => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
+  dnsLookup.mockReset();
+  dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // 공인 주소
   vi.resetModules();
   ({ POST } = await import('./route'));
 });
@@ -70,6 +76,38 @@ describe('POST /api/feedback — 수집처 구성', () => {
     await POST(post({ category: 'general', content: '내용' }));
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.redirect).toBe('error');
+  });
+
+  it('공인 도메인이 내부 주소로 해석되면 보내지 않는다(127.0.0.1.nip.io 류)', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', 'https://127.0.0.1.nip.io/hook');
+    dnsLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(501);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_ALLOWED');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('DNS 해석이 실패하면 보내지 않는다(모르면 보내지 않는다)', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    dnsLookup.mockRejectedValue(new Error('ENOTFOUND'));
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(501);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allowlist 를 켜면 그 밖의 호스트는 거절', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', 'https://evil.example.com/hook');
+    vi.stubEnv('FEEDBACK_WEBHOOK_ALLOWED_HOSTS', 'hooks.slack.com');
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(501);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_CONFIGURED');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allowlist 안의 호스트는 통과', async () => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', 'https://hooks.slack.com/services/T0/B0/x');
+    vi.stubEnv('FEEDBACK_WEBHOOK_ALLOWED_HOSTS', 'hooks.slack.com');
+    expect((await POST(post({ category: 'general', content: '내용' }))).status).toBe(202);
   });
 });
 
@@ -234,9 +272,9 @@ describe('POST /api/feedback — 남용 가드', () => {
   });
 
   it('유효하지 않은 요청은 전체 상한을 소비하지 않는다(IP 를 갈아 끼운 쓰레기 요청으로 서비스를 막을 수 없다)', async () => {
-    // 전체 상한(60/시간)을 검증 전에 깎으면, 깨진 요청을 IP 만 바꿔 65번 보내는 것만으로
-    // 정상 사용자를 한 시간 막을 수 있다. 전체 카운터는 **유효한 제출**에서만 줄어야 한다.
-    for (let i = 0; i < 65; i++) {
+    // 전체 상한을 검증 전에 깎으면, 깨진 요청을 식별자만 바꿔 상한 넘게 보내는 것만으로
+    // 정상 사용자를 막을 수 있다. 전체 카운터는 **유효한 제출**에서만 줄어야 한다.
+    for (let i = 0; i < 40; i++) {
       const ip = `192.0.2.${i % 200}`;
       const res =
         i % 2 === 0
@@ -248,22 +286,70 @@ describe('POST /api/feedback — 남용 가드', () => {
     expect(ok.status).toBe(202);
   });
 
-  it('전체 상한(60회/시간)을 넘기면 유효한 제출도 429', async () => {
+  it('전체 상한(30회/5분)을 넘기면 유효한 제출도 429', async () => {
     const body = { category: 'general', content: '내용' };
-    // IP 를 바꿔 가며 60회 통과 → 61번째는 전체 상한에 걸린다.
-    for (let i = 0; i < 60; i++) {
+    // 식별자를 바꿔 가며 30회 통과 → 31번째는 전체 상한에 걸린다.
+    for (let i = 0; i < 30; i++) {
       expect((await POST(post(body, from(`192.0.2.${i}`)))).status).toBe(202);
     }
     const res = await POST(post(body, from('192.0.2.200')));
     expect(res.status).toBe(429);
-    expect(fetchMock).toHaveBeenCalledTimes(60); // 61번째는 수집처로 나가지 않았다
+    expect(fetchMock).toHaveBeenCalledTimes(30); // 31번째는 수집처로 나가지 않았다
+    // 창이 5분이라 막혀도 곧 풀린다 — 한 번의 버스트로 서비스가 한 시간 닫히지 않게.
+    expect(Number(res.headers.get('retry-after'))).toBeLessThanOrEqual(300);
   });
 
   it('프로덕션에서 리미터가 구성되지 않으면 열지 않고 503(fail-closed)', async () => {
-    vi.stubEnv('NODE_ENV', 'production'); // RATE_LIMIT_BACKEND 미설정 → 리미터 init 실패
-    const res = await POST(post({ category: 'general', content: '내용' }, from('203.0.113.7')));
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for'); // 식별자 쪽은 구성됨
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'x-vercel-forwarded-for': '203.0.113.7' }),
+    );
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe('RATE_LIMIT_UNAVAILABLE');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// 호출자 식별자를 위조 가능한 헤더에서 그냥 읽으면, 매 요청 다른 값을 넣는 것만으로 한도가
+// 통째로 무력화된다. 어떤 헤더를 신뢰할지는 **운영자가 선언**하고, 선언이 없는 프로덕션은 열지 않는다.
+describe('POST /api/feedback — 호출자 식별자의 신뢰 경계', () => {
+  beforeEach(() => {
+    vi.stubEnv('FEEDBACK_WEBHOOK_URL', WEBHOOK);
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
+  });
+
+  it('프로덕션 + 신뢰 헤더 미선언 → 503(추측한 헤더로 도는 보호는 보호가 아니다)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'x-forwarded-for': '203.0.113.7' }),
+    );
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('CLIENT_IP_SOURCE_NOT_CONFIGURED');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('선언된 헤더만 본다 — x-forwarded-for 를 갈아 끼워도 한도를 벗어나지 못한다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for');
+    const body = { category: 'general', content: '내용' };
+    const spoof = (i: number) => ({
+      'x-vercel-forwarded-for': '203.0.113.7', // 플랫폼이 넣는 값(고정)
+      'x-forwarded-for': `198.51.100.${i}`, // 클라이언트가 갈아 끼우는 값
+    });
+    for (let i = 0; i < 3; i++) {
+      expect((await POST(post(body, spoof(i)))).status).toBe(202);
+    }
+    expect((await POST(post(body, spoof(9)))).status).toBe(429);
+  });
+
+  it('선언된 헤더가 없는 요청은 공용 버킷에 모아 센다(예상 경로 밖)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for');
+    const body = { category: 'general', content: '내용' };
+    for (let i = 0; i < 3; i++) {
+      expect((await POST(post(body, { 'x-forwarded-for': `198.51.100.${i}` }))).status).toBe(202);
+    }
+    expect((await POST(post(body, { 'x-forwarded-for': '198.51.100.99' }))).status).toBe(429);
   });
 });

@@ -4,7 +4,7 @@ import {
   feedbackCategoryLabel,
   feedbackSubmissionSchema,
 } from '@pullim/shared';
-import { isAllowedWebhookUrl } from '@/lib/webhook-target';
+import { parseWebhookTarget, resolvesToPublicOnly } from '@/lib/webhook-target';
 import {
   FEEDBACK_GLOBAL_KEY,
   FEEDBACK_GLOBAL_RATE_RULES,
@@ -21,9 +21,12 @@ import {
 //
 // ⚠️ 그렇다고 이 라우트가 안전한 건 아니다 — **인증 없이 누구나 부를 수 있다.** URL 을 감춰도
 // 공격자는 /api/feedback 을 직접 때려 서버를 외부 발송 프록시로 쓸 수 있다. 그래서 세 겹으로 막는다:
-//   ① 호출자 식별자(IP) 기준 레이트리밋  ② 식별자와 무관한 전체 상한(IP 를 갈아 껴도 총량은 고정)
+//   ① 호출자 식별자 기준 레이트리밋 — 식별자는 **운영자가 선언한 신뢰 헤더**에서만 얻는다
+//   ② 식별자와 무관한 전체 상한(식별자를 갈아 껴도 수집처로 나가는 총량은 고정)
 //   ③ 본문 크기 상한을 **스트림을 읽는 도중에** 적용(큰 본문을 메모리에 담기 전에 끊는다)
-// 프로덕션에서 리미터가 구성되지 않으면 열어 두지 않고 503 으로 거절한다(fail-closed).
+// 프로덕션에서 ①의 신뢰 헤더나 리미터 백엔드가 구성되지 않으면 열어 두지 않고 503 으로
+// 거절한다(fail-closed) — 보호 없이 열린 공개 라우트는 그 순간 외부 발송 프록시다.
+// 수집처 주소는 https·비내부 + (선택) 호스트 allowlist + **DNS 해석 결과**까지 확인한다.
 //
 // 정직성 규칙(§6 — 가짜 상태 금지): **전달에 성공했을 때만 성공을 응답한다.**
 // 수집처가 없거나(501) 응답이 실패면(502) 그대로 실패를 돌려준다. 조용히 버리고 200 을
@@ -70,14 +73,30 @@ function limiterUnavailable() {
 }
 
 /**
- * 레이트리밋 키(호출자 식별자). 프록시 뒤에서는 `x-forwarded-for` 의 첫 항목이 클라이언트다.
- * ⚠️ 이 헤더는 프록시 구성에 따라 **위조될 수 있다** — 그래서 이 키에만 의존하지 않고
- * 식별자와 무관한 전체 상한(FEEDBACK_GLOBAL_RATE_RULES)을 함께 건다.
+ * 레이트리밋 키(호출자 식별자).
+ *
+ * `x-forwarded-for` 는 **클라이언트가 직접 넣을 수 있다.** 프록시가 그 값을 덮어쓴다는 보장이
+ * 없으면, 매 요청 다른 값을 넣는 것만으로 호출자별 한도가 통째로 무력화된다. 그래서 어떤 헤더를
+ * 신뢰할지 코드가 추측하지 않고 **운영자가 선언한다**(TRUSTED_CLIENT_IP_HEADER) — 플랫폼이
+ * 값을 보장하는 헤더여야 한다(Vercel `x-vercel-forwarded-for`, Cloudflare `cf-connecting-ip`,
+ * 또는 프록시가 덮어쓰는 `x-forwarded-for`).
+ *
+ * 반환: 식별자 키 / `null` = 프로덕션인데 선언이 없다(= 신뢰할 수 있는 식별자가 없다).
+ * 선언된 헤더가 요청에 없으면 예상한 경로로 들어온 요청이 아니므로 **공용 버킷**에 모아 센다.
  */
-function callerKey(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const real = req.headers.get('x-real-ip')?.trim();
-  return `feedback:${forwarded || real || 'unknown'}`;
+function callerKey(req: Request): string | null {
+  const declared = process.env.TRUSTED_CLIENT_IP_HEADER?.trim();
+  if (declared) {
+    const value = req.headers.get(declared)?.split(',')[0]?.trim();
+    return value ? `feedback:${value}` : 'feedback:untrusted';
+  }
+  // 프로덕션은 선언을 요구한다 — 추측한 헤더로 도는 보호는 보호가 아니다.
+  if (process.env.NODE_ENV === 'production') return null;
+  // 개발·테스트 편의: 관용 헤더를 그대로 쓴다(로컬에는 프록시가 없다).
+  const dev =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip')?.trim();
+  return `feedback:${dev || 'local'}`;
 }
 
 /**
@@ -136,9 +155,17 @@ export async function POST(req: Request) {
 
   // ── 2) 호출자별 남용 가드 — 본문을 읽기 전에 건다 ──
   // 순서가 중요하다: 읽고 나서 재면 이미 자원을 쓴 뒤다.
-  // (전체 상한은 여기서 보지 않는다 — 아래 5)의 설명 참조.)
+  // (전체 상한은 여기서 보지 않는다 — 아래 6)의 설명 참조.)
+  const key = callerKey(req);
+  if (key === null) {
+    return fail(
+      503,
+      'CLIENT_IP_SOURCE_NOT_CONFIGURED',
+      '호출자를 식별할 신뢰 가능한 경로가 설정되지 않아 접수를 중단했습니다. 운영자가 TRUSTED_CLIENT_IP_HEADER 를 설정해야 합니다.',
+    );
+  }
   try {
-    const caller = await rateLimiter.check(callerKey(req), FEEDBACK_RATE_RULES);
+    const caller = await rateLimiter.check(key, FEEDBACK_RATE_RULES);
     if (!caller.allowed) return rateLimited(caller.retryAfterSec);
   } catch {
     return limiterUnavailable();
@@ -147,12 +174,25 @@ export async function POST(req: Request) {
   // ── 3) 수집처 구성 — 없으면 여기서 끝낸다 ──
   // 검증보다 앞에 두는 이유: 어차피 전달할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
   // 입력을 고치려 들지만 실제 원인은 서버 구성이다. 원인을 그대로 말한다.
-  const webhookUrl = process.env.FEEDBACK_WEBHOOK_URL;
-  if (!isAllowedWebhookUrl(webhookUrl)) {
+  const sink = parseWebhookTarget(
+    process.env.FEEDBACK_WEBHOOK_URL,
+    process.env.FEEDBACK_WEBHOOK_ALLOWED_HOSTS,
+  );
+  if (!sink) {
     return fail(
       501,
       'FEEDBACK_SINK_NOT_CONFIGURED',
-      '건의 내용을 전달할 수집처가 이 환경에 설정되어 있지 않습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 설정해야 전송됩니다(내부 주소가 아닌 https URL).',
+      '건의 내용을 전달할 수집처가 이 환경에 설정되어 있지 않습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 설정해야 전송됩니다(내부 주소가 아닌 https URL, allowlist 를 켰다면 그 안의 호스트).',
+    );
+  }
+
+  // 이름이 실제로 가리키는 주소까지 확인한다 — `127.0.0.1.nip.io` 처럼 공인 도메인이 내부를
+  // 가리키면 https 조건만으로는 막히지 않는다. 본문을 읽기 전에 끝낸다.
+  if (!(await resolvesToPublicOnly(sink.hostname))) {
+    return fail(
+      501,
+      'FEEDBACK_SINK_NOT_ALLOWED',
+      '설정된 수집처 주소가 내부망을 가리키거나 확인되지 않아 전송하지 않았습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 확인해야 합니다.',
     );
   }
 
@@ -210,7 +250,7 @@ export async function POST(req: Request) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
   try {
-    const res = await fetch(webhookUrl as string, {
+    const res = await fetch(sink.href, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text }),

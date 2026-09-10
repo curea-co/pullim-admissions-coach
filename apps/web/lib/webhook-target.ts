@@ -5,8 +5,10 @@
 // 것과 "보내도 되는 주소"는 다르다 — http·file 스킴, 루프백·사설·링크로컬 주소가 전부 유효한
 // URL 이다. 판정을 순수 함수로 떼어 주소 표기별로 단독 테스트한다.
 //
-// ⚠️ 한계: DNS 리바인딩(공인 도메인이 사설 IP 로 해석되는 경우)은 이름만 보는 이 계층에서 막을 수
-// 없다. 최종 방어는 설정값 관리(+ 필요하면 이그레스 방화벽)다.
+// 판정은 두 단계다: ① 이름·스킴(+ 선택적 allowlist) ② 그 이름이 **실제로 해석되는 주소**.
+// ①만 하면 `127.0.0.1.nip.io` 처럼 공인 도메인이 내부를 가리키는 경우가 그대로 통과한다.
+// ⚠️ 남는 한계: 확인 시점과 연결 시점 사이에 응답이 바뀌는 DNS 리바인딩은 연결을 확인한 IP 에
+// 고정해야 닫힌다. 수집처는 운영자 설정값이므로 실무 방어는 allowlist + 이그레스 정책이다.
 
 /** IPv4 점표기 → 옥텟. 형식이 아니면 null. */
 function parseIpv4(host: string): number[] | null {
@@ -104,6 +106,7 @@ export function isInternalHost(hostname: string): boolean {
 /**
  * 수집처로 **보내도 되는** URL 인가 — https + 내부망이 아닌 호스트.
  * 평문 http 를 막는 이유: 건의 내용이 중간에서 그대로 읽힌다.
+ * ⚠️ 이름만 본다. 이름이 실제로 가리키는 주소는 resolvesToPublicOnly() 가 확인한다.
  */
 export function isAllowedWebhookUrl(value: string | undefined): boolean {
   if (!value) return false;
@@ -115,4 +118,67 @@ export function isAllowedWebhookUrl(value: string | undefined): boolean {
   }
   if (url.protocol !== 'https:') return false;
   return !isInternalHost(url.hostname);
+}
+
+/**
+ * 호스트 allowlist — 운영에서 쓰는 수집처 공급자가 정해져 있으면 그 호스트로 못박는다.
+ * `allowlist` 가 비면(미설정) 통과시킨다. 항목은 정확히 일치하거나 그 도메인의 하위 도메인만 인정.
+ */
+export function isAllowedWebhookHost(hostname: string, allowlist: string | undefined): boolean {
+  const list = (allowlist ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (list.length === 0) return true;
+  const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  return list.some((entry) => host === entry || host.endsWith(`.${entry}`));
+}
+
+/**
+ * 설정값 → 보내도 되는 목적지(URL). 아니면 null.
+ * 스킴·내부 주소·allowlist 를 한 번에 판정하고 파싱 결과를 그대로 돌려준다 —
+ * 호출부가 같은 문자열을 두 번 파싱하며 판정과 어긋나는 일을 막는다.
+ */
+export function parseWebhookTarget(
+  value: string | undefined,
+  allowlist: string | undefined,
+): URL | null {
+  if (!isAllowedWebhookUrl(value)) return null;
+  const url = new URL(value as string);
+  return isAllowedWebhookHost(url.hostname, allowlist) ? url : null;
+}
+
+/** 호스트명 → 주소 목록. 테스트에서 갈아끼울 수 있게 주입식으로 둔다. */
+export type HostLookup = (hostname: string) => Promise<string[]>;
+
+const systemLookup: HostLookup = async (hostname) => {
+  const { lookup } = await import('node:dns/promises');
+  const rows = await lookup(hostname, { all: true, verbatim: true });
+  return rows.map((r) => r.address);
+};
+
+/**
+ * 이름이 **실제로 가리키는 주소**까지 확인한다.
+ * 호스트명 문자열만 보면 `127.0.0.1.nip.io` 처럼 공인 도메인이 내부 주소로 해석되는 경우를
+ * 그대로 통과시킨다 — fetch 는 그 해석 결과로 연결하므로 https 조건만으로는 막히지 않는다.
+ * 해석된 주소가 **하나라도** 내부면 거절하고, 해석 자체가 실패해도 거절한다(모르면 보내지 않는다).
+ *
+ * ⚠️ 남는 틈: 확인 시점과 fetch 의 연결 시점 사이에 이름이 다른 주소로 바뀌는 DNS 리바인딩은
+ * 이 계층에서 닫을 수 없다(연결을 확인한 IP 에 고정해야 한다). 수집처는 운영자가 설정하는
+ * 값이므로 실무 방어는 allowlist + 이그레스 정책이다.
+ */
+export async function resolvesToPublicOnly(
+  hostname: string,
+  lookup: HostLookup = systemLookup,
+): Promise<boolean> {
+  const host = hostname.trim().replace(/^\[/, '').replace(/\]$/, '');
+  // IP 리터럴은 DNS 를 볼 것이 없다 — 문자열 판정이 곧 최종 판정이다.
+  if (/^[\d.]+$/.test(host) || host.includes(':')) return !isInternalHost(host);
+  try {
+    const addresses = await lookup(host);
+    if (addresses.length === 0) return false;
+    return addresses.every((address) => !isInternalHost(address));
+  } catch {
+    return false;
+  }
 }

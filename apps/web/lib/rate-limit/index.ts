@@ -29,7 +29,10 @@ export const FEEDBACK_RATE_RULES: RateLimitRule[] = [
  * 총량은 이 캡을 넘지 못한다 — 우회 가능한 방어 위에 우회 불가능한 천장을 하나 더 둔다.
  */
 export const FEEDBACK_GLOBAL_RATE_RULES: RateLimitRule[] = [
-  { windowSec: 3_600, max: 60 }, // 전체 60회/시간
+  // 창을 짧게(5분) 잡는다: 같은 총량 상한을 한 시간짜리 창으로 두면, 한 번의 버스트로 창이 차는
+  // 순간 **모두가 한 시간 동안** 막힌다. 5분이면 막혀도 몇 분 안에 풀린다(상한의 목적은
+  // 수집처로 나가는 총량을 묶는 것이지 서비스를 오래 닫는 것이 아니다).
+  { windowSec: 300, max: 30 },
 ];
 /** 전체 상한용 고정 키 — 호출자와 무관하게 한 카운터를 공유한다. */
 export const FEEDBACK_GLOBAL_KEY = 'feedback:__all__';
