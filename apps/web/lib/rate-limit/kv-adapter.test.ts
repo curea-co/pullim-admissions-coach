@@ -105,3 +105,47 @@ describe('createKvRateLimiter — 차단된 요청은 어떤 규칙의 quota도 
     expect(peeks[60]).toBeUndefined();
   });
 });
+
+// KV 장애·지연에서 **열리지 않는지**. @upstash/ratelimit 의 기본 timeout 은 fail-open 이라
+// (응답을 못 받으면 `{success:true, reason:'timeout'}`) 그대로 두면 공개 발송 라우트의 보호가
+// 저장소 장애와 함께 사라진다. 어댑터는 그런 응답도, 응답 없음도 **거절**해야 한다.
+describe('createKvRateLimiter — 저장소 지연은 허용이 아니다(fail-closed)', () => {
+  const ONE: RateLimitRule[] = [{ windowSec: 60, max: 3 }];
+
+  it("SDK 가 지연을 허용으로 넘긴 응답(reason:'timeout')은 판정으로 인정하지 않는다", async () => {
+    const factory: RuleLimiterFactory = () => ({
+      async limit() {
+        return { success: true, remaining: 0, reset: 0, reason: 'timeout' };
+      },
+      async getRemaining() {
+        return { remaining: 5, reset: NOW + 60_000 };
+      },
+    });
+    await expect(
+      createKvRateLimiter({ now: clock, factory }).check('ip', ONE),
+    ).rejects.toThrow(/허용으로 넘어왔다/);
+  });
+
+  it('저장소가 응답하지 않으면 상한 시간 뒤 거절한다(무한 대기·통과 금지)', async () => {
+    const never = new Promise<never>(() => {});
+    const factory: RuleLimiterFactory = () => ({
+      limit: () => never,
+      getRemaining: () => never,
+    });
+    await expect(
+      createKvRateLimiter({ now: clock, factory, opTimeoutMs: 10 }).check('ip', ONE),
+    ).rejects.toThrow(/응답 지연/);
+  });
+
+  it('peek(getRemaining) 지연도 거절한다', async () => {
+    const factory: RuleLimiterFactory = () => ({
+      async limit() {
+        return { success: true, remaining: 1, reset: NOW + 60_000 };
+      },
+      getRemaining: () => new Promise<never>(() => {}),
+    });
+    await expect(
+      createKvRateLimiter({ now: clock, factory, opTimeoutMs: 10 }).check('ip', RULES),
+    ).rejects.toThrow(/응답 지연/);
+  });
+});

@@ -14,8 +14,10 @@ import type { RateLimiter, RateLimitRule, RateLimitResult } from './types';
 
 /** 한 규칙에 대한 리미터(테스트 주입용 최소 계약 — Ratelimit이 이를 충족). */
 export interface RuleLimiter {
-  /** 1회 소비하고 판정. */
-  limit(key: string): Promise<{ success: boolean; remaining: number; reset: number }>;
+  /** 1회 소비하고 판정. `reason: 'timeout'` 은 저장소 응답을 못 받고 **허용으로 넘긴** 경우다. */
+  limit(
+    key: string,
+  ): Promise<{ success: boolean; remaining: number; reset: number; reason?: string }>;
   /** **소비 없이** 남은 허용량만 본다. 여러 규칙을 함께 볼 때 필요하다. */
   getRemaining(key: string): Promise<{ remaining: number; reset: number }>;
 }
@@ -38,13 +40,51 @@ function defaultFactory(): RuleLimiterFactory {
       // max가 바뀌는 경우에도 서로 다른 정책이 같은 카운터를 공유하지 않게 한다.
       prefix: `pullim:rl:${rule.windowSec}:${rule.max}`,
       analytics: false,
+      // ⚠️ 기본값(5000)은 **fail-open** 이다 — 그 시간 안에 Redis 응답이 없으면 SDK 가 예외가
+      //    아니라 `{ success: true, reason: 'timeout' }` 을 돌려준다. 그러면 호출부의 503
+      //    fail-closed 경로를 그냥 지나쳐 공개 발송 라우트의 보호가 사라진다. 0 으로 끈다.
+      timeout: 0,
     });
 }
 
+/**
+ * 저장소 응답을 기다리는 상한. 넘으면 **거절(reject)** 한다 — 호출부(app/api/feedback)가
+ * 503 fail-closed 로 받는다. 지연을 허용으로 넘기면 보호가 무력화된다.
+ */
+const KV_OP_TIMEOUT_MS = 1_500;
+
+function withDeadline<T>(op: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`KV 레이트리밋 ${what} 응답 지연(${ms}ms) — 허용하지 않는다`)),
+      ms,
+    );
+    op.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/** SDK 가 지연을 허용으로 넘긴 응답인지 — 그렇다면 판정으로 인정하지 않는다. */
+function rejectFailOpen<T extends { reason?: string }>(res: T, what: string): T {
+  if (res.reason === 'timeout') {
+    throw new Error(`KV 레이트리밋 ${what} 이 저장소 응답 없이 허용으로 넘어왔다 — 인정하지 않는다`);
+  }
+  return res;
+}
+
 export function createKvRateLimiter(
-  opts: { factory?: RuleLimiterFactory; now?: () => number } = {}
+  opts: { factory?: RuleLimiterFactory; now?: () => number; opTimeoutMs?: number } = {}
 ): RateLimiter {
   const now = opts.now ?? (() => Date.now());
+  const opTimeoutMs = opts.opTimeoutMs ?? KV_OP_TIMEOUT_MS;
   const factory = opts.factory ?? defaultFactory();
   // 규칙(windowSec:max)별 리미터 캐시 — 매 호출 재생성 방지.
   const cache = new Map<string, RuleLimiter>();
@@ -69,7 +109,10 @@ export function createKvRateLimiter(
       //    저장소 측 스크립트가 필요하다. 과허용은 동시 요청 수만큼으로 제한된다.
       if (rules.length > 1) {
         const peeks = await Promise.all(
-          rules.map(async (rule) => ({ rule, res: await limiterFor(rule).getRemaining(key) })),
+          rules.map(async (rule) => ({
+            rule,
+            res: await withDeadline(limiterFor(rule).getRemaining(key), opTimeoutMs, 'getRemaining'),
+          })),
         );
         const short = peeks.find((p) => p.res.remaining <= 0);
         if (short) {
@@ -81,7 +124,10 @@ export function createKvRateLimiter(
       const passed: { rule: RateLimitRule; remaining: number }[] = [];
       // 실제 소비. 순차 + 첫 차단 시 단락 — 경합으로 peek 이후 상황이 바뀐 경우만 여기 걸린다.
       for (const rule of rules) {
-        const res = await limiterFor(rule).limit(key);
+        const res = rejectFailOpen(
+          await withDeadline(limiterFor(rule).limit(key), opTimeoutMs, 'limit'),
+          'limit',
+        );
         if (!res.success) {
           const retryAfterSec = Math.max(1, Math.ceil((res.reset - now()) / 1000));
           return { allowed: false, retryAfterSec, limit: rule.max, remaining: 0 };
