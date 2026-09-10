@@ -10,6 +10,8 @@ import { UserMenu } from '@/components/auth/user-menu';
 import { ServiceSwitcher } from '@/components/shell/service-switcher';
 import { CommandSearch } from '@/components/shell/command-search';
 import { NotificationsMenu } from '@/components/shell/notifications-menu';
+import { FeedbackWidget } from '@/components/feedback/feedback-widget';
+import { isFeedbackEnabled } from '@/lib/feedback';
 
 // 입시 코치 대시보드 구조 — 풀림 OS/classbot 패턴(좌측 레일 + 상단 바 + 콘텐츠).
 const NAV: { label: string; href: string; icon: React.ReactNode }[] = [
@@ -52,6 +54,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       onToggleCollapsed={toggle}
       // 레일·탭바·브랜드 로고를 next/link 로 — <a> 하드코딩이면 클릭마다 풀 페이지 리로드가 된다.
       linkComponent={Link}
+      // 우하단 플로팅 — 건의하기(NEXT_PUBLIC_FEEDBACK_ENABLED=true 일 때만). 여기서 플래그를
+      // 판정해 null 을 넘기는 이유: 슬롯이 비어야 셸이 본문 하단 여백도 되돌린다(보이지도 않는
+      // 버튼 자리를 비워 두지 않게).
+      floating={isFeedbackEnabled() ? <FeedbackWidget /> : null}
       // topbar 좌측 [브랜드][스위처] — OS `OsShell` 순서. 스위처는 카탈로그가 비면(= OS URL 미설정)
       // 스스로 null 을 반환하므로 여기서 조건부로 감싸지 않는다.
       switcher={<ServiceSwitcher />}
