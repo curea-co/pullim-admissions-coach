@@ -26,7 +26,9 @@ export function OsTabbar({ items, linkComponent: Link = "a", className }: OsTabb
     <nav
       aria-label="모바일 탭 메뉴"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-[70] flex h-[calc(62px_+_env(safe-area-inset-bottom))] justify-around border-t border-[var(--border-default)] bg-white/[.92] px-2 pt-1.5 pb-[calc(6px_+_env(safe-area-inset-bottom))] backdrop-blur-[14px] min-[921px]:hidden",
+        // 높이 62px 는 `--tabbar-h`(app/globals.css) — 그 위에 얹히는 플로팅 버튼·본문 하단
+        // 여백이 같은 값을 봐야 해서 한 곳에서만 정의한다.
+        "fixed inset-x-0 bottom-0 z-[70] flex h-[calc(var(--tabbar-h)_+_env(safe-area-inset-bottom))] justify-around border-t border-[var(--border-default)] bg-white/[.92] px-2 pt-1.5 pb-[calc(6px_+_env(safe-area-inset-bottom))] backdrop-blur-[14px] min-[921px]:hidden",
         className,
       )}
     >

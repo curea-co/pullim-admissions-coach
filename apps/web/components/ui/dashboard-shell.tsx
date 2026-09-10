@@ -27,6 +27,12 @@ export interface DashboardShellProps {
   onToggleCollapsed?: () => void;
   /** 네비게이션에 쓸 링크 컴포넌트. Next 앱은 `next/link` 의 Link 를 넘겨 SPA 라우팅을 쓴다. */
   linkComponent?: React.ElementType;
+  /**
+   * 우하단 플로팅 액션 슬롯(예: 건의하기 FAB). 셸 밖에 두면 본문 하단 여백과 어긋나
+   * 마지막 카드를 영구히 덮으므로 **슬롯으로 받는다** — 넘어온 경우에만 여백을 넓힌다.
+   * 플래그로 숨기는 요소라면 여기에 `null` 을 넘겨야 여백도 함께 사라진다.
+   */
+  floating?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }
@@ -103,6 +109,7 @@ export function DashboardShell({
   collapsed = false,
   onToggleCollapsed,
   linkComponent,
+  floating,
   children,
   className,
 }: DashboardShellProps) {
@@ -124,14 +131,23 @@ export function DashboardShell({
             {rail}
           </aside>
         )}
-        {/* 모바일 하단 패딩은 탭바(62px + safe-area) 높이만큼 비운다 — OS `.main` 과 동일. */}
+        {/* 모바일 하단 패딩은 탭바(--tabbar-h + safe-area) 높이만큼 비운다 — OS `.main` 과 동일.
+            플로팅 액션이 있으면 그 높이(탭바 위 14px + 52px + 여유)만큼 더 비운다. 데스크톱에서
+            기본값 pb-8 이 모바일 값을 덮어쓰므로 **양쪽 분기를 모두** 넓혀야 한다 — 한쪽만
+            고치면 마지막 카드가 버튼에 영구히 가린다. */}
         <main
           id="main-content"
-          className="min-w-0 flex-1 px-[18px] py-[22px] pb-[calc(96px_+_env(safe-area-inset-bottom))] min-[921px]:px-6 min-[921px]:py-8 min-[921px]:pb-8"
+          className={cn(
+            "min-w-0 flex-1 px-[18px] py-[22px] min-[921px]:px-6 min-[921px]:py-8",
+            floating
+              ? "pb-[calc(var(--tabbar-h)_+_env(safe-area-inset-bottom)_+_78px)] min-[921px]:pb-[calc(env(safe-area-inset-bottom)_+_92px)]"
+              : "pb-[calc(96px_+_env(safe-area-inset-bottom))] min-[921px]:pb-8",
+          )}
         >
           {children}
         </main>
       </div>
+      {floating}
       {tabbarNode}
     </div>
   );
