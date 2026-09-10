@@ -199,8 +199,10 @@ export async function POST(req: Request) {
   }
   // JSON 만 받는다. `text/plain` 등을 허용하면 CORS 프리플라이트 없이 보낼 수 있는
   // "simple request" 가 되어 교차 출처 POST 가 그대로 들어온다.
-  const contentType = req.headers.get('content-type') ?? '';
-  if (!contentType.split(';')[0].trim().toLowerCase().startsWith('application/json')) {
+  // 정확히 일치를 본다 — startsWith 면 `application/jsonp`·`application/json-seq` 처럼
+  // JSON 이 아닌 타입까지 통과한다.
+  const mediaType = (req.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (mediaType !== 'application/json') {
     return fail(
       415,
       'UNSUPPORTED_MEDIA_TYPE',

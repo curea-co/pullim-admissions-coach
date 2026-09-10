@@ -14,6 +14,10 @@ interface Capture {
   status: number;
   fail?: Error;
   timeout?: boolean;
+  /** 헤더만 보내고 본문을 끝내지 않는 수집처(slow-drip) 흉내. */
+  neverEnds?: boolean;
+  resDestroyed?: boolean;
+  reqDestroyed?: boolean;
 }
 
 /** node:https 의 request 를 대신한다 — 실제 소켓을 열지 않고 옵션과 본문만 잡는다. */
@@ -26,7 +30,8 @@ function fakeRequest(capture: Capture): HttpsRequestFn {
       destroy: (e?: Error) => void;
     };
     req.destroy = (e?: Error) => {
-      req.emit('error', e ?? new Error('destroyed'));
+      capture.reqDestroyed = true;
+      if (e) req.emit('error', e);
     };
     req.end = (body: string) => {
       capture.body = body;
@@ -38,8 +43,16 @@ function fakeRequest(capture: Capture): HttpsRequestFn {
         setImmediate(() => req.emit('error', capture.fail));
         return;
       }
-      const res = Readable.from(['']) as Readable & { statusCode: number };
+      // neverEnds: 계속 흘리기만 하고 'end' 를 내지 않는 응답.
+      const res = (
+        capture.neverEnds ? new Readable({ read() {} }) : Readable.from([''])
+      ) as Readable & { statusCode: number };
       res.statusCode = capture.status;
+      const realDestroy = res.destroy.bind(res);
+      res.destroy = ((e?: Error) => {
+        capture.resDestroyed = true;
+        return realDestroy(e);
+      }) as typeof res.destroy;
       setImmediate(() => cb(res));
     };
     return req;
@@ -131,5 +144,39 @@ describe('postJsonPinned — 응답 처리', () => {
     await expect(
       postJsonPinned(target, '3.5.7.9', {}, { timeoutMs: 5, request: fakeRequest(capture) }),
     ).rejects.toThrow('webhook timeout');
+  });
+});
+
+describe('postJsonPinned — 응답을 붙잡고 놓지 않는 수집처', () => {
+  it('헤더만 오면 즉시 판정하고 응답을 파기한다(본문을 기다리지 않는다)', async () => {
+    // 2xx 헤더 뒤에 본문을 끝내지 않으면, 본문을 기다리는 구현은 이 요청과 소켓을 계속 붙잡는다.
+    const capture: Capture = { status: 200, neverEnds: true };
+    const result = await postJsonPinned(target, '3.5.7.9', {}, {
+      timeoutMs: 50,
+      request: fakeRequest(capture),
+    });
+    expect(result).toBe(200);
+    expect(capture.resDestroyed).toBe(true);
+  });
+
+  it('연결만 되고 헤더가 오지 않으면 절대 마감으로 끊는다', async () => {
+    // 소켓 무활동 타임아웃은 데이터가 올 때마다 갱신된다 — 전체 마감이 따로 있어야 한다.
+    const capture: Capture = { status: 200 };
+    const silent = (() => {
+      const req = new EventEmitter() as EventEmitter & {
+        end: () => void;
+        destroy: (e?: Error) => void;
+      };
+      req.end = () => {}; // 아무 일도 일어나지 않는다
+      req.destroy = () => {
+        capture.reqDestroyed = true;
+      };
+      return () => req;
+    })() as unknown as HttpsRequestFn;
+
+    await expect(
+      postJsonPinned(target, '3.5.7.9', {}, { timeoutMs: 10, request: silent }),
+    ).rejects.toThrow('webhook timeout');
+    expect(capture.reqDestroyed).toBe(true);
   });
 });

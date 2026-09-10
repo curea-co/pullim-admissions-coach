@@ -183,6 +183,8 @@ describe('POST /api/feedback — 교차 출처 차단', () => {
     ['text/plain', 'text/plain'],
     ['form 인코딩', 'application/x-www-form-urlencoded'],
     ['multipart', 'multipart/form-data'],
+    ['application/jsonp — JSON 이 아니다', 'application/jsonp'],
+    ['application/json-seq — JSON 이 아니다', 'application/json-seq'],
     ['빈 값', ''],
   ])('CORS 프리플라이트 없이 보낼 수 있는 타입(%s)은 415', async (_l, type) => {
     const req = new Request('http://localhost:3007/api/feedback', {

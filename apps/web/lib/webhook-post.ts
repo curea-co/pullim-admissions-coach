@@ -55,20 +55,40 @@ export function postJsonPinned(
   };
 
   return new Promise<number>((resolve, reject) => {
+    let settled = false;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      fn();
+    };
+
     let req: ClientRequest;
     try {
       req = request(target, options, (res: IncomingMessage) => {
-        // 본문은 쓰지 않는다. 다만 흘려보내지 않으면 소켓이 열린 채 남는다.
-        res.resume();
-        res.on('end', () => resolve(res.statusCode ?? 0));
-        res.on('error', reject);
+        // 우리가 쓰는 것은 상태 코드뿐이다. 본문을 기다리면, 2xx 헤더만 보내고 본문을 천천히
+        // 흘리거나 끝내지 않는 수집처가 이 요청과 소켓을 붙잡아 둘 수 있다(공개 라우트라 그게
+        // 곧 자원 고갈이다). 헤더를 받는 즉시 판정하고 응답을 파기한다.
+        const status = res.statusCode ?? 0;
+        res.destroy();
+        finish(() => resolve(status));
       });
     } catch (error) {
       reject(error);
       return;
     }
+
+    // 소켓 무활동 타임아웃은 데이터가 올 때마다 갱신된다 — 전체에 걸리는 **절대 마감**을 따로 둔다.
+    deadline = setTimeout(() => {
+      finish(() => {
+        req.destroy();
+        reject(new Error('webhook timeout'));
+      });
+    }, timeoutMs);
+
     req.on('timeout', () => req.destroy(new Error('webhook timeout')));
-    req.on('error', reject);
+    req.on('error', (error) => finish(() => reject(error)));
     req.end(body);
   });
 }
