@@ -91,20 +91,21 @@ describe('POST /api/feedback — 저장 표면 구성', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('프로덕션에서 평문 http 는 501 — 서비스 키를 그대로 흘리지 않는다', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
-    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for');
+  it('원격 호스트의 평문 http 는 501 — 개발 환경에서도 서비스 키를 흘리지 않는다', async () => {
     vi.stubEnv('PULLIM_API_URL', 'http://api.example.test');
     vi.stubEnv('FEEDBACK_SERVICE_KEY', SERVICE_KEY);
-    const res = await POST(
-      post({ category: 'general', content: '내용' }, { 'x-vercel-forwarded-for': '203.0.113.7' }),
-    );
+    const res = await POST(post({ category: 'general', content: '내용' }));
     expect(res.status).toBe(501);
     const body = await res.json();
     expect(body.code).toBe('FEEDBACK_SINK_NOT_ALLOWED');
     expect(body.message).toContain('https');
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('로컬(loopback) http 는 통과한다 — 개발 환경이 막히지 않게', async () => {
+    vi.stubEnv('PULLIM_API_URL', 'http://localhost:3000');
+    vi.stubEnv('FEEDBACK_SERVICE_KEY', SERVICE_KEY);
+    expect((await POST(post({ category: 'general', content: '내용' }))).status).toBe(202);
   });
 
   it('구성이 갖춰지면 202 로 접수한다', async () => {

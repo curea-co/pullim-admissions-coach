@@ -96,19 +96,37 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     expect(r.reason).toBe('invalid-url');
   });
 
-  it('개발에서는 http(로컬)를 허용한다', () => {
-    vi.stubEnv('PULLIM_API_URL', 'http://localhost:3000');
-    const r = resolveFeedbackApiTarget();
-    expect(r.ok).toBe(true);
+  // http 는 **주소로** 가른다 — NODE_ENV 로 가르면 개발·프리뷰에서 원격 http 가 열려 그
+  // 환경의 서비스 키가 평문으로 흘러간다.
+  it.each([
+    ['localhost', 'http://localhost:3000'],
+    ['127.0.0.1', 'http://127.0.0.1:3000'],
+    ['127.x 대역', 'http://127.1.2.3:3000'],
+    ['IPv6 loopback', 'http://[::1]:3000'],
+    ['*.localhost', 'http://api.localhost:3000'],
+  ])('loopback(%s)은 http 를 허용한다 — 네트워크로 나가지 않는다', (_label, url) => {
+    vi.stubEnv('PULLIM_API_URL', url);
+    expect(resolveFeedbackApiTarget().ok).toBe(true);
   });
 
-  it('프로덕션에서 평문 http 는 거절 — 서비스 키가 그대로 흘러간다', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('PULLIM_API_URL', 'http://api.example.test');
+  it.each([
+    ['개발/프리뷰의 원격 호스트', 'test', 'http://api.example.test'],
+    ['프로덕션의 원격 호스트', 'production', 'http://api.example.test'],
+    ['loopback 을 닮은 이름', 'test', 'http://localhost.evil.example.com'],
+    ['사설 IP', 'test', 'http://10.1.2.3:3000'],
+  ])('loopback 이 아닌 평문 http(%s)는 거절 — 서비스 키가 그대로 흘러간다', (_l, env, url) => {
+    vi.stubEnv('NODE_ENV', env);
+    vi.stubEnv('PULLIM_API_URL', url);
     const r = resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.reason).toBe('insecure');
+  });
+
+  it('프로덕션에서도 https 는 그대로 통과', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('PULLIM_API_URL', 'https://api.example.test');
+    expect(resolveFeedbackApiTarget().ok).toBe(true);
   });
 });
 
@@ -148,6 +166,19 @@ describe('postFeedbackToApi — 전송 형태', () => {
     // 리다이렉트를 따라가면 서비스 키가 다른 호스트로 다시 나간다.
     expect(init.redirect).toBe('manual');
     expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  // Node(undici)는 본문을 읽거나 취소해야 연결을 풀에 돌려준다. 상태만 보고 두면 반복 호출에서
+  // 연결이 고갈된다.
+  it('본문이 있는 응답도 읽지 않을 것이면 취소한다(연결을 물고 있지 않게)', async () => {
+    const res = new Response(JSON.stringify({ id: 'f_1', createdAt: '2026-09-14T00:00:00Z' }), {
+      status: 201,
+    });
+    const cancel = vi.spyOn(res.body!, 'cancel');
+    const fetchMock = vi.fn().mockResolvedValue(res);
+
+    expect(await postFeedbackToApi(target, payload, { timeoutMs: 5_000, fetchImpl: fetchMock })).toBe(201);
+    expect(cancel).toHaveBeenCalled();
   });
 
   it('상태 코드를 그대로 돌려준다 — 성공 판단은 호출부 몫(3xx 는 성공이 아니다)', async () => {
@@ -260,6 +291,17 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_not_authenticated' }), { status }));
     expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
+  });
+
+  it('읽지 않는 응답(비 200)의 본문도 취소한다', async () => {
+    const res = new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
+    const cancel = vi.spyOn(res.body!, 'cancel');
+    const fetchMock = vi.fn().mockResolvedValue(res);
+
+    expect(
+      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
+    ).toBeNull();
+    expect(cancel).toHaveBeenCalled();
   });
 
   it.each([

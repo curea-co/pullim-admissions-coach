@@ -318,7 +318,7 @@ export async function POST(req: Request) {
       501,
       'FEEDBACK_SINK_NOT_ALLOWED',
       resolved.reason === 'insecure'
-        ? '저장 주소가 평문 http 라 서비스 키를 보낼 수 없어 접수하지 않았습니다. 운영자가 PULLIM_API_URL 을 https 로 설정해야 합니다.'
+        ? '저장 주소가 평문 http 라 서비스 키를 보낼 수 없어 접수하지 않았습니다. 운영자가 PULLIM_API_URL 을 https 로 설정해야 합니다(http 는 localhost 등 loopback 주소에서만 허용).'
         : '저장 주소(PULLIM_API_URL)가 올바른 http(s) 주소가 아니라 접수하지 않았습니다. 운영자가 값을 확인해야 합니다.',
     );
   }

@@ -91,16 +91,29 @@ export function resolveFeedbackApiTarget(): FeedbackApiTargetResult {
     return { ok: false, reason: 'invalid-url' };
   }
 
-  const path = root.pathname.replace(/\/+$/, '');
-  const endpoint = new URL(`${path}/feedback`, root);
-  const identityEndpoint = new URL(`${path}/me`, root);
-  // 평문 http 로 보내면 `x-service-key` 가 경로 위에 그대로 노출된다. 로컬(dev) 은 그 위험이
-  // 없으니 허용하고, 프로덕션에서는 거절한다 — 열어 두는 대신 원인을 말하고 멈춘다.
-  if (process.env.NODE_ENV === 'production' && endpoint.protocol !== 'https:') {
+  // 평문 http 로 보내면 `x-service-key` 가 네트워크 위에 그대로 노출된다. 같은 기계 안에서
+  // 끝나는 loopback 만 예외로 둔다 — **환경 변수(NODE_ENV)가 아니라 주소로** 가른다.
+  // 개발·프리뷰라는 이유로 원격 http 를 열어 두면 그 환경의 키가 평문으로 흘러간다.
+  if (root.protocol !== 'https:' && !isLoopbackHost(root.hostname)) {
     return { ok: false, reason: 'insecure' };
   }
 
+  const path = root.pathname.replace(/\/+$/, '');
+  const endpoint = new URL(`${path}/feedback`, root);
+  const identityEndpoint = new URL(`${path}/me`, root);
   return { ok: true, target: { endpoint, identityEndpoint, serviceKey } };
+}
+
+/**
+ * 같은 기계 안에서 끝나는 주소인가. http 를 허용할 수 있는 **유일한** 경우다.
+ * (`*.localhost` 는 RFC 6761 상 loopback 으로 해석된다. IPv6 는 `URL.hostname` 이 대괄호를
+ *  붙여 주지만, 직접 넘겨 쓰는 호출도 있어 양쪽 표기를 모두 본다.)
+ */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '[::1]' || host === '::1') return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }
 
 /**
@@ -116,6 +129,22 @@ interface SendOptions {
   timeoutMs: number;
   /** 테스트 주입용. 기본 전역 fetch(호출 시점에 바인딩 — stubGlobal 이 먹어야 한다). */
   fetchImpl?: typeof fetch;
+}
+
+/**
+ * 읽지 않을 응답 본문을 정리한다.
+ *
+ * Node(undici)의 fetch 는 본문을 읽거나 취소해야 연결을 풀에 돌려준다. 상태 코드만 보고
+ * 그냥 두면 본문을 보내는 업스트림 앞에서 연결이 물린 채 남고, 요청이 반복되면 풀이 고갈된다.
+ * (이미 닫힌 본문에 cancel 을 부르면 던질 수 있으므로 삼킨다 — 정리는 실패해도 호출부의
+ *  판단을 바꾸지 않는다.)
+ */
+async function discardBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    /* 이미 닫혔거나 취소된 본문 — 정리할 것이 없다. */
+  }
 }
 
 /**
@@ -141,6 +170,8 @@ export async function postFeedbackToApi(
     cache: 'no-store',
     signal: AbortSignal.timeout(timeoutMs),
   });
+  // 응답 본문(`{ id, createdAt }`)은 화면에 쓰지 않는다 — 읽지 않을 것이면 **버려야** 한다.
+  await discardBody(res);
   return res.status;
 }
 
@@ -207,7 +238,10 @@ export async function resolveUserId(
       cache: 'no-store',
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.status !== 200) return null; // 401(미인증)·만료·오류 모두 "모른다" 다
+    if (res.status !== 200) {
+      await discardBody(res); // 읽지 않고 끝내는 경로 — 연결을 물고 있지 않게 정리한다
+      return null; // 401(미인증)·만료·오류 모두 "모른다" 다
+    }
     const body = (await res.json()) as MeIdentity;
     // 문자열 `sub` 만 인정한다. 저장값이 커지지 않게 상한도 둔다.
     return typeof body?.sub === 'string' && body.sub.trim() ? body.sub.trim().slice(0, 128) : null;
