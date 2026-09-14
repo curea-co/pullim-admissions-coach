@@ -20,6 +20,9 @@ const sentBody = () =>
   JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)) as {
     category: string;
     content: string;
+    // 제출 맥락(화면 경로·뷰포트)은 폼이 아니라 lib/feedback.ts 가 붙인다 — 여기서는
+    // 폼이 정하는 값만 본다(맥락 자체는 lib/feedback.test.ts 가 고정한다).
+    context?: unknown;
   };
 
 function open() {
@@ -178,7 +181,7 @@ describe('FeedbackWidget — 전송', () => {
     await fillAndSend();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(sentBody()).toEqual({
+    expect(sentBody()).toMatchObject({
       category: 'bug',
       content: '탭을 바꾸면 스크롤이 맨 위로 올라가요.',
     });

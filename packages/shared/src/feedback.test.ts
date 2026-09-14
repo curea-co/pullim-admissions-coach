@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   FEEDBACK_CONTENT_MAX,
+  FEEDBACK_PAGE_URL_MAX,
   feedbackCategoryLabel,
   feedbackSubmissionSchema,
 } from './feedback';
@@ -82,5 +83,80 @@ describe('feedbackSubmissionSchema — 알 수 없는 필드', () => {
     });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data).toEqual({ category: 'general', content: '내용' });
+  });
+});
+
+// 제출 맥락. 여기서 못박는 것은 **담기는 것과 담기지 않는 것**이다 — 경로·뷰포트는 담고,
+// 호스트와 사용자 정보는 어떤 모양으로 와도 남지 않는다.
+describe('feedbackSubmissionSchema — 제출 맥락(context)', () => {
+  const valid = { pageUrl: '/result?tab=interview', viewport: { w: 390, h: 844 } };
+
+  it('없어도 통과한다 — 선택 값이다(옛 번들의 제출을 잃지 않게)', () => {
+    const r = feedbackSubmissionSchema.safeParse({ category: 'general', content: '내용' });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toBeUndefined();
+  });
+
+  it('경로·뷰포트를 그대로 통과시킨다', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: valid,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toEqual(valid);
+  });
+
+  it.each([
+    ['절대 URL — 호스트가 섞인다', 'https://evil.example.com/x'],
+    ['스킴 상대 URL', '//evil.example.com/x'],
+    ['상대 경로', 'result?tab=1'],
+    ['빈 문자열', ''],
+  ])('경로가 아닌 pageUrl(%s)은 거절', (_label, pageUrl) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it(`pageUrl 은 ${FEEDBACK_PAGE_URL_MAX}자까지 — 넘으면 거절(폼이 미리 자른다)`, () => {
+    const ok = `/x${'a'.repeat(FEEDBACK_PAGE_URL_MAX - 2)}`;
+    expect(
+      feedbackSubmissionSchema.safeParse({ category: 'general', content: '내용', context: { ...valid, pageUrl: ok } })
+        .success,
+    ).toBe(true);
+    expect(
+      feedbackSubmissionSchema.safeParse({
+        category: 'general',
+        content: '내용',
+        context: { ...valid, pageUrl: `${ok}a` },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ['소수', { w: 390.5, h: 844 }],
+    ['음수', { w: -1, h: 844 }],
+    ['문자열', { w: '390', h: 844 }],
+    ['키 누락', { w: 390 }],
+  ])('뷰포트가 정수 픽셀이 아니면(%s) 거절', (_label, viewport) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, viewport },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('맥락에 끼워 넣은 사용자 정보는 제거된다(수신처로 새어 나가지 않게)', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, email: 'a@b.c', displayName: '박준호', userId: 'u_1' },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toEqual(valid);
   });
 });

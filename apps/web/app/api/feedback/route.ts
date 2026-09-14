@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
+import { FEEDBACK_CONTENT_MAX, feedbackSubmissionSchema } from '@pullim/shared';
 import {
-  FEEDBACK_CONTENT_MAX,
-  feedbackCategoryLabel,
-  feedbackSubmissionSchema,
-} from '@pullim/shared';
-import { parseWebhookTarget, resolvePublicAddress } from '@/lib/webhook-target';
-import { postJsonPinned } from '@/lib/webhook-post';
+  FEEDBACK_USER_AGENT_MAX,
+  appVersion,
+  postFeedbackToApi,
+  resolveFeedbackApiTarget,
+  resolveUserId,
+  type FeedbackApiPayload,
+} from '@/lib/feedback-api';
 import {
   FEEDBACK_GLOBAL_KEY,
   FEEDBACK_GLOBAL_RATE_RULES,
@@ -14,27 +16,30 @@ import {
   rateLimiter,
 } from '@/lib/rate-limit';
 
-// 건의하기 수신 라우트 — 모달이 보낸 내용을 **서버 전용** 수집처로 넘긴다.
+// 건의하기 수신 라우트 — 모달이 보낸 내용을 pullim-api 에 **저장한다**(운영은 pullim-admin
+// 에서 읽는다). 알림만 던지고 마는 경로는 지나가면 사라져 그 목적을 못 채운다.
 //
-// 왜 same-origin 라우트를 한 겹 두는가: 수집처 URL(FEEDBACK_WEBHOOK_URL)은 사실상 인증 없는
-// 쓰기 엔드포인트다. 브라우저에서 직접 부르려면 URL 을 번들에 넣어야 하고, 그러면 누구나 그
-// 주소로 무제한 전송할 수 있다. URL 은 서버에만 두고 브라우저는 /api/feedback 만 안다.
+// 왜 same-origin 라우트를 한 겹 두는가: 저장 표면(PULLIM_API_URL + FEEDBACK_SERVICE_KEY)은
+// 서비스 키 하나로 쓰는 엔드포인트다. 브라우저에서 직접 부르려면 키를 번들에 넣어야 하고,
+// 그러면 누구나 그 키로 무제한 전송할 수 있다. 키는 서버에만 두고 브라우저는 /api/feedback 만 안다.
 //
-// ⚠️ 그렇다고 이 라우트가 안전한 건 아니다 — **인증 없이 누구나 부를 수 있다.** URL 을 감춰도
+// ⚠️ 그렇다고 이 라우트가 안전한 건 아니다 — **인증 없이 누구나 부를 수 있다.** 키를 감춰도
 // 공격자는 /api/feedback 을 직접 때려 서버를 외부 발송 프록시로 쓸 수 있다. 그래서 세 겹으로 막는다:
 //   ① 호출자 식별자 기준 레이트리밋 — 식별자는 **운영자가 선언한 신뢰 헤더**에서만 얻는다
-//   ② 식별자와 무관한 전체 상한(식별자를 갈아 껴도 수집처로 나가는 총량은 고정)
+//   ② 식별자와 무관한 전체 상한(식별자를 갈아 껴도 api 로 나가는 총량은 고정)
 //   ③ 본문 크기 상한을 **스트림을 읽는 도중에** 적용(큰 본문을 메모리에 담기 전에 끊는다)
 // 프로덕션에서 ①의 신뢰 헤더나 리미터 백엔드가 구성되지 않으면 열어 두지 않고 503 으로
 // 거절한다(fail-closed) — 보호 없이 열린 공개 라우트는 그 순간 외부 발송 프록시다.
-// 수집처 주소는 https·비내부 + (선택) 호스트 allowlist + **DNS 해석 결과**까지 확인한다.
 //
-// 정직성 규칙(§6 — 가짜 상태 금지): **전달에 성공했을 때만 성공을 응답한다.**
-// 수집처가 없거나(501) 응답이 실패면(502) 그대로 실패를 돌려준다. 조용히 버리고 200 을
+// 저장 값의 경계(오너 결정): 담기는 신원은 **userId 하나뿐**이고 그 값도 서버가 정한다.
+// 이름·이메일·등급·미성년 여부는 보내지 않는다(lib/feedback-api.ts 의 payload 타입이 경계다).
+//
+// 정직성 규칙(§6 — 가짜 상태 금지): **저장에 성공했을 때만 성공을 응답한다.**
+// 구성이 없거나(501) api 가 받지 못하면(502) 그대로 실패를 돌려준다. 조용히 버리고 200 을
 // 주는 구현은 사용자에게 "접수됐다"는 거짓말이 된다.
 
 export const runtime = 'nodejs';
-// 매 요청마다 현재 구성(FEEDBACK_WEBHOOK_URL)을 다시 읽어야 한다 — 캐시하지 않는다.
+// 매 요청마다 현재 구성(PULLIM_API_URL·FEEDBACK_SERVICE_KEY)을 다시 읽어야 한다 — 캐시하지 않는다.
 export const dynamic = 'force-dynamic';
 
 /**
@@ -43,8 +48,14 @@ export const dynamic = 'force-dynamic';
  */
 const MAX_BODY_BYTES = 8 * 1024;
 
-/** 수집처가 응답하지 않을 때 요청이 매달려 있지 않도록 하는 상한. */
-const WEBHOOK_TIMEOUT_MS = 5_000;
+/** api 가 응답하지 않을 때 요청이 매달려 있지 않도록 하는 상한. */
+const API_TIMEOUT_MS = 5_000;
+
+/**
+ * 신원 확인(`GET /me`)의 상한. 저장보다 짧게 둔다 — 이건 **있으면 좋은 값**이라, 여기서 오래
+ * 기다리다 사용자의 건의를 놓치는 쪽이 더 나쁘다.
+ */
+const IDENTITY_TIMEOUT_MS = 2_000;
 
 /**
  * 본문을 다 받기까지의 상한. 크기만 재고 시간을 재지 않으면, 연결만 잡고 본문을 보내지 않는
@@ -123,13 +134,22 @@ function expectedOrigin(req: Request): string {
 }
 
 /**
- * Slack mrkdwn 특수 토큰 무력화.
- * `<!channel>`·`<@U123>` 같은 토큰이 그대로 들어가면 사용자가 적은 한 줄로 운영 채널 전원에게
- * 알림을 울릴 수 있다. Slack 문서가 지정한 세 글자(&, <, >)를 이스케이프해 **텍스트로** 만든다.
- * (`mrkdwn: false` 도 함께 보내지만, 수집처가 그 필드를 무시할 수 있으므로 이스케이프가 본선이다.)
+ * 저장할 맥락을 만든다. **서버가 아는 값은 서버가 채운다** — user-agent 는 요청 헤더에서 읽고
+ * (클라이언트가 보낸 값보다 신뢰도가 높다), 빌드 식별자는 배포 환경에서 읽는다.
+ * 모르는 값은 **필드째 생략한다**(빈 문자열·'unknown' 같은 가짜 값을 저장하지 않는다).
  */
-function escapeSinkText(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function buildContext(
+  req: Request,
+  client: { pageUrl: string; viewport: { w: number; h: number } } | undefined,
+): FeedbackApiPayload['context'] {
+  const userAgent = req.headers.get('user-agent')?.trim().slice(0, FEEDBACK_USER_AGENT_MAX);
+  const version = appVersion();
+  return {
+    ...(client ? { pageUrl: client.pageUrl } : {}),
+    ...(userAgent ? { userAgent } : {}),
+    ...(client ? { viewport: client.viewport } : {}),
+    ...(version ? { appVersion: version } : {}),
+  };
 }
 
 /**
@@ -280,39 +300,29 @@ export async function POST(req: Request) {
     return limiterUnavailable();
   }
 
-  // ── 3) 수집처 구성 — 없으면 여기서 끝낸다 ──
-  // 검증보다 앞에 두는 이유: 어차피 전달할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
+  // ── 3) 저장 대상(pullim-api) 구성 — 없으면 여기서 끝낸다 ──
+  // 검증보다 앞에 두는 이유: 어차피 저장할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
   // 입력을 고치려 들지만 실제 원인은 서버 구성이다. 원인을 그대로 말한다.
-  const allowlist = process.env.FEEDBACK_WEBHOOK_ALLOWED_HOSTS?.trim();
-  // 프로덕션은 allowlist 를 **요구한다.** 이름 검사와 DNS 확인만으로는 확인 시점과 연결 시점
-  // 사이의 리바인딩을 닫지 못한다(연결을 확인한 IP 에 고정해야 닫힌다). allowlist 를 강제하면
-  // 그 경로를 쓰려면 허용된 공급자의 DNS 자체를 장악해야 한다 — 실무에서 이 틈이 닫힌다.
-  if (process.env.NODE_ENV === 'production' && !allowlist) {
-    return fail(
-      501,
-      'FEEDBACK_SINK_ALLOWLIST_REQUIRED',
-      '수집처 호스트 allowlist 가 설정되지 않아 전송하지 않았습니다. 운영자가 FEEDBACK_WEBHOOK_ALLOWED_HOSTS 를 설정해야 합니다.',
-    );
-  }
-  const sink = parseWebhookTarget(process.env.FEEDBACK_WEBHOOK_URL, allowlist);
-  if (!sink) {
-    return fail(
-      501,
-      'FEEDBACK_SINK_NOT_CONFIGURED',
-      '건의 내용을 전달할 수집처가 이 환경에 설정되어 있지 않습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 설정해야 전송됩니다(내부 주소가 아닌 https URL, allowlist 를 켰다면 그 안의 호스트).',
-    );
-  }
-
-  // 이름이 실제로 가리키는 주소까지 확인하고, **그 주소로 연결한다**(아래 postJsonPinned).
-  // 확인만 하고 이름으로 다시 연결하면 그 사이에 응답이 바뀌는 DNS 리바인딩을 막지 못한다.
-  const sinkAddress = await resolvePublicAddress(sink.hostname);
-  if (!sinkAddress) {
+  const resolved = resolveFeedbackApiTarget();
+  if (!resolved.ok) {
+    if (resolved.reason === 'not-configured') {
+      return fail(
+        501,
+        'FEEDBACK_SINK_NOT_CONFIGURED',
+        `건의를 저장할 곳이 이 환경에 설정되어 있지 않습니다. 운영자가 ${resolved.missing.join(
+          '·',
+        )} 를 설정해야 접수됩니다.`,
+      );
+    }
     return fail(
       501,
       'FEEDBACK_SINK_NOT_ALLOWED',
-      '설정된 수집처 주소가 내부망을 가리키거나 확인되지 않아 전송하지 않았습니다. 운영자가 FEEDBACK_WEBHOOK_URL 을 확인해야 합니다.',
+      resolved.reason === 'insecure'
+        ? '저장 주소가 평문 http 라 서비스 키를 보낼 수 없어 접수하지 않았습니다. 운영자가 PULLIM_API_URL 을 https 로 설정해야 합니다.'
+        : '저장 주소(PULLIM_API_URL)가 올바른 http(s) 주소가 아니라 접수하지 않았습니다. 운영자가 값을 확인해야 합니다.',
     );
   }
+  const target = resolved.target;
 
   // ── 4) 본문 파싱 — 읽어 가면서 상한을 적용한다(content-length 는 없거나 거짓일 수 있다) ──
   let read: BoundedRead;
@@ -350,7 +360,7 @@ export async function POST(req: Request) {
       issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
   }
-  const { category, content } = parsed.data;
+  const { category, content, context } = parsed.data;
 
   // ── 6) 전체 상한 — **유효한 제출로 확인된 뒤에** 소비한다 ──
   // 이 카운터의 목적은 "수집처로 나가는 총량"을 묶는 것이다. 검증 전에 깎으면, 깨진 JSON 을
@@ -363,41 +373,42 @@ export async function POST(req: Request) {
     return limiterUnavailable();
   }
 
-  // ── 7) 전달 ──
-  // Slack incoming webhook 호환 형태(`{ text }`) 한 가지만 보낸다. 수집처가 모르는 키를
-  // 거절하는 경우가 있어 구조화 필드를 덧붙이지 않고, 카테고리는 본문 첫 줄에 적는다.
-  // 사용자가 적은 내용은 **이스케이프해서** 넣는다 — 그대로 넣으면 `<!channel>` 한 줄로
-  // 운영 채널 전원 알림을 울릴 수 있다. 앞뒤 줄은 우리가 만든 문자열이라 그대로 둔다.
-  const text = [
-    `[입시코치 건의] ${feedbackCategoryLabel[category]}`,
-    escapeSinkText(content),
-    `— ${new Date().toISOString()}`,
-  ].join('\n');
+  // ── 7) 저장 ──
+  // 신원은 **여기서** 정한다 — 클라이언트가 보낸 id 는 읽지도 않는다(스키마에 그런 필드가 없다).
+  // 확인되지 않으면 null 이고, 그래도 건의는 저장된다(신원은 있으면 좋은 값이다).
+  const userId = await resolveUserId(req.headers.get('cookie'), target, {
+    timeoutMs: IDENTITY_TIMEOUT_MS,
+  });
+
+  const payload: FeedbackApiPayload = {
+    service: 'admissions',
+    category,
+    content,
+    userId,
+    context: buildContext(req, context),
+  };
 
   try {
-    // 연결은 위에서 확인한 IP 로 고정한다(TLS 검증은 호스트명 기준 그대로).
-    // `mrkdwn: false` — 수집처가 지원하면 서식 해석 자체를 끈다(이스케이프와 이중 방어).
-    const status = await postJsonPinned(sink, sinkAddress, { text, mrkdwn: false }, {
-      timeoutMs: WEBHOOK_TIMEOUT_MS,
-    });
+    const status = await postFeedbackToApi(target, payload, { timeoutMs: API_TIMEOUT_MS });
     if (status < 200 || status >= 300) {
-      // 수집처의 응답 본문은 그대로 흘리지 않는다(내부 주소·토큰이 섞여 나올 수 있다).
+      // api 의 응답 본문은 그대로 흘리지 않는다(내부 주소·토큰이 섞여 나올 수 있다).
       // 3xx 도 여기로 온다 — 리다이렉트를 따라가지 않으므로 성공으로 치지 않는다.
       return fail(
         502,
         'FEEDBACK_SINK_FAILED',
-        '수집처가 요청을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+        '건의를 저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
       );
     }
   } catch {
-    // 타임아웃·DNS·연결 실패가 모두 여기로 온다. 어느 쪽이든 전달되지 않았다.
+    // 타임아웃·DNS·연결 실패가 모두 여기로 온다. 어느 쪽이든 저장되지 않았다.
     return fail(
       502,
       'FEEDBACK_SINK_UNREACHABLE',
-      '수집처에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+      '건의를 저장할 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
     );
   }
 
-  // 202 Accepted — 전달은 됐고, 사람이 읽는 것은 그 뒤의 일이다.
+  // 202 Accepted — 저장은 됐고, 사람이 읽는 것은 그 뒤의 일이다.
+  // (api 가 돌려주는 id 는 화면에 쓰지 않으므로 흘리지 않는다 — 표시하지 않을 값을 노출하지 않는다.)
   return NextResponse.json({ ok: true }, { status: 202 });
 }
