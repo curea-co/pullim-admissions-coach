@@ -83,7 +83,12 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     ['빈 경로만', '///'],
     ['file 스킴', 'file:///etc/passwd'],
     ['javascript 스킴', 'javascript:alert(1)'],
-  ])('http(s) 가 아닌 주소(%s)는 대상이 되지 않는다', (_label, url) => {
+    // 문자열로 이어 붙이면 `/api?v=1/feedback` 이 되어 엉뚱한 주소로 간다 — 구성 오류로 끊는다.
+    ['쿼리가 붙은 베이스', 'https://api.example.test/api?version=1'],
+    ['프래그먼트가 붙은 베이스', 'https://api.example.test/api#frag'],
+    // URL 안의 자격증명은 요청과 함께 나간다.
+    ['인증정보가 박힌 베이스', 'https://user:pass@api.example.test'],
+  ])('이어 붙일 수 없는 주소(%s)는 대상이 되지 않는다', (_label, url) => {
     vi.stubEnv('PULLIM_API_URL', url);
     const r = resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
@@ -174,17 +179,19 @@ describe('postFeedbackToApi — 전송 형태', () => {
 });
 
 describe('resolveUserId — 신원은 쿠키로만', () => {
+  beforeEach(() => vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', 'pullim_at,pullim_rt'));
+
   it('쿠키가 없으면 왕복 자체를 만들지 않는다', async () => {
     const fetchMock = vi.fn();
     expect(await resolveUserId(null, target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('인증된 요청이면 /me 의 sub 를 쓴다 — 쿠키는 그대로 넘긴다', async () => {
+  it('인증된 요청이면 /me 의 sub 를 쓴다', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_abc', email: 'a@b.c' }), { status: 200 }));
-    const userId = await resolveUserId('access=xyz; other=1', target, {
+    const userId = await resolveUserId('pullim_at=xyz', target, {
       timeoutMs: 2_000,
       fetchImpl: fetchMock,
     });
@@ -193,7 +200,52 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(String(url)).toBe('https://api.example.test/me');
     expect(init.method).toBe('GET');
-    expect((init.headers as Record<string, string>).cookie).toBe('access=xyz; other=1');
+    expect((init.headers as Record<string, string>).cookie).toBe('pullim_at=xyz');
+  });
+
+  // 받은 Cookie 헤더를 통째로 넘기면 브라우저의 쿠키 격리를 서버가 우회하게 된다.
+  // 넘어가는 것은 **운영자가 선언한 이름만**이다.
+  it('선언하지 않은 쿠키(웹 전용 세션·CSRF·__Host-*)는 api 로 넘어가지 않는다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_abc' }), { status: 200 }));
+    await resolveUserId(
+      '__Host-web_csrf=c1; web_session=s1; pullim_at=xyz; _ga=GA1.2.3; pullim_rt=rrr',
+      target,
+      { timeoutMs: 2_000, fetchImpl: fetchMock },
+    );
+
+    const cookie = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(cookie.cookie).toBe('pullim_at=xyz; pullim_rt=rrr');
+    expect(cookie.cookie).not.toMatch(/__Host-|web_session|_ga/);
+  });
+
+  it('FEEDBACK_IDENTITY_COOKIES 미선언이면 아무것도 넘기지 않고 호출도 하지 않는다(fail-closed)', async () => {
+    vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', '');
+    const fetchMock = vi.fn();
+    expect(
+      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
+    ).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('선언된 쿠키가 요청에 없으면 호출하지 않는다', async () => {
+    const fetchMock = vi.fn();
+    expect(
+      await resolveUserId('web_session=s1; _ga=GA1.2.3', target, {
+        timeoutMs: 2_000,
+        fetchImpl: fetchMock,
+      }),
+    ).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('이름이 부분 일치하는 쿠키(pullim_at_shadow)는 넘기지 않는다', async () => {
+    const fetchMock = vi.fn();
+    expect(
+      await resolveUserId('pullim_at_shadow=evil', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
+    ).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -207,7 +259,7 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_not_authenticated' }), { status }));
-    expect(await resolveUserId('access=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
   });
 
   it.each([
@@ -216,22 +268,22 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
     ['sub 가 공백', { sub: '   ' }],
   ])('%s → null(추측하지 않는다)', async (_label, body) => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
-    expect(await resolveUserId('access=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
   });
 
   it('연결 실패·JSON 깨짐은 삼킨다 — 신원 확인 실패가 건의를 잃게 하지 않는다', async () => {
     const boom = vi.fn().mockRejectedValue(new Error('ETIMEDOUT'));
-    expect(await resolveUserId('access=xyz', target, { timeoutMs: 2_000, fetchImpl: boom })).toBeNull();
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: boom })).toBeNull();
 
     const broken = vi.fn().mockResolvedValue(new Response('not json', { status: 200 }));
-    expect(await resolveUserId('access=xyz', target, { timeoutMs: 2_000, fetchImpl: broken })).toBeNull();
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: broken })).toBeNull();
   });
 
   it('sub 가 길어도 저장값이 무한정 커지지 않게 자른다', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ sub: 'u'.repeat(500) }), { status: 200 }));
-    const userId = await resolveUserId('access=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock });
+    const userId = await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock });
     expect(userId).toHaveLength(128);
   });
 });

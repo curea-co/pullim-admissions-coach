@@ -73,20 +73,27 @@ export function resolveFeedbackApiTarget(): FeedbackApiTargetResult {
   if (!serviceKey) missing.push('FEEDBACK_SERVICE_KEY');
   if (!base || !serviceKey) return { ok: false, reason: 'not-configured', missing };
 
-  // 베이스의 경로를 **보존해서** 잇는다. `new URL('/feedback', base)` 는 base 가
-  // `https://host/api` 일 때 `/api` 를 버린다.
-  const root = base.replace(/\/+$/, '');
-  let endpoint: URL;
-  let identityEndpoint: URL;
+  // 베이스는 **URL 로 파싱한 뒤** 경로 위에서만 잇는다. 문자열로 이어 붙이면
+  // `https://host/api?v=1` 이 `/api?v=1/feedback` 이 되고(쿼리 안으로 들어간다),
+  // `#frag` 는 경로를 통째로 프래그먼트로 삼켜 요청이 엉뚱한 주소로 간다.
+  let root: URL;
   try {
-    endpoint = new URL(`${root}/feedback`);
-    identityEndpoint = new URL(`${root}/me`);
+    root = new URL(base);
   } catch {
     return { ok: false, reason: 'invalid-url' };
   }
-  if (endpoint.protocol !== 'https:' && endpoint.protocol !== 'http:') {
+  if (root.protocol !== 'https:' && root.protocol !== 'http:') {
     return { ok: false, reason: 'invalid-url' };
   }
+  // 베이스에 쿼리·프래그먼트·인증정보가 붙어 있으면 이어 붙일 수 없거나 자격증명이 함께
+  // 나간다. 조용히 무시하지 않고 **구성 오류로 끊는다**(어디로 가는지 모르면 보내지 않는다).
+  if (root.search || root.hash || root.username || root.password) {
+    return { ok: false, reason: 'invalid-url' };
+  }
+
+  const path = root.pathname.replace(/\/+$/, '');
+  const endpoint = new URL(`${path}/feedback`, root);
+  const identityEndpoint = new URL(`${path}/me`, root);
   // 평문 http 로 보내면 `x-service-key` 가 경로 위에 그대로 노출된다. 로컬(dev) 은 그 위험이
   // 없으니 허용하고, 프로덕션에서는 거절한다 — 열어 두는 대신 원인을 말하고 멈춘다.
   if (process.env.NODE_ENV === 'production' && endpoint.protocol !== 'https:') {
@@ -143,15 +150,41 @@ interface MeIdentity {
 }
 
 /**
+ * api 로 넘길 쿠키만 골라 헤더를 다시 만든다.
+ *
+ * 받은 `Cookie` 헤더를 통째로 넘기면 **브라우저의 쿠키 격리를 서버가 우회**하게 된다 — 웹
+ * 호스트 전용 세션·CSRF·`__Host-*` 쿠키까지 다른 호스트로 함께 나간다. 어떤 쿠키가 인증용인지
+ * 코드가 추측하지 않고 **운영자가 선언한다**(FEEDBACK_IDENTITY_COOKIES, 쉼표 구분).
+ * 선언이 없으면 아무것도 넘기지 않는다(fail-closed — 그 환경에서는 userId 가 늘 null 이다).
+ */
+function identityCookieHeader(cookieHeader: string): string | null {
+  const declared = process.env.FEEDBACK_IDENTITY_COOKIES?.trim();
+  if (!declared) return null;
+  const allow = new Set(
+    declared
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
+  );
+  if (allow.size === 0) return null;
+
+  const kept = cookieHeader.split(';').filter((part) => {
+    const eq = part.indexOf('=');
+    return eq > 0 && allow.has(part.slice(0, eq).trim());
+  });
+  return kept.length > 0 ? kept.map((part) => part.trim()).join('; ') : null;
+}
+
+/**
  * 요청자의 userId — **서버에서만** 정한다.
  *
  * 클라이언트가 보낸 id 를 그대로 저장하면 아무나 남의 id 를 붙여 건의를 남길 수 있다. 그래서
- * 신원은 **인증 쿠키로만** 확인한다: 요청에 실려 온 쿠키를 그대로 api 에 넘겨 `GET /me` 가
+ * 신원은 **인증 쿠키로만** 확인한다: 운영자가 선언한 쿠키만 골라 api 에 넘기고, `GET /me` 가
  * 인정하는 `sub` 만 쓴다. 확인되지 않으면 `null` 이다(빈 값 > 위조 가능한 값).
  *
  * ⚠️ 현재 인증 쿠키는 **api 호스트 전용**이라(설계 §7 "Next 미들웨어가 못 읽는다") 웹 호스트로
  * 들어오는 요청에는 실려 오지 않는다 — 즉 지금은 사실상 항상 `null` 이다. 쿠키 도메인이 공유
- * 부모(`Domain=.pullim…`)로 확정되면 이 경로가 그대로 값을 채운다.
+ * 부모(`Domain=.pullim…`)로 확정되고 운영자가 쿠키 이름을 선언하면 이 경로가 값을 채운다.
  *
  * 실패는 **전부 삼킨다.** 신원 확인이 안 됐다고 건의를 잃게 하지 않는다.
  */
@@ -160,14 +193,16 @@ export async function resolveUserId(
   target: FeedbackApiTarget,
   { timeoutMs, fetchImpl }: SendOptions,
 ): Promise<string | null> {
-  // 쿠키가 아예 없으면 확인할 것이 없다 — 왕복을 만들지 않는다.
+  // 쿠키가 아예 없거나 넘길 쿠키가 없으면 확인할 것이 없다 — 왕복을 만들지 않는다.
   if (!cookieHeader) return null;
+  const forwarded = identityCookieHeader(cookieHeader);
+  if (!forwarded) return null;
 
   const doFetch = fetchImpl ?? globalThis.fetch.bind(globalThis);
   try {
     const res = await doFetch(target.identityEndpoint, {
       method: 'GET',
-      headers: { cookie: cookieHeader, accept: 'application/json' },
+      headers: { cookie: forwarded, accept: 'application/json' },
       redirect: 'manual',
       cache: 'no-store',
       signal: AbortSignal.timeout(timeoutMs),

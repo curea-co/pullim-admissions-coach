@@ -56,15 +56,18 @@ function messageForStatus(status: number): string {
 /**
  * 제출 맥락 — **클라이언트만 아는 값**만 모은다.
  *
- * `pageUrl` 은 `pathname + search` 다. 호스트는 붙이지 않는다 — 서버가 이미 알고, 굳이 보내면
- * 저장값에 중복된 출처가 생긴다. 상한을 넘는 쿼리는 **자른다**(거절하면 긴 주소를 쓰는 화면에서
- * 건의 자체를 잃는다). 사용자 식별 정보는 어떤 경우에도 담지 않는다.
+ * `pageUrl` 은 `pathname` 뿐이다.
+ *  - 호스트를 붙이지 않는 이유: 서버가 이미 안다.
+ *  - **쿼리(`search`)·해시를 담지 않는 이유:** `?next=`·`?code=`·`?token=` 처럼 일회성 토큰이나
+ *    개인 정보가 실리는 자리라, 그대로 저장하면 그 값이 건의 레코드로 복제된다. 화면을 아는 데
+ *    필요한 것은 경로뿐이다. (스키마도 같은 규칙을 강제한다 — @pullim/shared 의 feedbackPagePath.)
+ *  - 상한을 넘으면 **자른다**(거절하면 경로가 긴 화면에서 건의 자체를 잃는다).
+ * 사용자 식별 정보는 어떤 경우에도 담지 않는다.
  */
 function currentContext(): FeedbackClientContext | undefined {
   if (typeof window === 'undefined') return undefined;
-  const { pathname, search } = window.location;
   const candidate = {
-    pageUrl: `${pathname}${search}`.slice(0, FEEDBACK_PAGE_URL_MAX),
+    pageUrl: window.location.pathname.slice(0, FEEDBACK_PAGE_URL_MAX),
     // innerWidth 는 확대 상태에서 소수로 나온다 — 정수로 맞춘다(스키마가 정수만 받는다).
     viewport: { w: Math.round(window.innerWidth) || 0, h: Math.round(window.innerHeight) || 0 },
   };

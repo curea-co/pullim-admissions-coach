@@ -89,7 +89,7 @@ describe('feedbackSubmissionSchema — 알 수 없는 필드', () => {
 // 제출 맥락. 여기서 못박는 것은 **담기는 것과 담기지 않는 것**이다 — 경로·뷰포트는 담고,
 // 호스트와 사용자 정보는 어떤 모양으로 와도 남지 않는다.
 describe('feedbackSubmissionSchema — 제출 맥락(context)', () => {
-  const valid = { pageUrl: '/result?tab=interview', viewport: { w: 390, h: 844 } };
+  const valid = { pageUrl: '/result', viewport: { w: 390, h: 844 } };
 
   it('없어도 통과한다 — 선택 값이다(옛 번들의 제출을 잃지 않게)', () => {
     const r = feedbackSubmissionSchema.safeParse({ category: 'general', content: '내용' });
@@ -119,6 +119,25 @@ describe('feedbackSubmissionSchema — 제출 맥락(context)', () => {
       context: { ...valid, pageUrl },
     });
     expect(r.success).toBe(false);
+  });
+
+  // 쿼리·해시는 일회성 토큰·이메일이 실리는 자리다. **클라이언트를 믿지 않고** 스키마에서
+  // 잘라내, 옛 번들이나 변조된 요청이 보낸 값도 저장 대상에는 남지 않게 한다.
+  it.each([
+    ['쿼리', '/login?next=/mypage&code=one-time-token', '/login'],
+    ['해시', '/result#card-3', '/result'],
+    ['둘 다', '/result?tab=gap#card-3', '/result'],
+  ])('pageUrl 의 %s 는 저장 전에 제거된다', (_label, pageUrl, expected) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.context?.pageUrl).toBe(expected);
+      expect(JSON.stringify(r.data)).not.toMatch(/one-time-token|card-3|tab=gap/);
+    }
   });
 
   it(`pageUrl 은 ${FEEDBACK_PAGE_URL_MAX}자까지 — 넘으면 거절(폼이 미리 자른다)`, () => {

@@ -78,14 +78,25 @@ describe('submitFeedback — 제출 맥락', () => {
     setLocation('/');
   });
 
-  it('현재 경로와 쿼리를 담는다 — **호스트는 담지 않는다**(서버가 안다)', async () => {
-    setLocation('/result?tab=interview&id=7');
+  it('현재 경로를 담는다 — **호스트는 담지 않는다**(서버가 안다)', async () => {
+    setLocation('/result');
     await submitFeedback({ category: 'general', content: '내용' });
 
     const context = sentBody().context;
-    expect(context?.pageUrl).toBe('/result?tab=interview&id=7');
+    expect(context?.pageUrl).toBe('/result');
     expect(context?.pageUrl).not.toContain(window.location.host);
     expect(context?.pageUrl.startsWith('/')).toBe(true);
+  });
+
+  // 쿼리에는 `?next=`·`?code=`·`?token=` 처럼 일회성 토큰·개인 정보가 실린다. 그대로 보내면
+  // 그 값이 건의 레코드로 복제돼 admin 화면·백업에 남는다.
+  it('쿼리는 담지 않는다 — 토큰·이메일이 건의 데이터로 복제되지 않게', async () => {
+    setLocation('/login?next=/mypage&code=one-time-token&email=student@example.com');
+    await submitFeedback({ category: 'general', content: '내용' });
+
+    const body = sentBody();
+    expect(body.context?.pageUrl).toBe('/login');
+    expect(JSON.stringify(body)).not.toMatch(/one-time-token|student@example.com|next=/);
   });
 
   it('뷰포트는 정수 픽셀로 담는다', async () => {
@@ -95,14 +106,14 @@ describe('submitFeedback — 제출 맥락', () => {
     expect(Number.isInteger(viewport?.w)).toBe(true);
   });
 
-  it('해시(#)는 담지 않는다 — 서버로 보낼 이유가 없는 클라이언트 전용 값이다', async () => {
-    setLocation('/result?tab=gap#card-3');
+  it('해시(#)도 담지 않는다 — 서버로 보낼 이유가 없는 클라이언트 전용 값이다', async () => {
+    setLocation('/result#card-3');
     await submitFeedback({ category: 'general', content: '내용' });
-    expect(sentBody().context?.pageUrl).toBe('/result?tab=gap');
+    expect(sentBody().context?.pageUrl).toBe('/result');
   });
 
-  it('아주 긴 쿼리는 **잘라서** 보낸다(맥락 때문에 제출이 막히지 않게)', async () => {
-    setLocation(`/submit?q=${'a'.repeat(2_000)}`);
+  it('아주 긴 경로는 **잘라서** 보낸다(맥락 때문에 제출이 막히지 않게)', async () => {
+    setLocation(`/submit/${'a'.repeat(2_000)}`);
     const result = await submitFeedback({ category: 'general', content: '내용' });
 
     expect(result).toEqual({ ok: true });

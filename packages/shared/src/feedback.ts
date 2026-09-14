@@ -31,16 +31,31 @@ export const FEEDBACK_CONTENT_MAX = 1000;
 
 /**
  * 제출 화면 경로 길이 상한. 폼이 **자르고** 서버가 같은 값으로 검증한다 — 두 숫자가 갈라지면
- * 쿼리가 긴 화면에서 정상 건의가 400 으로 막힌다.
+ * 경로가 긴 화면에서 정상 건의가 400 으로 막힌다.
  */
 export const FEEDBACK_PAGE_URL_MAX = 512;
+
+/**
+ * 저장할 화면 경로만 남긴다 — **쿼리와 프래그먼트는 버린다.**
+ *
+ * 쿼리는 일회성 토큰·이메일·초대 코드·복귀 주소(`?next=`)가 실리는 자리다. 그대로 저장하면 그
+ * 값이 건의 레코드로 복제돼 admin 화면·백업·로그에 남는다. 화면을 아는 데 필요한 것은 경로뿐이다.
+ *
+ * 스키마의 transform 으로 걸어 **클라이언트와 서버 양쪽에서** 같은 규칙이 적용되게 한다 —
+ * 폼이 실수로(또는 옛 번들이) 쿼리를 통째로 보내도 저장되는 값에는 남지 않는다.
+ */
+export function feedbackPagePath(raw: string): string {
+  const cut = raw.search(/[?#]/);
+  return cut === -1 ? raw : raw.slice(0, cut);
+}
 
 /**
  * 클라이언트만 알 수 있는 제출 맥락.
  *
  * 담기는 것은 **화면 경로와 뷰포트뿐**이다:
- *  - `pageUrl` 은 `pathname + search` — **호스트를 담지 않는다**(서버가 이미 안다).
- *    절대 URL·스킴 상대 URL(`//other`)은 거절해 남의 주소가 저장값에 섞이지 않게 한다.
+ *  - `pageUrl` 은 `pathname` — **호스트도 쿼리도 담지 않는다**(호스트는 서버가 이미 알고,
+ *    쿼리는 민감한 값이 실리는 자리다). 절대 URL·스킴 상대 URL(`//other`)은 거절해 남의
+ *    주소가 저장값에 섞이지 않게 한다.
  *  - `userAgent`·`appVersion` 은 **여기에 없다.** 서버가 요청 헤더·빌드 환경에서 채운다
  *    (클라이언트가 보낸 값보다 신뢰도가 높다).
  *  - 사용자 식별·프로필(이름·이메일·등급 등)은 **어떤 경우에도 담지 않는다.**
@@ -50,7 +65,8 @@ export const feedbackClientContextSchema = z.object({
     .string()
     .trim()
     .max(FEEDBACK_PAGE_URL_MAX)
-    .regex(/^\/(?!\/)/, '경로는 / 로 시작하는 상대 경로여야 합니다.'),
+    .regex(/^\/(?!\/)/, '경로는 / 로 시작하는 상대 경로여야 합니다.')
+    .transform(feedbackPagePath),
   viewport: z.object({
     // 픽셀 값이므로 정수·음이 아닌 값만. 상한은 사람이 쓰는 화면을 한참 넘는 자리에 둔다.
     w: z.number().int().nonnegative().max(100_000),
