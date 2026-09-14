@@ -27,6 +27,15 @@ const payload: FeedbackApiPayload = {
   context: { pageUrl: '/result?tab=interview', userAgent: 'UA/1.0', viewport: { w: 390, h: 844 } },
 };
 
+// 이름이 **실제로 해석되는 주소**까지 확인하므로(SSRF 방어) DNS 는 테스트에서 실제로 나가면
+// 안 되고, 해석 결과별 동작도 골라 봐야 한다.
+const dnsLookup = vi.hoisted(() => vi.fn());
+vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
+
+beforeEach(() => {
+  dnsLookup.mockReset();
+  dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // 공인 주소
+});
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -38,8 +47,8 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     vi.stubEnv('FEEDBACK_SERVICE_KEY', 'svc-key-123');
   });
 
-  it('두 값이 있으면 /feedback·/me 주소를 만든다', () => {
-    const r = resolveFeedbackApiTarget();
+  it('두 값이 있으면 /feedback·/me 주소를 만든다', async () => {
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.target.endpoint.href).toBe('https://api.example.test/feedback');
@@ -47,9 +56,9 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     expect(r.target.serviceKey).toBe('svc-key-123');
   });
 
-  it('베이스의 경로를 버리지 않는다(https://host/api → /api/feedback)', () => {
+  it('베이스의 경로를 버리지 않는다(https://host/api → /api/feedback)', async () => {
     vi.stubEnv('PULLIM_API_URL', 'https://api.example.test/api/');
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.target.endpoint.href).toBe('https://api.example.test/api/feedback');
@@ -62,9 +71,9 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     ['스킴 상대 경로', 'https://api.example.test//evil.example/x'],
     ['역슬래시 표기', 'https://api.example.test/\\\\evil.example/x'],
     ['상위 경로 탈출 시도', 'https://api.example.test/api/../../x'],
-  ])('조합 결과는 설정된 호스트를 벗어나지 않는다(%s)', (_label, url) => {
+  ])('조합 결과는 설정된 호스트를 벗어나지 않는다(%s)', async (_label, url) => {
     vi.stubEnv('PULLIM_API_URL', url);
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     if (!r.ok) return; // 구성 오류로 끊는 것도 안전한 결말이다
     expect(r.target.endpoint.origin).toBe('https://api.example.test');
     expect(r.target.identityEndpoint.origin).toBe('https://api.example.test');
@@ -75,9 +84,9 @@ describe('resolveFeedbackApiTarget — 구성', () => {
   it.each([
     ['PULLIM_API_URL', 'PULLIM_API_URL'],
     ['FEEDBACK_SERVICE_KEY', 'FEEDBACK_SERVICE_KEY'],
-  ])('%s 가 비면 미구성 — 어느 값이 없는지 이름으로 말한다', (_label, name) => {
+  ])('%s 가 비면 미구성 — 어느 값이 없는지 이름으로 말한다', async (_label, name) => {
     vi.stubEnv(name, '');
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.reason).toBe('not-configured');
@@ -85,10 +94,10 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     expect(r.missing).toEqual([name]);
   });
 
-  it('둘 다 비면 둘 다 이름을 댄다', () => {
+  it('둘 다 비면 둘 다 이름을 댄다', async () => {
     vi.stubEnv('PULLIM_API_URL', '   ');
     vi.stubEnv('FEEDBACK_SERVICE_KEY', '');
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
     if (r.ok || r.reason !== 'not-configured') return;
     expect(r.missing).toEqual(['PULLIM_API_URL', 'FEEDBACK_SERVICE_KEY']);
@@ -104,9 +113,9 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     ['프래그먼트가 붙은 베이스', 'https://api.example.test/api#frag'],
     // URL 안의 자격증명은 요청과 함께 나간다.
     ['인증정보가 박힌 베이스', 'https://user:pass@api.example.test'],
-  ])('이어 붙일 수 없는 주소(%s)는 대상이 되지 않는다', (_label, url) => {
+  ])('이어 붙일 수 없는 주소(%s)는 대상이 되지 않는다', async (_label, url) => {
     vi.stubEnv('PULLIM_API_URL', url);
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.reason).toBe('invalid-url');
@@ -120,9 +129,9 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     ['127.x 대역', 'http://127.1.2.3:3000'],
     ['IPv6 loopback', 'http://[::1]:3000'],
     ['*.localhost', 'http://api.localhost:3000'],
-  ])('loopback(%s)은 http 를 허용한다 — 네트워크로 나가지 않는다', (_label, url) => {
+  ])('loopback(%s)은 http 를 허용한다 — 네트워크로 나가지 않는다', async (_label, url) => {
     vi.stubEnv('PULLIM_API_URL', url);
-    expect(resolveFeedbackApiTarget().ok).toBe(true);
+    expect((await resolveFeedbackApiTarget()).ok).toBe(true);
   });
 
   it.each([
@@ -130,19 +139,85 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     ['프로덕션의 원격 호스트', 'production', 'http://api.example.test'],
     ['loopback 을 닮은 이름', 'test', 'http://localhost.evil.example.com'],
     ['사설 IP', 'test', 'http://10.1.2.3:3000'],
-  ])('loopback 이 아닌 평문 http(%s)는 거절 — 서비스 키가 그대로 흘러간다', (_l, env, url) => {
+  ])('loopback 이 아닌 평문 http(%s)는 거절 — 서비스 키가 그대로 흘러간다', async (_l, env, url) => {
     vi.stubEnv('NODE_ENV', env);
     vi.stubEnv('PULLIM_API_URL', url);
-    const r = resolveFeedbackApiTarget();
+    const r = await resolveFeedbackApiTarget();
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.reason).toBe('insecure');
   });
 
-  it('프로덕션에서도 https 는 그대로 통과', () => {
+  it('프로덕션에서도 https 는 그대로 통과(allowlist 와 함께)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('FEEDBACK_API_ALLOWED_HOSTS', 'api.example.test');
+    vi.stubEnv('PULLIM_API_URL', 'https://api.example.test');
+    expect((await resolveFeedbackApiTarget()).ok).toBe(true);
+  });
+});
+
+// 이 경로는 `x-service-key` 와 인증 쿠키를 실어 보낸다 — 주소가 내부망을 가리키면 그 자체가
+// secret 유출이다. 웹훅 시절과 같은 검사를 그대로 건다(lib/webhook-target.ts 재사용).
+describe('resolveFeedbackApiTarget — 자격증명을 보낼 주소인가(SSRF 방어)', () => {
+  beforeEach(() => vi.stubEnv('FEEDBACK_SERVICE_KEY', 'svc-key-123'));
+
+  it.each([
+    ['사설 IP', 'https://10.1.2.3'],
+    ['링크로컬(메타데이터)', 'https://169.254.169.254'],
+    ['IPv6 ULA', 'https://[fd00::1]'],
+    ['내부 도메인', 'https://pullim-api.internal'],
+    ['.local', 'https://api.pullim.local'],
+  ])('내부망을 가리키는 이름(%s)은 거절', async (_label, url) => {
+    vi.stubEnv('PULLIM_API_URL', url);
+    const r = await resolveFeedbackApiTarget();
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('not-allowed');
+  });
+
+  it('공인 도메인이 내부 주소로 해석되면 거절(127.0.0.1.nip.io 류)', async () => {
+    vi.stubEnv('PULLIM_API_URL', 'https://127.0.0.1.nip.io');
+    dnsLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    const r = await resolveFeedbackApiTarget();
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('not-allowed');
+  });
+
+  it('DNS 해석이 실패하면 거절 — 모르면 보내지 않는다', async () => {
+    vi.stubEnv('PULLIM_API_URL', 'https://api.example.test');
+    dnsLookup.mockRejectedValue(new Error('ENOTFOUND'));
+    const r = await resolveFeedbackApiTarget();
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('not-allowed');
+  });
+
+  it('프로덕션에서 allowlist 미설정이면 보내지 않는다 — 리바인딩 틈을 닫는 최소 조건', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('PULLIM_API_URL', 'https://api.example.test');
-    expect(resolveFeedbackApiTarget().ok).toBe(true);
+    const r = await resolveFeedbackApiTarget();
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('allowlist-required');
+  });
+
+  it('allowlist 밖의 호스트는 거절(하위 도메인은 인정)', async () => {
+    vi.stubEnv('FEEDBACK_API_ALLOWED_HOSTS', 'pullim.ai');
+    vi.stubEnv('PULLIM_API_URL', 'https://api.evil.example');
+    const blocked = await resolveFeedbackApiTarget();
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.reason).toBe('not-allowed');
+
+    vi.stubEnv('PULLIM_API_URL', 'https://api.pullim.ai');
+    expect((await resolveFeedbackApiTarget()).ok).toBe(true);
+  });
+
+  it('loopback 은 allowlist·DNS 확인을 거치지 않는다(같은 기계 안에서 끝난다)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('PULLIM_API_URL', 'http://127.0.0.1:3000');
+    expect((await resolveFeedbackApiTarget()).ok).toBe(true);
+    expect(dnsLookup).not.toHaveBeenCalled();
   });
 });
 

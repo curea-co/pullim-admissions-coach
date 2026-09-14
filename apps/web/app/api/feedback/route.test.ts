@@ -39,6 +39,11 @@ vi.mock('@/lib/feedback-api', async (importOriginal) => ({
   postFeedbackToApi: sendMock,
 }));
 
+// 저장 주소는 이름이 **실제로 해석되는 주소**까지 확인한다(자격증명을 보낼 주소이므로).
+// DNS 는 테스트에서 실제로 나가면 안 되고, 해석 결과별 동작도 골라 봐야 한다.
+const dnsLookup = vi.hoisted(() => vi.fn());
+vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
+
 // 라우트는 프로세스 수명 동안 유지되는 레이트리밋 싱글톤을 쓴다. 테스트마다 모듈을 새로
 // 불러 카운터를 0 에서 시작하게 한다 — 안 그러면 앞 테스트의 호출이 뒤 테스트를 429 로 만든다.
 let POST: (req: Request) => Promise<Response>;
@@ -46,6 +51,8 @@ let POST: (req: Request) => Promise<Response>;
 beforeEach(async () => {
   sendMock.mockReset();
   sendMock.mockResolvedValue(201);
+  dnsLookup.mockReset();
+  dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // 공인 주소
   vi.resetModules();
   ({ POST } = await import('./route'));
 });
@@ -106,6 +113,42 @@ describe('POST /api/feedback — 저장 표면 구성', () => {
     vi.stubEnv('PULLIM_API_URL', 'http://localhost:3000');
     vi.stubEnv('FEEDBACK_SERVICE_KEY', SERVICE_KEY);
     expect((await POST(post({ category: 'general', content: '내용' }))).status).toBe(202);
+  });
+
+  it.each([
+    ['사설 IP', 'https://10.1.2.3'],
+    ['내부 도메인', 'https://pullim-api.internal'],
+  ])('내부망을 가리키는 저장 주소(%s)는 501 — 서비스 키를 내부로 보내지 않는다', async (_l, url) => {
+    vi.stubEnv('PULLIM_API_URL', url);
+    vi.stubEnv('FEEDBACK_SERVICE_KEY', SERVICE_KEY);
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(501);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_ALLOWED');
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('공인 도메인이 내부 주소로 해석되면 501(127.0.0.1.nip.io 류)', async () => {
+    configureApi();
+    dnsLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    const res = await POST(post({ category: 'general', content: '내용' }));
+    expect(res.status).toBe(501);
+    expect((await res.json()).code).toBe('FEEDBACK_SINK_NOT_ALLOWED');
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('프로덕션에서 allowlist 미설정이면 501 — 리바인딩 틈을 닫는 최소 조건', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for');
+    configureApi();
+    const res = await POST(
+      post({ category: 'general', content: '내용' }, { 'x-vercel-forwarded-for': '203.0.113.7' }),
+    );
+    expect(res.status).toBe(501);
+    const body = await res.json();
+    expect(body.code).toBe('FEEDBACK_SINK_ALLOWLIST_REQUIRED');
+    expect(body.message).toContain('FEEDBACK_API_ALLOWED_HOSTS');
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('구성이 갖춰지면 202 로 접수한다', async () => {
@@ -617,6 +660,7 @@ describe('POST /api/feedback — 남용 가드', () => {
 
   it('프로덕션에서 리미터가 구성되지 않으면 열지 않고 503(fail-closed)', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('FEEDBACK_API_ALLOWED_HOSTS', 'api.example.test');
     vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-vercel-forwarded-for'); // 식별자 쪽은 구성됨
     const res = await POST(
       post({ category: 'general', content: '내용' }, { 'x-vercel-forwarded-for': '203.0.113.7' }),
@@ -632,6 +676,7 @@ describe('POST /api/feedback — 남용 가드', () => {
 describe('POST /api/feedback — 호출자 식별자의 신뢰 경계', () => {
   beforeEach(() => {
     configureApi();
+    vi.stubEnv('FEEDBACK_API_ALLOWED_HOSTS', 'api.example.test'); // 프로덕션 필수 조건
     vi.stubEnv('RATE_LIMIT_BACKEND', 'memory');
   });
 

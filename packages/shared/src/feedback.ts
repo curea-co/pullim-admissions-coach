@@ -61,12 +61,15 @@ export function feedbackPagePath(raw: string): string {
  *  - 사용자 식별·프로필(이름·이메일·등급 등)은 **어떤 경우에도 담지 않는다.**
  */
 export const feedbackClientContextSchema = z.object({
+  // 순서가 계약이다: 형식 확인 → **쿼리·해시 제거** → 그 결과에 길이 제한.
+  // 길이를 먼저 재면 `/login?code=<아주 긴 토큰>` 처럼 **버릴 부분 때문에** 제출이 400 으로
+  // 거절된다 — 저장될 값은 짧은 `/login` 인데도. "민감한 쿼리는 버리고 제출은 받는다"가 깨진다.
   pageUrl: z
     .string()
     .trim()
-    .max(FEEDBACK_PAGE_URL_MAX)
     .regex(/^\/(?!\/)/, '경로는 / 로 시작하는 상대 경로여야 합니다.')
-    .transform(feedbackPagePath),
+    .transform(feedbackPagePath)
+    .pipe(z.string().max(FEEDBACK_PAGE_URL_MAX)),
   viewport: z.object({
     // 픽셀 값이므로 정수·음이 아닌 값만. 상한은 사람이 쓰는 화면을 한참 넘는 자리에 둔다.
     w: z.number().int().nonnegative().max(100_000),

@@ -303,7 +303,7 @@ export async function POST(req: Request) {
   // ── 3) 저장 대상(pullim-api) 구성 — 없으면 여기서 끝낸다 ──
   // 검증보다 앞에 두는 이유: 어차피 저장할 수 없는 요청이다. 400 을 돌려주면 사용자는 자기
   // 입력을 고치려 들지만 실제 원인은 서버 구성이다. 원인을 그대로 말한다.
-  const resolved = resolveFeedbackApiTarget();
+  const resolved = await resolveFeedbackApiTarget();
   if (!resolved.ok) {
     if (resolved.reason === 'not-configured') {
       return fail(
@@ -314,12 +314,24 @@ export async function POST(req: Request) {
         )} 를 설정해야 접수됩니다.`,
       );
     }
+    if (resolved.reason === 'allowlist-required') {
+      return fail(
+        501,
+        'FEEDBACK_SINK_ALLOWLIST_REQUIRED',
+        '저장 주소의 호스트 allowlist 가 설정되지 않아 접수하지 않았습니다. 운영자가 FEEDBACK_API_ALLOWED_HOSTS 를 설정해야 합니다.',
+      );
+    }
     return fail(
       501,
       'FEEDBACK_SINK_NOT_ALLOWED',
-      resolved.reason === 'insecure'
-        ? '저장 주소가 평문 http 라 서비스 키를 보낼 수 없어 접수하지 않았습니다. 운영자가 PULLIM_API_URL 을 https 로 설정해야 합니다(http 는 localhost 등 loopback 주소에서만 허용).'
-        : '저장 주소(PULLIM_API_URL)가 올바른 http(s) 주소가 아니라 접수하지 않았습니다. 운영자가 값을 확인해야 합니다.',
+      {
+        insecure:
+          '저장 주소가 평문 http 라 서비스 키를 보낼 수 없어 접수하지 않았습니다. 운영자가 PULLIM_API_URL 을 https 로 설정해야 합니다(http 는 localhost 등 loopback 주소에서만 허용).',
+        'not-allowed':
+          '저장 주소가 내부망을 가리키거나 확인되지 않아 접수하지 않았습니다. 운영자가 PULLIM_API_URL 과 FEEDBACK_API_ALLOWED_HOSTS 를 확인해야 합니다.',
+        'invalid-url':
+          '저장 주소(PULLIM_API_URL)가 올바른 http(s) 주소가 아니라 접수하지 않았습니다. 운영자가 값을 확인해야 합니다.',
+      }[resolved.reason],
     );
   }
   const target = resolved.target;

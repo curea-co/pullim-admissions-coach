@@ -140,6 +140,18 @@ describe('feedbackSubmissionSchema — 제출 맥락(context)', () => {
     }
   });
 
+  // 길이를 쿼리 제거보다 먼저 재면, **버릴 부분 때문에** 제출이 거절된다 — 저장될 값은
+  // 짧은 `/login` 인데도. 순서가 곧 계약이다(민감한 쿼리는 버리고 제출은 받는다).
+  it('제거될 쿼리가 길이 상한을 넘겨도 거절하지 않는다 — 정제 뒤 길이를 잰다', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl: `/login?code=${'t'.repeat(FEEDBACK_PAGE_URL_MAX * 2)}` },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context?.pageUrl).toBe('/login');
+  });
+
   it(`pageUrl 은 ${FEEDBACK_PAGE_URL_MAX}자까지 — 넘으면 거절(폼이 미리 자른다)`, () => {
     const ok = `/x${'a'.repeat(FEEDBACK_PAGE_URL_MAX - 2)}`;
     expect(

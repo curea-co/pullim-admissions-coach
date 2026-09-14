@@ -1,6 +1,11 @@
 import 'server-only';
 
 import type { FeedbackCategory } from '@pullim/shared';
+import {
+  isAllowedWebhookHost,
+  isInternalHost,
+  resolvePublicAddress,
+} from '@/lib/webhook-target';
 
 // 건의 저장 — pullim-api 의 `POST /feedback` 표면.
 //
@@ -54,8 +59,12 @@ export type FeedbackApiTargetResult =
   | { ok: false; reason: 'not-configured'; missing: string[] }
   /** 주소가 URL 이 아니거나 http(s) 가 아니다. */
   | { ok: false; reason: 'invalid-url' }
-  /** 프로덕션인데 평문 http — 서비스 키가 그대로 흘러간다. */
-  | { ok: false; reason: 'insecure' };
+  /** loopback 이 아닌데 평문 http — 서비스 키가 그대로 흘러간다. */
+  | { ok: false; reason: 'insecure' }
+  /** 프로덕션인데 호스트 allowlist 가 없다. */
+  | { ok: false; reason: 'allowlist-required' }
+  /** 내부망을 가리키거나(이름·DNS 해석) allowlist 밖의 호스트. */
+  | { ok: false; reason: 'not-allowed' };
 
 /** user-agent 는 길이 상한이 없는 헤더다. 저장값이 무한정 커지지 않게 잘라 둔다. */
 export const FEEDBACK_USER_AGENT_MAX = 512;
@@ -63,8 +72,18 @@ export const FEEDBACK_USER_AGENT_MAX = 512;
 /**
  * 전달 대상 구성. **매 호출마다** env 를 다시 읽는다 — 모듈 상수로 굳히면 구성이 바뀐 뒤에도
  * 옛 값으로 돈다(라우트가 `dynamic = 'force-dynamic'` 인 이유와 같다).
+ *
+ * 이 경로는 `x-service-key` 와 (선언된) 인증 쿠키를 실어 보낸다. 즉 **자격증명이 나가는
+ * 주소**라, 값이 잘못 설정되거나 이름이 내부를 가리키면 그 자체가 secret 유출이다.
+ * 그래서 웹훅 시절과 같은 검사를 그대로 건다(lib/webhook-target.ts 재사용):
+ *   ① 이름이 내부망을 가리키는가 ② 프로덕션은 호스트 allowlist 필수 ③ **DNS 해석 결과**까지
+ * loopback 은 같은 기계 안에서 끝나므로 ①~③에서 면제한다(로컬 개발).
+ *
+ * ⚠️ 남는 한계는 웹훅 때와 같다 — 확인 시점과 연결 시점 사이의 DNS 리바인딩은 연결을 확인한
+ * IP 에 고정해야 완전히 닫힌다. 여기서는 fetch 가 다시 해석하므로, 실무 방어는 프로덕션에서
+ * **강제되는 allowlist** + 네트워크 이그레스 정책이다.
  */
-export function resolveFeedbackApiTarget(): FeedbackApiTargetResult {
+export async function resolveFeedbackApiTarget(): Promise<FeedbackApiTargetResult> {
   const base = process.env.PULLIM_API_URL?.trim();
   const serviceKey = process.env.FEEDBACK_SERVICE_KEY?.trim();
 
@@ -91,11 +110,26 @@ export function resolveFeedbackApiTarget(): FeedbackApiTargetResult {
     return { ok: false, reason: 'invalid-url' };
   }
 
-  // 평문 http 로 보내면 `x-service-key` 가 네트워크 위에 그대로 노출된다. 같은 기계 안에서
-  // 끝나는 loopback 만 예외로 둔다 — **환경 변수(NODE_ENV)가 아니라 주소로** 가른다.
-  // 개발·프리뷰라는 이유로 원격 http 를 열어 두면 그 환경의 키가 평문으로 흘러간다.
-  if (root.protocol !== 'https:' && !isLoopbackHost(root.hostname)) {
-    return { ok: false, reason: 'insecure' };
+  // loopback 은 같은 기계 안에서 끝난다 — 평문도, 내부 주소 검사 면제도 여기서만 허용한다.
+  // **환경 변수(NODE_ENV)가 아니라 주소로** 가른다: 개발·프리뷰라는 이유로 원격을 열어 두면
+  // 그 환경의 서비스 키가 그대로 흘러간다.
+  if (!isLoopbackHost(root.hostname)) {
+    // 평문 http 로 보내면 `x-service-key` 가 네트워크 위에 그대로 노출된다.
+    if (root.protocol !== 'https:') return { ok: false, reason: 'insecure' };
+
+    const allowlist = process.env.FEEDBACK_API_ALLOWED_HOSTS?.trim();
+    // 프로덕션은 allowlist 를 **요구한다.** 이름 검사와 DNS 확인만으로는 확인 시점과 연결 시점
+    // 사이의 리바인딩을 닫지 못한다. allowlist 를 강제하면 그 틈을 쓰려면 허용된 호스트의 DNS
+    // 자체를 장악해야 한다 — 실무에서 이 틈이 닫히는 지점이다.
+    if (process.env.NODE_ENV === 'production' && !allowlist) {
+      return { ok: false, reason: 'allowlist-required' };
+    }
+    // 이름이 내부망을 가리키면(사설·링크로컬·루프백·.internal 류) 거기로 자격증명을 보내지 않는다.
+    if (isInternalHost(root.hostname)) return { ok: false, reason: 'not-allowed' };
+    if (!isAllowedWebhookHost(root.hostname, allowlist)) return { ok: false, reason: 'not-allowed' };
+    // 이름이 **실제로 해석되는 주소**까지 본다 — `127.0.0.1.nip.io` 처럼 공인 도메인이 내부를
+    // 가리키는 경우는 이름 검사만으로 걸리지 않는다. 해석 실패도 거절한다(모르면 보내지 않는다).
+    if (!(await resolvePublicAddress(root.hostname))) return { ok: false, reason: 'not-allowed' };
   }
 
   // 경로는 **URL 객체의 pathname 에 직접** 넣는다. 상대 참조 문자열로 넘기면(`new URL(path, root)`)
