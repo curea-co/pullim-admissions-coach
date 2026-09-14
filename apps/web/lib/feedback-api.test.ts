@@ -56,6 +56,22 @@ describe('resolveFeedbackApiTarget — 구성', () => {
     expect(r.target.identityEndpoint.href).toBe('https://api.example.test/api/me');
   });
 
+  // 경로를 상대 참조 문자열로 이어 붙이면 `//` 로 시작하는 경로가 **스킴 상대 URL** 로
+  // 해석돼 호스트가 통째로 바뀐다 — 그 주소로 서비스 키와 인증 쿠키가 나간다.
+  it.each([
+    ['스킴 상대 경로', 'https://api.example.test//evil.example/x'],
+    ['역슬래시 표기', 'https://api.example.test/\\\\evil.example/x'],
+    ['상위 경로 탈출 시도', 'https://api.example.test/api/../../x'],
+  ])('조합 결과는 설정된 호스트를 벗어나지 않는다(%s)', (_label, url) => {
+    vi.stubEnv('PULLIM_API_URL', url);
+    const r = resolveFeedbackApiTarget();
+    if (!r.ok) return; // 구성 오류로 끊는 것도 안전한 결말이다
+    expect(r.target.endpoint.origin).toBe('https://api.example.test');
+    expect(r.target.identityEndpoint.origin).toBe('https://api.example.test');
+    expect(r.target.endpoint.hostname).toBe('api.example.test');
+    expect(r.target.identityEndpoint.hostname).toBe('api.example.test');
+  });
+
   it.each([
     ['PULLIM_API_URL', 'PULLIM_API_URL'],
     ['FEEDBACK_SERVICE_KEY', 'FEEDBACK_SERVICE_KEY'],

@@ -98,9 +98,19 @@ export function resolveFeedbackApiTarget(): FeedbackApiTargetResult {
     return { ok: false, reason: 'insecure' };
   }
 
+  // 경로는 **URL 객체의 pathname 에 직접** 넣는다. 상대 참조 문자열로 넘기면(`new URL(path, root)`)
+  // `//` 로 시작하는 경로가 **스킴 상대 URL** 로 해석돼 호스트가 통째로 바뀐다 —
+  // `https://api.pullim.test//evil.example/x` 가 `https://evil.example/x/feedback` 이 되고,
+  // 그 주소로 서비스 키와 인증 쿠키가 나간다. pathname 대입은 origin 을 바꾸지 못한다.
   const path = root.pathname.replace(/\/+$/, '');
-  const endpoint = new URL(`${path}/feedback`, root);
-  const identityEndpoint = new URL(`${path}/me`, root);
+  const endpoint = new URL(root);
+  endpoint.pathname = `${path}/feedback`;
+  const identityEndpoint = new URL(root);
+  identityEndpoint.pathname = `${path}/me`;
+  // 그래도 한 번 더 확인한다 — 조합 결과가 설정된 호스트를 벗어나면 보내지 않는다.
+  if (endpoint.origin !== root.origin || identityEndpoint.origin !== root.origin) {
+    return { ok: false, reason: 'invalid-url' };
+  }
   return { ok: true, target: { endpoint, identityEndpoint, serviceKey } };
 }
 
