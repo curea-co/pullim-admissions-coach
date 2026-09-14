@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import {
   appVersion,
   postFeedbackToApi,
@@ -7,6 +9,7 @@ import {
   type FeedbackApiPayload,
   type FeedbackApiTarget,
 } from './feedback-api';
+import type { PinnedRequestFn } from './pinned-request';
 
 // 저장 표면 계약 고정. 여기서 지키는 것 세 가지:
 //  ① 구성이 없거나 안전하지 않으면 **대상을 만들지 않는다**(라우트가 501 로 끝낸다).
@@ -16,6 +19,7 @@ import {
 const target: FeedbackApiTarget = {
   endpoint: new URL('https://api.example.test/feedback'),
   identityEndpoint: new URL('https://api.example.test/me'),
+  address: '93.184.216.34',
   serviceKey: 'svc-key-123',
 };
 
@@ -241,60 +245,104 @@ describe('appVersion — 모르면 비운다', () => {
   });
 });
 
+// 전송은 **검증한 IP 에 고정한 요청**이다(lib/pinned-request.ts) — fetch 가 아니다.
+// 여기서는 node http(s) 의 request 를 대신 넣어 무엇이 어느 주소로 나가는지 잡는다.
+interface Sent {
+  url?: unknown;
+  options?: Record<string, unknown>;
+  body?: string;
+  /** lookup 콜백이 실제로 돌려준 주소 — "연결이 그 IP 로 간다"의 증거. */
+  pinned?: string;
+  resDestroyed?: boolean;
+}
+
+/** 상태·본문을 정해 놓고 응답하는 가짜 request. */
+function fakeRequest(sent: Sent, status: number, responseBody = ''): PinnedRequestFn {
+  return ((url: unknown, options: Record<string, unknown>, cb: (res: unknown) => void) => {
+    sent.url = url;
+    sent.options = options;
+    // 고정이 실제로 걸렸는지 확인하려면 콜백까지 불러 봐야 한다.
+    const lookup = options.lookup as (h: string, o: object, c: (e: null, a: string) => void) => void;
+    lookup('ignored.example', {}, (_e, address) => {
+      sent.pinned = address;
+    });
+
+    const req = new EventEmitter() as EventEmitter & {
+      end: (body?: string) => void;
+      destroy: (e?: Error) => void;
+    };
+    req.destroy = () => {};
+    req.end = (body?: string) => {
+      sent.body = body;
+      // node 는 인코딩 지정이 없으면 Buffer 를 흘린다 — 실제와 같게 맞춘다.
+      const res = Readable.from([Buffer.from(responseBody)]) as Readable & { statusCode: number };
+      res.statusCode = status;
+      const origDestroy = res.destroy.bind(res);
+      res.destroy = ((error?: Error) => {
+        sent.resDestroyed = true;
+        origDestroy(error);
+        return res;
+      }) as typeof res.destroy;
+      setImmediate(() => cb(res));
+    };
+    return req;
+  }) as unknown as PinnedRequestFn;
+}
+
 describe('postFeedbackToApi — 전송 형태', () => {
-  it('x-service-key 를 붙여 JSON 으로 POST 한다', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
-    const status = await postFeedbackToApi(target, payload, { timeoutMs: 5_000, fetchImpl: fetchMock });
+  it('x-service-key 를 붙여 JSON 으로 POST 하고, 연결은 검증한 IP 에 고정한다', async () => {
+    const sent: Sent = {};
+    const status = await postFeedbackToApi(target, payload, {
+      timeoutMs: 5_000,
+      request: fakeRequest(sent, 201),
+    });
 
     expect(status).toBe(201);
-    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(String(url)).toBe('https://api.example.test/feedback');
-    expect(init.method).toBe('POST');
-    const headers = init.headers as Record<string, string>;
+    expect(String(sent.url)).toBe('https://api.example.test/feedback');
+    expect(sent.options?.method).toBe('POST');
+    const headers = sent.options?.headers as Record<string, string>;
     expect(headers['x-service-key']).toBe('svc-key-123');
     expect(headers['content-type']).toBe('application/json');
-    expect(JSON.parse(String(init.body))).toEqual(payload);
-    // 리다이렉트를 따라가면 서비스 키가 다른 호스트로 다시 나간다.
-    expect(init.redirect).toBe('manual');
-    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(JSON.parse(String(sent.body))).toEqual(payload);
+    // **확인한 그 IP 로** 연결한다 — 이름으로 다시 해석하면 리바인딩이 열린다.
+    expect(sent.pinned).toBe('93.184.216.34');
   });
 
-  // Node(undici)는 본문을 읽거나 취소해야 연결을 풀에 돌려준다. 상태만 보고 두면 반복 호출에서
-  // 연결이 고갈된다.
-  it('본문이 있는 응답도 읽지 않을 것이면 취소한다(연결을 물고 있지 않게)', async () => {
-    const res = new Response(JSON.stringify({ id: 'f_1', createdAt: '2026-09-14T00:00:00Z' }), {
-      status: 201,
+  it('쓰지 않을 응답 본문은 읽지 않고 파기한다(소켓을 붙잡아 두지 않게)', async () => {
+    const sent: Sent = {};
+    await postFeedbackToApi(target, payload, {
+      timeoutMs: 5_000,
+      request: fakeRequest(sent, 201, JSON.stringify({ id: 'f_1', createdAt: 'x' })),
     });
-    const cancel = vi.spyOn(res.body!, 'cancel');
-    const fetchMock = vi.fn().mockResolvedValue(res);
-
-    expect(await postFeedbackToApi(target, payload, { timeoutMs: 5_000, fetchImpl: fetchMock })).toBe(201);
-    expect(cancel).toHaveBeenCalled();
+    expect(sent.resDestroyed).toBe(true);
   });
 
   it('상태 코드를 그대로 돌려준다 — 성공 판단은 호출부 몫(3xx 는 성공이 아니다)', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 302 }));
-    expect(await postFeedbackToApi(target, payload, { timeoutMs: 5_000, fetchImpl: fetchMock })).toBe(302);
+    const sent: Sent = {};
+    expect(
+      await postFeedbackToApi(target, payload, { timeoutMs: 5_000, request: fakeRequest(sent, 302) }),
+    ).toBe(302);
   });
 
   it('연결 실패는 그대로 던진다(호출부가 502 로 바꾼다)', async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const boom = (() => {
+      throw new Error('ECONNREFUSED');
+    }) as unknown as PinnedRequestFn;
     await expect(
-      postFeedbackToApi(target, payload, { timeoutMs: 5_000, fetchImpl: fetchMock }),
+      postFeedbackToApi(target, payload, { timeoutMs: 5_000, request: boom }),
     ).rejects.toThrow();
   });
 
   it('본문에 프로필(이름·이메일·등급)이 섞일 자리가 없다', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }));
+    const sent: Sent = {};
     await postFeedbackToApi(
       target,
       // 타입 밖의 값을 억지로 끼워도 **직렬화는 payload 그대로** 이므로, 이 테스트는 계약이
       // 넓어지는 순간(예: 라우트가 user 객체를 통째로 넘기는 변경) 함께 깨져야 한다.
       { ...payload, userId: 'u_1' },
-      { timeoutMs: 5_000, fetchImpl: fetchMock },
+      { timeoutMs: 5_000, request: fakeRequest(sent, 201) },
     );
-    const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    const body = JSON.parse(String(sent.body)) as Record<string, unknown>;
     expect(Object.keys(body).sort()).toEqual(['category', 'content', 'context', 'service', 'userId']);
     expect(JSON.stringify(body)).not.toMatch(/displayName|email|tier|isMinor/);
   });
@@ -303,71 +351,67 @@ describe('postFeedbackToApi — 전송 형태', () => {
 describe('resolveUserId — 신원은 쿠키로만', () => {
   beforeEach(() => vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', 'pullim_at,pullim_rt'));
 
+  const ok = (sent: Sent, body: unknown) => fakeRequest(sent, 200, JSON.stringify(body));
+
   it('쿠키가 없으면 왕복 자체를 만들지 않는다', async () => {
-    const fetchMock = vi.fn();
-    expect(await resolveUserId(null, target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    const never = vi.fn() as unknown as PinnedRequestFn;
+    expect(await resolveUserId(null, target, { timeoutMs: 2_000, request: never })).toBeNull();
+    expect(never).not.toHaveBeenCalled();
   });
 
-  it('인증된 요청이면 /me 의 sub 를 쓴다', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_abc', email: 'a@b.c' }), { status: 200 }));
+  it('인증된 요청이면 /me 의 sub 를 쓴다 — 연결은 저장과 같은 IP 에 고정한다', async () => {
+    const sent: Sent = {};
     const userId = await resolveUserId('pullim_at=xyz', target, {
       timeoutMs: 2_000,
-      fetchImpl: fetchMock,
+      request: ok(sent, { sub: 'u_abc', email: 'a@b.c' }),
     });
 
     expect(userId).toBe('u_abc');
-    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(String(url)).toBe('https://api.example.test/me');
-    expect(init.method).toBe('GET');
-    expect((init.headers as Record<string, string>).cookie).toBe('pullim_at=xyz');
+    expect(String(sent.url)).toBe('https://api.example.test/me');
+    expect(sent.options?.method).toBe('GET');
+    expect((sent.options?.headers as Record<string, string>).cookie).toBe('pullim_at=xyz');
+    // 쿠키가 나가는 요청이다 — 여기서 리바인딩이 열리면 인증 쿠키가 내부 주소로 간다.
+    expect(sent.pinned).toBe('93.184.216.34');
   });
 
   // 받은 Cookie 헤더를 통째로 넘기면 브라우저의 쿠키 격리를 서버가 우회하게 된다.
   // 넘어가는 것은 **운영자가 선언한 이름만**이다.
   it('선언하지 않은 쿠키(웹 전용 세션·CSRF·__Host-*)는 api 로 넘어가지 않는다', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_abc' }), { status: 200 }));
+    const sent: Sent = {};
     await resolveUserId(
       '__Host-web_csrf=c1; web_session=s1; pullim_at=xyz; _ga=GA1.2.3; pullim_rt=rrr',
       target,
-      { timeoutMs: 2_000, fetchImpl: fetchMock },
+      { timeoutMs: 2_000, request: ok(sent, { sub: 'u_abc' }) },
     );
 
-    const cookie = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
-    expect(cookie.cookie).toBe('pullim_at=xyz; pullim_rt=rrr');
-    expect(cookie.cookie).not.toMatch(/__Host-|web_session|_ga/);
+    const cookie = (sent.options?.headers as Record<string, string>).cookie;
+    expect(cookie).toBe('pullim_at=xyz; pullim_rt=rrr');
+    expect(cookie).not.toMatch(/__Host-|web_session|_ga/);
   });
 
   it('FEEDBACK_IDENTITY_COOKIES 미선언이면 아무것도 넘기지 않고 호출도 하지 않는다(fail-closed)', async () => {
     vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', '');
-    const fetchMock = vi.fn();
+    const never = vi.fn() as unknown as PinnedRequestFn;
     expect(
-      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
+      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request: never }),
     ).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(never).not.toHaveBeenCalled();
   });
 
   it('선언된 쿠키가 요청에 없으면 호출하지 않는다', async () => {
-    const fetchMock = vi.fn();
+    const never = vi.fn() as unknown as PinnedRequestFn;
     expect(
-      await resolveUserId('web_session=s1; _ga=GA1.2.3', target, {
-        timeoutMs: 2_000,
-        fetchImpl: fetchMock,
-      }),
+      await resolveUserId('web_session=s1; _ga=GA1.2.3', target, { timeoutMs: 2_000, request: never }),
     ).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(never).not.toHaveBeenCalled();
   });
 
   it('이름이 부분 일치하는 쿠키(pullim_at_shadow)는 넘기지 않는다', async () => {
-    const fetchMock = vi.fn();
+    const never = vi.fn() as unknown as PinnedRequestFn;
     expect(
-      await resolveUserId('pullim_at_shadow=evil', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
+      await resolveUserId('pullim_at_shadow=evil', target, { timeoutMs: 2_000, request: never }),
     ).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(never).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -378,21 +422,9 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
   ])('%s 는 "모른다" 로 본다 — null', async (_label, status) => {
     // 본문에 sub 가 **들어 있어도** 200 이 아니면 쓰지 않는다. api 가 오류 본문에 식별자를
     // 실어 보내는 경우(또는 로그인 페이지 HTML/JSON)에 남의 id 를 주워 담지 않게 하는 경계다.
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_not_authenticated' }), { status }));
-    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
-  });
-
-  it('읽지 않는 응답(비 200)의 본문도 취소한다', async () => {
-    const res = new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
-    const cancel = vi.spyOn(res.body!, 'cancel');
-    const fetchMock = vi.fn().mockResolvedValue(res);
-
-    expect(
-      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock }),
-    ).toBeNull();
-    expect(cancel).toHaveBeenCalled();
+    const sent: Sent = {};
+    const request = fakeRequest(sent, status, JSON.stringify({ sub: 'u_not_authenticated' }));
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request })).toBeNull();
   });
 
   it.each([
@@ -400,23 +432,37 @@ describe('resolveUserId — 신원은 쿠키로만', () => {
     ['sub 가 문자열이 아님', { sub: 12345 }],
     ['sub 가 공백', { sub: '   ' }],
   ])('%s → null(추측하지 않는다)', async (_label, body) => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
-    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock })).toBeNull();
+    const sent: Sent = {};
+    expect(
+      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request: ok(sent, body) }),
+    ).toBeNull();
   });
 
   it('연결 실패·JSON 깨짐은 삼킨다 — 신원 확인 실패가 건의를 잃게 하지 않는다', async () => {
-    const boom = vi.fn().mockRejectedValue(new Error('ETIMEDOUT'));
-    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: boom })).toBeNull();
+    const boom = (() => {
+      throw new Error('ETIMEDOUT');
+    }) as unknown as PinnedRequestFn;
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request: boom })).toBeNull();
 
-    const broken = vi.fn().mockResolvedValue(new Response('not json', { status: 200 }));
-    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: broken })).toBeNull();
+    const sent: Sent = {};
+    const broken = fakeRequest(sent, 200, 'not json');
+    expect(
+      await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request: broken }),
+    ).toBeNull();
   });
 
   it('sub 가 길어도 저장값이 무한정 커지지 않게 자른다', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u'.repeat(500) }), { status: 200 }));
-    const userId = await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, fetchImpl: fetchMock });
+    const sent: Sent = {};
+    const userId = await resolveUserId('pullim_at=xyz', target, {
+      timeoutMs: 2_000,
+      request: ok(sent, { sub: 'u'.repeat(500) }),
+    });
     expect(userId).toHaveLength(128);
+  });
+
+  it('응답 본문이 상한을 넘으면 신원을 쓰지 않는다(응답이 메모리를 먹지 않게)', async () => {
+    const sent: Sent = {};
+    const huge = fakeRequest(sent, 200, 'x'.repeat(17 * 1024));
+    expect(await resolveUserId('pullim_at=xyz', target, { timeoutMs: 2_000, request: huge })).toBeNull();
   });
 });

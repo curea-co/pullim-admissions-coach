@@ -44,6 +44,11 @@ vi.mock('@/lib/feedback-api', async (importOriginal) => ({
 const dnsLookup = vi.hoisted(() => vi.fn());
 vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
 
+// 신원 확인(`GET /me`)은 고정 IP 요청으로 나간다 — 전송 계층을 mock 해 응답만 정한다.
+// 고정이 실제로 걸리는지는 lib/pinned-request.test.ts 가 본다.
+const identityMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/pinned-request', () => ({ requestPinned: identityMock }));
+
 // 라우트는 프로세스 수명 동안 유지되는 레이트리밋 싱글톤을 쓴다. 테스트마다 모듈을 새로
 // 불러 카운터를 0 에서 시작하게 한다 — 안 그러면 앞 테스트의 호출이 뒤 테스트를 429 로 만든다.
 let POST: (req: Request) => Promise<Response>;
@@ -53,6 +58,7 @@ beforeEach(async () => {
   sendMock.mockResolvedValue(201);
   dnsLookup.mockReset();
   dnsLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); // 공인 주소
+  identityMock.mockReset();
   vi.resetModules();
   ({ POST } = await import('./route'));
 });
@@ -479,19 +485,17 @@ describe('POST /api/feedback — 저장 payload 계약', () => {
 
   it('인증 쿠키가 확인되면 그 sub 를 userId 로 저장한다', async () => {
     vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', 'pullim_at');
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ sub: 'u_abc' }), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
+    identityMock.mockResolvedValue({ status: 200, body: JSON.stringify({ sub: 'u_abc' }) });
 
     await POST(post({ category: 'general', content: '내용' }, { cookie: 'pullim_at=xyz' }));
     expect(sentPayload().userId).toBe('u_abc');
-    expect(String(fetchMock.mock.calls[0][0])).toBe(`${API_URL}/me`);
+    const [url, address] = identityMock.mock.calls[0] as [URL, string];
+    expect(String(url)).toBe(`${API_URL}/me`);
+    // 신원 확인도 **확인한 그 IP** 로 나간다(쿠키가 실리는 요청이다).
+    expect(address).toBe('93.184.216.34');
   });
 
   it('선언하지 않은 쿠키는 api 로 나가지 않는다 — 신원 확인 호출 자체가 없다', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
     const res = await POST(
       post(
         { category: 'general', content: '내용' },
@@ -500,12 +504,12 @@ describe('POST /api/feedback — 저장 payload 계약', () => {
     );
     expect(res.status).toBe(202);
     expect(sentPayload().userId).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(identityMock).not.toHaveBeenCalled();
   });
 
   it('신원 확인이 실패해도 건의는 저장된다(있으면 좋은 값이 제출을 막지 않는다)', async () => {
     vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', 'pullim_at');
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ETIMEDOUT')));
+    identityMock.mockRejectedValue(new Error('ETIMEDOUT'));
     const res = await POST(post({ category: 'general', content: '내용' }, { cookie: 'pullim_at=xyz' }));
     expect(res.status).toBe(202);
     expect(sentPayload().userId).toBeNull();
@@ -514,22 +518,17 @@ describe('POST /api/feedback — 저장 payload 계약', () => {
   // 오너 결정: 저장하는 신원은 userId 뿐이다. 이 테스트가 그 경계를 못박는다.
   it('이름·이메일·등급·미성년 여부는 **어떤 경로로도** payload 에 들어가지 않는다', async () => {
     vi.stubEnv('FEEDBACK_IDENTITY_COOKIES', 'pullim_at');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        // /me 가 프로필을 통째로 돌려줘도 우리가 꺼내는 것은 sub 하나뿐이다.
-        new Response(
-          JSON.stringify({
-            sub: 'u_abc',
-            email: 'student@example.com',
-            displayName: '박준호',
-            tier: 'premium',
-            isMinor: true,
-          }),
-          { status: 200 },
-        ),
-      ),
-    );
+    // /me 가 프로필을 통째로 돌려줘도 우리가 꺼내는 것은 sub 하나뿐이다.
+    identityMock.mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        sub: 'u_abc',
+        email: 'student@example.com',
+        displayName: '박준호',
+        tier: 'premium',
+        isMinor: true,
+      }),
+    });
 
     await POST(
       post(

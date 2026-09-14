@@ -143,7 +143,7 @@ describe('postJsonPinned — 응답 처리', () => {
     const capture: Capture = { status: 200, timeout: true };
     await expect(
       postJsonPinned(target, '3.5.7.9', {}, { timeoutMs: 5, request: fakeRequest(capture) }),
-    ).rejects.toThrow('webhook timeout');
+    ).rejects.toThrow(/timeout/); // 문구는 전송 계층 소관 — 여기서 고정하는 것은 "끊고 실패시킨다"다
   });
 });
 
@@ -176,7 +176,7 @@ describe('postJsonPinned — 응답을 붙잡고 놓지 않는 수집처', () =>
 
     await expect(
       postJsonPinned(target, '3.5.7.9', {}, { timeoutMs: 10, request: silent }),
-    ).rejects.toThrow('webhook timeout');
+    ).rejects.toThrow(/timeout/); // 문구는 전송 계층 소관 — 여기서 고정하는 것은 "끊고 실패시킨다"다
     expect(capture.reqDestroyed).toBe(true);
   });
 });
