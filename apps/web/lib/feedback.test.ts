@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { FEEDBACK_PAGE_URL_MAX } from '@pullim/shared';
 import { isFeedbackEnabled, submitFeedback } from './feedback';
 
 // 전송 클라이언트 계약. 핵심은 **실패를 실패로 돌려주는 것** — 서버가 501/502 를 주거나 네트워크가
@@ -35,6 +36,16 @@ describe('isFeedbackEnabled', () => {
   });
 });
 
+/** 보낸 요청 본문. */
+function sentBody() {
+  const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+  return JSON.parse(String(init.body)) as {
+    category: string;
+    content: string;
+    context?: { pageUrl: string; viewport: { w: number; h: number } };
+  };
+}
+
 describe('submitFeedback — 정상 경로', () => {
   it('same-origin /api/feedback 으로 카테고리·내용을 보낸다', async () => {
     fetchMock.mockResolvedValue(json(202));
@@ -44,17 +55,74 @@ describe('submitFeedback — 정상 경로', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/feedback');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toEqual({
-      category: 'feature',
-      content: '검색에 최근 항목이 있으면 좋겠어요.',
-    });
+    const body = sentBody();
+    expect(body.category).toBe('feature');
+    expect(body.content).toBe('검색에 최근 항목이 있으면 좋겠어요.');
   });
 
   it('앞뒤 공백은 다듬어 보낸다', async () => {
     fetchMock.mockResolvedValue(json(202));
     await submitFeedback({ category: 'general', content: '  내용  ' });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(init.body)).content).toBe('내용');
+    expect(sentBody().content).toBe('내용');
+  });
+});
+
+// 맥락은 폼이 아니라 여기서 붙인다. 담기는 것은 **경로와 뷰포트뿐** — 호스트도, 사용자 정보도 아니다.
+describe('submitFeedback — 제출 맥락', () => {
+  const setLocation = (href: string) => {
+    window.history.replaceState({}, '', href);
+  };
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(json(202));
+    setLocation('/');
+  });
+
+  it('현재 경로를 담는다 — **호스트는 담지 않는다**(서버가 안다)', async () => {
+    setLocation('/result');
+    await submitFeedback({ category: 'general', content: '내용' });
+
+    const context = sentBody().context;
+    expect(context?.pageUrl).toBe('/result');
+    expect(context?.pageUrl).not.toContain(window.location.host);
+    expect(context?.pageUrl.startsWith('/')).toBe(true);
+  });
+
+  // 쿼리에는 `?next=`·`?code=`·`?token=` 처럼 일회성 토큰·개인 정보가 실린다. 그대로 보내면
+  // 그 값이 건의 레코드로 복제돼 admin 화면·백업에 남는다.
+  it('쿼리는 담지 않는다 — 토큰·이메일이 건의 데이터로 복제되지 않게', async () => {
+    setLocation('/login?next=/mypage&code=one-time-token&email=student@example.com');
+    await submitFeedback({ category: 'general', content: '내용' });
+
+    const body = sentBody();
+    expect(body.context?.pageUrl).toBe('/login');
+    expect(JSON.stringify(body)).not.toMatch(/one-time-token|student@example.com|next=/);
+  });
+
+  it('뷰포트는 정수 픽셀로 담는다', async () => {
+    await submitFeedback({ category: 'general', content: '내용' });
+    const viewport = sentBody().context?.viewport;
+    expect(viewport).toEqual({ w: window.innerWidth, h: window.innerHeight });
+    expect(Number.isInteger(viewport?.w)).toBe(true);
+  });
+
+  it('해시(#)도 담지 않는다 — 서버로 보낼 이유가 없는 클라이언트 전용 값이다', async () => {
+    setLocation('/result#card-3');
+    await submitFeedback({ category: 'general', content: '내용' });
+    expect(sentBody().context?.pageUrl).toBe('/result');
+  });
+
+  it('아주 긴 경로는 **잘라서** 보낸다(맥락 때문에 제출이 막히지 않게)', async () => {
+    setLocation(`/submit/${'a'.repeat(2_000)}`);
+    const result = await submitFeedback({ category: 'general', content: '내용' });
+
+    expect(result).toEqual({ ok: true });
+    expect(sentBody().context?.pageUrl).toHaveLength(FEEDBACK_PAGE_URL_MAX);
+  });
+
+  it('맥락에 사용자 정보를 담지 않는다(경로·뷰포트 두 키뿐)', async () => {
+    await submitFeedback({ category: 'general', content: '내용' });
+    expect(Object.keys(sentBody().context ?? {}).sort()).toEqual(['pageUrl', 'viewport']);
   });
 });
 
@@ -65,7 +133,7 @@ describe('submitFeedback — 실패는 실패로', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('501(수집처 미설정) → 원인을 밝힌 문구', async () => {
+  it('501(저장 표면 미설정) → 원인을 밝힌 문구', async () => {
     fetchMock.mockResolvedValue(json(501));
     const result = await submitFeedback({ category: 'general', content: '내용' });
     expect(result.ok).toBe(false);
@@ -98,6 +166,13 @@ describe('submitFeedback — 실패는 실패로', () => {
     const result = await submitFeedback({ category: 'general', content: '내용' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message).toContain('새로고침');
+  });
+
+  it('503(접수를 잠시 멈춤) → 사용자 잘못이 아님을 밝힌 문구', async () => {
+    fetchMock.mockResolvedValue(json(503));
+    const result = await submitFeedback({ category: 'general', content: '내용' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain('잠시 멈춰');
   });
 
   it('502 → 서버 전달 실패', async () => {

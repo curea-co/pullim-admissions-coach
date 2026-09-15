@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   FEEDBACK_CONTENT_MAX,
+  FEEDBACK_PAGE_URL_MAX,
   feedbackCategoryLabel,
   feedbackSubmissionSchema,
 } from './feedback';
@@ -82,5 +83,111 @@ describe('feedbackSubmissionSchema — 알 수 없는 필드', () => {
     });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data).toEqual({ category: 'general', content: '내용' });
+  });
+});
+
+// 제출 맥락. 여기서 못박는 것은 **담기는 것과 담기지 않는 것**이다 — 경로·뷰포트는 담고,
+// 호스트와 사용자 정보는 어떤 모양으로 와도 남지 않는다.
+describe('feedbackSubmissionSchema — 제출 맥락(context)', () => {
+  const valid = { pageUrl: '/result', viewport: { w: 390, h: 844 } };
+
+  it('없어도 통과한다 — 선택 값이다(옛 번들의 제출을 잃지 않게)', () => {
+    const r = feedbackSubmissionSchema.safeParse({ category: 'general', content: '내용' });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toBeUndefined();
+  });
+
+  it('경로·뷰포트를 그대로 통과시킨다', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: valid,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toEqual(valid);
+  });
+
+  it.each([
+    ['절대 URL — 호스트가 섞인다', 'https://evil.example.com/x'],
+    ['스킴 상대 URL', '//evil.example.com/x'],
+    ['상대 경로', 'result?tab=1'],
+    ['빈 문자열', ''],
+  ])('경로가 아닌 pageUrl(%s)은 거절', (_label, pageUrl) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  // 쿼리·해시는 일회성 토큰·이메일이 실리는 자리다. **클라이언트를 믿지 않고** 스키마에서
+  // 잘라내, 옛 번들이나 변조된 요청이 보낸 값도 저장 대상에는 남지 않게 한다.
+  it.each([
+    ['쿼리', '/login?next=/mypage&code=one-time-token', '/login'],
+    ['해시', '/result#card-3', '/result'],
+    ['둘 다', '/result?tab=gap#card-3', '/result'],
+  ])('pageUrl 의 %s 는 저장 전에 제거된다', (_label, pageUrl, expected) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.context?.pageUrl).toBe(expected);
+      expect(JSON.stringify(r.data)).not.toMatch(/one-time-token|card-3|tab=gap/);
+    }
+  });
+
+  // 길이를 쿼리 제거보다 먼저 재면, **버릴 부분 때문에** 제출이 거절된다 — 저장될 값은
+  // 짧은 `/login` 인데도. 순서가 곧 계약이다(민감한 쿼리는 버리고 제출은 받는다).
+  it('제거될 쿼리가 길이 상한을 넘겨도 거절하지 않는다 — 정제 뒤 길이를 잰다', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, pageUrl: `/login?code=${'t'.repeat(FEEDBACK_PAGE_URL_MAX * 2)}` },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context?.pageUrl).toBe('/login');
+  });
+
+  it(`pageUrl 은 ${FEEDBACK_PAGE_URL_MAX}자까지 — 넘으면 거절(폼이 미리 자른다)`, () => {
+    const ok = `/x${'a'.repeat(FEEDBACK_PAGE_URL_MAX - 2)}`;
+    expect(
+      feedbackSubmissionSchema.safeParse({ category: 'general', content: '내용', context: { ...valid, pageUrl: ok } })
+        .success,
+    ).toBe(true);
+    expect(
+      feedbackSubmissionSchema.safeParse({
+        category: 'general',
+        content: '내용',
+        context: { ...valid, pageUrl: `${ok}a` },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ['소수', { w: 390.5, h: 844 }],
+    ['음수', { w: -1, h: 844 }],
+    ['문자열', { w: '390', h: 844 }],
+    ['키 누락', { w: 390 }],
+  ])('뷰포트가 정수 픽셀이 아니면(%s) 거절', (_label, viewport) => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, viewport },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('맥락에 끼워 넣은 사용자 정보는 제거된다(수신처로 새어 나가지 않게)', () => {
+    const r = feedbackSubmissionSchema.safeParse({
+      category: 'general',
+      content: '내용',
+      context: { ...valid, email: 'a@b.c', displayName: '박준호', userId: 'u_1' },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.context).toEqual(valid);
   });
 });
