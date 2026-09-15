@@ -142,20 +142,30 @@
 
 **→ 이게 닫히기 전에는 4단계(서비스 키 발급) 이후로 넘어가지 마라.** 3단계까지(마이그레이션·api 배포)는 빈 테이블이라 수집이 일어나지 않으므로 진행해도 된다.
 
-**현재 dev 에 버튼이 켜져 있는 것은 안전하다** — 저장할 곳이 없어 제출이 501 로 끝나고 아무것도 쌓이지 않는다. **그 안전은 4단계에서 사라진다.**
+**현재 dev 에 버튼이 켜져 있는 것은 안전하다 — 실측으로 확인했다.** `dev-admissions.pullim.ai` 에서 `POST /api/feedback` 을 직접 호출한 결과:
+
+```
+503  { "ok": false, "code": "CLIENT_IP_SOURCE_NOT_CONFIGURED" }
+```
+
+Vercel Preview(dev) 에 설정된 건의 관련 env 는 **`NEXT_PUBLIC_FEEDBACK_ENABLED` 하나뿐**이다. `TRUSTED_CLIENT_IP_HEADER`·`RATE_LIMIT_BACKEND`·`FEEDBACK_WEBHOOK_URL` 이 없어 **레이트리밋 신뢰 헤더 가드가 수집처 검사보다 먼저 걸리고**, 요청은 저장·전달 어느 쪽에도 닿지 못한다(fail-closed).
+→ **버튼은 보이지만 수집은 0건이다. 그 안전은 4~5단계에서 env 를 채우는 순간 사라진다.**
 
 ---
 
 ## 3. 배포 순서 (순서를 지켜야 하는 이유까지)
 
 1. **마이그레이션 경로 확보**(승인된 배스천) ← 지금 여기
-2. **마이그레이션을 먼저 실행한다.** #644 의 **승인된 커밋을 빌드**해 배스천/일회성 작업에서 `pnpm migration:run`.
+2. **마이그레이션을 먼저 실행한다.** #644 의 **아래 커밋을 그대로 체크아웃해 빌드**한 뒤 배스천/일회성 작업에서 `pnpm migration:run`.
+   - **고정 대상**: `pullim-api` `462334dc012776b2b1e4a6bef5542ae2bfc2c6f0` (브랜치 `feat/feedback-module`, 2026-09-15 기준 PR #644 head)
+   - 브랜치 이름이 아니라 **이 SHA 로 고정하라.** 브랜치는 움직일 수 있고, 적용한 스키마와 머지되는 코드가 어긋나면 추적이 어렵다.
    - 이 마이그레이션은 **신규 스키마 + 신규 테이블 2개뿐**이라 **기존 코드와 호환**된다(기존 코드는 그 테이블을 모른다). 그래서 배포보다 먼저 돌려도 안전하다.
-   - ⚠ 실행 후 **#644 에 커밋을 더 얹지 마라.** 얹으면 적용된 스키마와 코드가 어긋난다 — 추가 커밋이 생기면 마이그레이션 내용을 다시 확인하라.
+   - ⚠ **머지되는 커밋이 위 SHA 와 같은지 머지 직전에 확인하라.** 그 사이 #644 에 커밋이 더 얹혔다면 마이그레이션 파일이 바뀌었는지 보고, 바뀌었으면 새 SHA 로 다시 실행해야 한다.
 3. `pullim-api` **#644 머지** → dev 자동배포. 테이블이 이미 있으므로 **배포 직후부터 정상 동작**한다.
 4. **`WEB_FEEDBACK` 서비스 키 발급·주입** (Action Gate)
 5. `pullim-admissions-coach` env 4종 설정 → **#78 머지** → 배포
-   - `PULLIM_API_URL` · `FEEDBACK_SERVICE_KEY` · `FEEDBACK_API_ALLOWED_HOSTS`(운영 필수, 미설정 시 501) · `FEEDBACK_IDENTITY_COOKIES`
+   - `PULLIM_API_URL` · `FEEDBACK_SERVICE_KEY` · `FEEDBACK_API_ALLOWED_HOSTS` · `FEEDBACK_IDENTITY_COOKIES`
+   - ⚠ **`TRUSTED_CLIENT_IP_HEADER`·`RATE_LIMIT_BACKEND`(+Upstash 자격) 도 함께 필요하다.** 프로덕션(Vercel preview 포함)에서 이 둘이 없으면 라우트가 **503 `CLIENT_IP_SOURCE_NOT_CONFIGURED`** 로 거절한다 — 위 4개만 채우면 여전히 안 된다. Vercel 이면 `TRUSTED_CLIENT_IP_HEADER=x-vercel-forwarded-for`.
 6. `pullim-admin` **#60 머지**
 
 ### ⚠ `FEEDBACK_IDENTITY_COOKIES` 를 5단계에서 같이 넣어라
