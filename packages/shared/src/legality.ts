@@ -33,6 +33,10 @@ export interface ActionCandidate {
   competency: LegalityCompetency;
   text: string;
   rationale: string;
+  /** 학생이 혼자 수행하는 데 드는 예상 시간(분). 구버전 결과에는 없다. */
+  estimatedMinutes?: number;
+  /** 이 보완이 대비하는 면접 질문 번호(["Q1"]). 구버전 결과에는 없다. */
+  linkedQuestions?: string[];
   evidence: EvidenceRef | null;
 }
 
@@ -42,6 +46,8 @@ export interface PrescribedAction {
   competency: LegalityCompetency;
   text: string;
   rationale: string;
+  estimatedMinutes?: number;
+  linkedQuestions?: string[];
   evidence: EvidenceRef;
 }
 
@@ -80,11 +86,14 @@ export function filterActions(candidates: ActionCandidate[]): LegalityResult {
       stripped.push({ recordArea, reason: '증거인용 누락' });
       continue;
     }
+    // 필드를 하나씩 옮긴다 — 새 필드를 여기에 더하지 않으면 게이트 통과분에서 조용히 사라진다.
     passed.push({
       recordArea,
       competency: c.competency,
       text: c.text,
       rationale: c.rationale,
+      estimatedMinutes: c.estimatedMinutes,
+      linkedQuestions: c.linkedQuestions,
       evidence: c.evidence,
     });
   }
