@@ -54,6 +54,9 @@ function ProcessingFlow() {
   const router = useRouter();
   const [phase, setPhase] = useState<AnalysisPhase>('submitting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 재시도가 통하지 않는 오류(계정 진단 한도 소진)인지. 이때 "다시 시도" 버튼을 숨긴다 —
+  // 리셋되지 않는 한도라 눌러도 같은 403 이 돌아온다.
+  const [retryable, setRetryable] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +166,8 @@ function ProcessingFlow() {
       } catch (err) {
         if (cancelled) return;
         const e = err as ApiError;
+        // 403 = 소유·동의·한도 게이트. 한도 소진은 재시도 불가라 버튼을 내린다.
+        if (e?.status === 403 && /한도/.test(e?.message ?? '')) setRetryable(false);
         setErrorMsg(
           e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.')
         );
@@ -179,6 +184,7 @@ function ProcessingFlow() {
 
   function handleRetry() {
     setErrorMsg(null);
+    setRetryable(true);
     setPhase('submitting');
     // useEffect 의존성을 트리거하지 않으므로 페이지 리로드
     window.location.reload();
@@ -206,10 +212,12 @@ function ProcessingFlow() {
         {phase === 'error' ? (
           <div className="space-y-4">
             <ErrorState
-              title="분석 중 오류가 발생했습니다"
+              title={retryable ? '분석 중 오류가 발생했습니다' : '진단을 시작할 수 없습니다'}
               message={errorMsg ?? '알 수 없는 오류'}
+              tone={retryable ? 'error' : 'warning'}
             />
             <div className="flex gap-3">
+              {retryable && (
               <button
                 type="button"
                 onClick={handleRetry}
@@ -217,6 +225,7 @@ function ProcessingFlow() {
               >
                 다시 시도
               </button>
+              )}
               <Link
                 href="/submit"
                 className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
