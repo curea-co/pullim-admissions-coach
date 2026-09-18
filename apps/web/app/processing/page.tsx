@@ -33,7 +33,7 @@ const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
   { key: 'done', label: '결과 도착', detail: '결과 화면을 불러옵니다' },
 ];
 
-/** 폴링 간격·상한 — opus 3콜(진단·처방·면접) 비동기 워커라 넉넉히 잡는다. */
+/** 폴링 간격·상한 — 3콜(진단·면접·처방) 비동기 워커라 넉넉히 잡는다. */
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_MS = 8 * 60 * 1000;
 

@@ -10,8 +10,9 @@ export async function diagnose(profile: AnalysisInput, cohort: CohortResult): Pr
   const res = await anthropic.messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    output_config: { effort: 'high', format: zodOutputFormat(DiagnosisSchema) },
+    // NOTE: Haiku 4.5 는 adaptive thinking 과 output_config.effort 를 지원하지 않는다(보내면 400).
+    // 구조화 출력(output_config.format)만 쓴다.
+    output_config: { format: zodOutputFormat(DiagnosisSchema) },
     system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',

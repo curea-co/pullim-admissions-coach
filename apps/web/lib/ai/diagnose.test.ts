@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // vi.mock is hoisted above module top-level consts, so the mock fn must be
 // created via vi.hoisted to avoid a TDZ ReferenceError in the factory closure.
 const { parse } = vi.hoisted(() => ({ parse: vi.fn() }))
-vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-opus-4-8' }))
+vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-haiku-4-5' }))
 
 import { diagnose } from './diagnose'
 import { resolveCohort } from '@pullim/engine'

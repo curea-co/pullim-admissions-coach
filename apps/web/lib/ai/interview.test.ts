@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { parse } = vi.hoisted(() => ({ parse: vi.fn() }))
-vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-opus-4-8' }))
+vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-haiku-4-5' }))
 
 import { interviewPack } from './interview'
 import { resolveCohort } from '@pullim/engine'

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.mock is hoisted above module top-level consts → create mock fn via vi.hoisted.
 const { parse } = vi.hoisted(() => ({ parse: vi.fn() }))
-vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-opus-4-8' }))
+vi.mock('./client', () => ({ anthropic: { messages: { parse } }, MODEL: 'claude-haiku-4-5' }))
 
 import { judgeLanded } from './twin-judge'
 import type { PrescribedAction, EvidenceRef } from '@pullim/engine'
