@@ -304,7 +304,9 @@ Phase 1 이 핵심이다 — **여기까지는 게이트웨이 결정과 무관�
 ### 10.3 운영
 
 - **기본 게이트웨이는 `openrouter`**(`google/gemini-3.8-flash`). `ADMISSIONS_LLM_GATEWAY=anthropic` 으로 haiku-4.5 직결로 되돌린다.
-- **배포 선행 조건:** 통합 시크릿에 `OPENROUTER_API_KEY` 또는 `OPENROUTER_API_KEY_ADMISSIONS` 가 있어야 한다. 없으면 부팅은 되고 **진단 호출 시점에 fail-closed** 한다(기존 provider 동형).
+- **배포 선행 조건:** 통합 시크릿에 `OPENROUTER_API_KEY_ADMISSIONS` 가 있어야 한다.
+  **공유 `OPENROUTER_API_KEY` 는 폴백이 되지 않는다** — ADR-093 에 맞춰 어댑터가 `serviceKeyFor`(엄격 조회)를 쓴다.
+  없으면 부팅은 되고 **진단 호출 시점에 `LLM_NOT_CONFIGURED` 로 fail-closed** 한다. 등록 상태는 §10.7.
 - 어댑터가 호출마다 usage 를 로깅한다(`LLM <schema> openrouter in=… out=… reasoning=… cost=…`). DB 컬럼 추가 없이 게이트웨이 비교 기준선이 쌓인다.
 
 ### 10.4 골드 5건 회귀 (gemini-3.8-flash)
