@@ -16,17 +16,29 @@
 # Notes:
 #   - Phase 0 deploys staging only. prod added by separate workflow when ready.
 #   - api/admin services get sibling workflows in Phase C.
+#
+# ⚠️ 2026-09-19 — 수동 실행 전용(workflow_dispatch)으로 내렸다.
+#   위 변수·시크릿이 아직 하나도 채워져 있지 않다. AWS Organizations + 3계정(런북 1단계)이
+#   Gate keeper 회신 대기라 채울 수가 없고, 그래서 dev 푸시마다 첫 AWS 스텝에서
+#   `Input required and not supplied: aws-region` 으로 죽었다(최소 2026-09-10 이후 전건 실패).
+#   실제 배포는 그동안 Vercel 이 해왔으므로 이 실패는 아무것도 막지 않고 빨간불만 남겼다.
+#
+#   워크플로 자체는 폐기가 아니다 — 계정이 생기는 날 쓰려고 미리 짜둔 Phase 0 핸드오프
+#   산출물이다(`infra/README.md` §2, `docs/009_..._demo_scenario` A).
+#   **복구 절차:** 런북 §2 표대로 변수·시크릿을 채우고 workflow_dispatch 로 한 번 성공시킨 뒤,
+#   아래 `push:` 블록의 주석을 풀어 자동 배포로 되돌린다.
 
 name: deploy-staging-web
 
 on:
-  push:
-    branches: [dev]
-    paths:
-      - 'apps/web/**'
-      - 'packages/shared/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/deploy-staging-web.yml'
+  # 변수가 채워지기 전까지 자동 트리거를 끈다(위 ⚠️ 참조). 복구 시 주석만 푼다.
+  # push:
+  #   branches: [dev]
+  #   paths:
+  #     - 'apps/web/**'
+  #     - 'packages/shared/**'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/workflows/deploy-staging-web.yml'
   workflow_dispatch:
 
 # OIDC + reading repo
