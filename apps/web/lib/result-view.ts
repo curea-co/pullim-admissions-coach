@@ -106,6 +106,19 @@ export interface FindingView {
 
 export type InterviewFormatView = 'record_based' | 'passage_based' | 'mmi';
 
+/** 서버가 준 format 을 화면이 아는 값으로 좁힌다. 백엔드가 유형을 추가/개명해도
+ *  뱃지가 빈 칸으로 렌더되지 않게 한다(DTO 는 런타임 스키마 검증을 거치지 않는다). */
+const INTERVIEW_FORMATS: readonly InterviewFormatView[] = [
+  'record_based',
+  'passage_based',
+  'mmi',
+];
+function toFormat(raw: unknown): InterviewFormatView {
+  return INTERVIEW_FORMATS.includes(raw as InterviewFormatView)
+    ? (raw as InterviewFormatView)
+    : 'record_based';
+}
+
 export interface InterviewQuestionView {
   question: string;
   /** 면접 유형 — 목표 대학·계열 KB 산출값. 구버전 결과는 record_based 로 본다. */
@@ -193,7 +206,7 @@ export function toResultViewModel(r: AnalyzeResult): ResultViewModel {
     const evidence = q.evidence ?? (legacy.basis ? [legacy.basis] : []);
     return {
       question: q.question,
-      format: q.format ?? 'record_based',
+      format: toFormat(q.format),
       pressure: q.pressure ?? false,
       evidence: evidence.map((e) => ({ quote: e.quote, section: e.section })),
       answerDirection: q.answerDirection,

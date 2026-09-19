@@ -103,7 +103,10 @@ const RULES: Rule[] = [
  * 헤더 줄 다음부터 빈 줄 전까지를 표 본문으로 보고, 성씨 whitelist를 통과한 토큰만 집는다.
  */
 const TEACHER_TABLE_HEADER = /담임\s*(?:성명|이름)/g;
-const MAX_TABLE_ROWS = 12;
+/** 인적·학적사항 표는 학년당 1행이라 3행이면 충분하다. 넉넉히 4행까지만 본다. */
+const MAX_TABLE_ROWS = 4;
+/** 표 본문 행의 표식 — 학년·반·번호 칸이 있어 독립된 숫자 토큰이 반드시 하나는 있다. */
+const TABLE_ROW_MARKER = /(?:^|\s)\d{1,3}(?=\s|$)/;
 
 function detectTeacherTableNames(text: string): PiiMatch[] {
   const out: PiiMatch[] = [];
@@ -115,7 +118,10 @@ function detectTeacherTableNames(text: string): PiiMatch[] {
       let lineEnd = text.indexOf('\n', cursor);
       if (lineEnd === -1) lineEnd = text.length;
       const line = text.slice(cursor, lineEnd);
-      if (line.trim() === '') break; // 표 끝
+      // 표 본문이 아니면 즉시 멈춘다. 빈 줄만 보고 계속 내려가면 표 아래 산문까지 스캔해
+      // "성적 정보 조사" 같은 일반어를 교사명으로 치환한다(성·정·조 모두 성씨라 걸린다).
+      if (line.trim() === '' || !TABLE_ROW_MARKER.test(line)) break;
+      // 행당 최대 1명 — 담임 성명은 한 칸이다. 여러 개를 집으면 본문을 망가뜨린다.
       for (const tok of line.matchAll(/[가-힣]{2,4}/g)) {
         if (!looksLikeKoreanName(tok[0])) continue;
         out.push({
@@ -127,6 +133,7 @@ function detectTeacherTableNames(text: string): PiiMatch[] {
           placeholder: PLACEHOLDER.teacher,
           maskedField: MASKED_FIELD.teacher,
         });
+        break;
       }
       if (lineEnd === text.length) break;
       cursor = lineEnd + 1;
@@ -138,13 +145,26 @@ function detectTeacherTableNames(text: string): PiiMatch[] {
 export function detectPii(text: string): PiiMatch[] {
   const raw: PiiMatch[] = [];
   for (const rule of RULES) {
-    for (const m of text.matchAll(rule.re)) {
-      const span = (m as RegExpMatchArray & { indices?: Array<[number, number] | undefined> })
+    // matchAll 이 아니라 exec 루프인 이유: validate 가 후보를 거절했을 때 **그 매치가 삼킨 구간을
+    // 버리면 안 된다.** 탐욕 매칭이 앞 글자까지 끌어오는 경우가 있어서다 —
+    // "열심히김민수 학생이" 는 `히김민수` 로 잡히고, 거절 후 그냥 넘어가면 뒤의 진짜 이름
+    // `김민수` 가 그대로 새어나간다. PDF 추출 생기부는 띄어쓰기가 자주 붙어 실제로 발생한다.
+    // 거절 시 시작점 +1 에서 다시 스캔한다.
+    rule.re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = rule.re.exec(text)) !== null) {
+      const span = (m as RegExpExecArray & { indices?: Array<[number, number] | undefined> })
         .indices?.[rule.group];
-      if (!span) continue;
+      if (!span) {
+        if (rule.re.lastIndex <= m.index) rule.re.lastIndex = m.index + 1;
+        continue;
+      }
       const [start, end] = span;
       const value = text.slice(start, end);
-      if (rule.validate && !rule.validate(value)) continue;
+      if (rule.validate && !rule.validate(value)) {
+        rule.re.lastIndex = start + 1;
+        continue;
+      }
       raw.push({
         category: rule.category,
         tier: TIER[rule.category],

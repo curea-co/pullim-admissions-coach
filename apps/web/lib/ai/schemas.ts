@@ -47,7 +47,12 @@ export const InterviewPackSchema = z.object({
     /** 답변 "방향"(핵심 포인트·논리)만. 완성 대본/합격 답변 금지. */
     answerDirection: z.string(),
     followups: z.array(z.string()),
-  })).min(8).max(10),
+  })).min(8).max(10)
+    // §6: record_based 질문은 생기부 근거가 반드시 있어야 한다. 백엔드 SSOT 와 동일한 보증.
+    .refine(
+      (qs) => qs.every((q) => q.format !== 'record_based' || q.evidence.length >= 1),
+      { message: 'record_based 질문에는 생기부 근거(evidence)가 1건 이상 필요합니다.' },
+    ),
 })
 export type InterviewPack = z.infer<typeof InterviewPackSchema>
 
