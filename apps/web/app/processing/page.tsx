@@ -25,6 +25,9 @@ import type { ApiError } from '@/lib/api';
 // 분석 진행 — admissions 백엔드(ADR-058): 제출 영속→동의 적재→진단 enqueue→워커 완료 폴링.
 // 결과 본문은 서버(diagnosis_results)가 정본 — 세션엔 진단 id 만 남긴다.
 
+/** pullim-api `ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED_CODE` 와 같은 값이어야 한다. */
+const QUOTA_EXCEEDED_CODE = 'ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED';
+
 type AnalysisPhase = 'submitting' | 'analyzing' | 'done' | 'error';
 
 const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
@@ -166,8 +169,10 @@ function ProcessingFlow() {
       } catch (err) {
         if (cancelled) return;
         const e = err as ApiError;
-        // 403 = 소유·동의·한도 게이트. 한도 소진은 재시도 불가라 버튼을 내린다.
-        if (e?.status === 403 && /한도/.test(e?.message ?? '')) setRetryable(false);
+        // 403 = 소유·동의·한도 게이트. 한도 소진만 재시도 불가라 버튼을 내린다.
+        // **문구가 아니라 서버 코드로 분기한다** — 메시지는 pullim-api 소유이고 계약 테스트가
+        // 없어, 문안을 다듬는 순간 이 분기가 조용히 깨진다(사용자는 같은 403 에 계속 재시도).
+        if (e?.code === QUOTA_EXCEEDED_CODE) setRetryable(false);
         setErrorMsg(
           e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.')
         );

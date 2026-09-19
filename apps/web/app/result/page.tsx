@@ -396,10 +396,10 @@ const INTERVIEW_TAG_STYLE = {
   pressure: 'bg-amber-50 text-amber-700',
 } as const;
 
+// 유형 라벨은 shared 의 INTERVIEW_FORMAT_LABEL 이 정본이다 — 같은 enum 에 두 벌의 문구를
+// 두면 데모 패널(아래 parkJunho)과 실 결과가 서로 다른 말을 한다. 압박만 별도 축이라 더한다.
 const INTERVIEW_TAG_LABEL = {
-  record_based: '생기부 기반',
-  passage_based: '제시문',
-  mmi: 'MMI',
+  ...INTERVIEW_FORMAT_LABEL,
   pressure: '압박',
 } as const;
 
