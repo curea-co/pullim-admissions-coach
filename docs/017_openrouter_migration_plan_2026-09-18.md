@@ -375,13 +375,25 @@ usage 에 `cached=` 를 로깅하므로 실환경에서 관측 가능하다.
 
 1. **캐싱 실효 확인** — `cached_tokens` 가 계속 0 이면 breakpoint 를 빼거나 시스템 프롬프트 구성을 바꾼다.
 2. **일시 실패 빈도 관측** — 재시도로 흡수되지만 빈도가 높으면 모델·프로바이더 고정을 검토한다.
-3. **골드 회귀 하네스가 리포지토리 밖에 있다** — `process.env` 금지 린트 때문에 spec 으로 넣지 못했다. 재실행 레시피는 §10.8.
-4. **라이팅코치·공통 기본값은 haiku 유지** — 이번 벤치마크 대상이 아니었다.
+3. **라이팅코치·공통 기본값은 haiku 유지** — 이번 벤치마크 대상이 아니었다.
 
-### 10.8 골드 회귀 재실행
+### 10.8 골드 회귀 — 리포지토리에 상주한다
 
-하네스: 세션 스크래치패드의 `gold-harness.spec.ts.bak`.
-`pullim-api/src/admissions/engine/__gold.spec.ts` 로 복사하고
-`APP_ENV=local node --experimental-vm-modules node_modules/jest/bin/jest.js src/admissions/engine/__gold` 로 돌린다.
-키는 `pullim-admissions-coach/.secrets/openrouter.key`(gitignore) 에서 읽는다. 5건 약 $0.4·4분.
-**돌린 뒤 반드시 지운다** — 린트(`no-restricted-syntax`, `no-explicit-any`)에 걸린다.
+```
+pnpm test:gold        # pullim-api
+```
+
+- 하네스: `pullim-api/test/admissions-gold.gold-spec.ts`
+- 설정: `test/jest-gold.json` (`maxWorkers: 1` — 실 LLM 호출이라 동시 실행 시 레이트리밋·비용이 튄다)
+- **기본 실행에서 자동으로 빠진다.** 루트 jest 의 `testRegex` 가 `.spec.ts`·`.e2e-spec.ts` 만 잡고
+  이 파일은 `.gold-spec.ts` 다. `pnpm test` 에 섞이지 않으니 CI 가 돈을 쓰지 않는다.
+- 골드 데이터는 입시코치 레포(`docs/golden/`, EPO 소유)에 그대로 둔다 — 복제하면 드리프트가 생긴다.
+  하네스가 형제 디렉터리 경로로 참조한다(`../pullim-admissions-coach`).
+- 키는 `pullim-admissions-coach/.secrets/openrouter.key`(gitignore). 시크릿 스토어를 띄우지 않으려고
+  파일에서 직접 읽는다(`process.env` 금지 린트 회피).
+- 비용·시간: 5건 약 $0.4 · 5분.
+
+판정은 구조(역량 3 · 키워드 5+ · 질문 8+ · 역량별 강점/보완/다음할일 1+ · record_based 근거 1+)와
+**§6 하드 게이트(위반 0 · 처방 제거 0)** 다. 문체는 경고 게이트라 실패시키지 않고 출력만 한다.
+
+**모델이나 프롬프트를 바꾸면 반드시 다시 돌린다.** 기존 기준선이 무효가 된다.
