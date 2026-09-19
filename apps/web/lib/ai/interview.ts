@@ -36,12 +36,15 @@ export async function interviewPack(
       role: 'user',
       content:
         `코호트: ${cohort.system} / 계열: ${profile.track5} / 학년: ${profile.grade} / 학교유형: ${profile.schoolType}\n` +
-        `진단 요약: ${diagnosis.criteria.map(c => `${c.key}:${c.strength}`).join(' / ')}\n\n` +
+        `진단 요약: ${diagnosis.criteria.map(c => `${c.key}:${c.summary}`).join(' / ')}\n\n` +
         `생기부(마스킹됨):\n${profile.saengbu}\n\n` +
-        `위 생기부 근거에 기반한 학종 면접 예상질문 3–5개를 만들어라.\n` +
+        `위 생기부 근거에 기반한 학종 면접 예상질문 8–10개를 만들어라.\n` +
         `각 질문은 다음을 포함한다:\n` +
         `- question: 예상 면접 질문\n` +
-        `- basis: 그 질문의 근거가 된 실제 생기부 항목(생기부 원문에 등장하는 인용 quote + section). 생기부에 없는 인용을 지어내지 말 것.\n` +
+        `- format: record_based(생기부 기반) · passage_based(제시문) · mmi(의대) 중 하나.\n` +
+        `- pressure: 답변의 빈틈을 파고드는 압박 질문이면 true. 전체의 2할 안쪽.\n` +
+        `- evidence: 그 질문의 근거가 된 실제 생기부 항목(원문 인용 quote + 섹션명 section)을 배열로. `+
+        `record_based 는 1건 이상, passage_based·mmi 는 빈 배열. 생기부에 없는 인용을 지어내지 말 것.\n` +
         `- answerDirection: 답변의 *방향*(핵심 포인트·논리 전개)만. 완성 대본/예시 문장/"합격 답변"을 작성하지 말 것. 학생이 자기 경험으로 채울 수 있게 뼈대만 제시.\n` +
         `- followups: 예상 꼬리질문\n\n` +
         `${stage}`,

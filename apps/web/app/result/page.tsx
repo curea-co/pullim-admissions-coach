@@ -337,17 +337,19 @@ export default function ResultPage() {
         )}
         {tab === 'improvements' && (
           viewModel
-            ? <ImprovementsPanelReal items={viewModel.improvements} />
+            ? <ImprovementsPanelReal items={viewModel.improvements} keywords={viewModel.keywords} />
             : <ImprovementsPanel />
         )}
 
-        {/* 로드맵 (실 데이터 있을 때만) */}
-        {viewModel?.roadmap && (
+        {/*
+          로드맵·적합도는 보완 탭에만 붙인다. 둘 다 "앞으로 무엇을 할지"를 다루므로
+          면접·진단 탭에서는 읽는 맥락에서 벗어난다(프로토타입 015 의 구성).
+          실 데이터가 있을 때만 — 합격%·점수는 어디에도 없다.
+        */}
+        {tab === 'improvements' && viewModel?.roadmap && (
           <RoadmapSection roadmap={viewModel.roadmap} />
         )}
-
-        {/* 적합도 (실 데이터 있을 때만, 합격%·점수 없음) */}
-        {viewModel?.fit && (
+        {tab === 'improvements' && viewModel?.fit && (
           <FitSection fit={viewModel.fit} />
         )}
 
@@ -383,6 +385,44 @@ export default function ResultPage() {
 
 // ── 실데이터 패널들 ─────────────────────────────────────────────────────────
 
+/**
+ * 면접 질문 유형 뱃지. 유형(record_based·passage_based·mmi)과 방식(압박)은 다른 축이라,
+ * 압박 질문이면 그쪽을 먼저 보여준다 — 답변 준비 방향이 유형보다 크게 갈리기 때문이다.
+ */
+const INTERVIEW_TAG_STYLE = {
+  record_based: 'bg-emerald-50 text-emerald-700',
+  passage_based: 'bg-sky-50 text-sky-700',
+  mmi: 'bg-violet-50 text-violet-700',
+  pressure: 'bg-amber-50 text-amber-700',
+} as const;
+
+const INTERVIEW_TAG_LABEL = {
+  record_based: '생기부 기반',
+  passage_based: '제시문',
+  mmi: 'MMI',
+  pressure: '압박',
+} as const;
+
+function InterviewTag({
+  format,
+  pressure,
+}: {
+  format: ResultViewModel['interview'][number]['format'];
+  pressure: boolean;
+}) {
+  const key = pressure ? 'pressure' : format;
+  return (
+    <span
+      className={cn(
+        'rounded-md px-2 py-0.5 text-xs font-medium',
+        INTERVIEW_TAG_STYLE[key]
+      )}
+    >
+      {INTERVIEW_TAG_LABEL[key]}
+    </span>
+  );
+}
+
 function InterviewPanelReal({ questions }: { questions: ResultViewModel['interview'] }) {
   if (questions.length === 0) {
     return (
@@ -405,6 +445,7 @@ function InterviewPanelReal({ questions }: { questions: ResultViewModel['intervi
             <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
               Q{idx + 1}
             </span>
+            <InterviewTag format={q.format} pressure={q.pressure} />
             <h3 className="text-base font-semibold leading-snug text-ink-900">
               {q.question}
             </h3>
@@ -416,17 +457,23 @@ function InterviewPanelReal({ questions }: { questions: ResultViewModel['intervi
               </dt>
               <dd className="mt-1 text-ink-900">{q.answerDirection}</dd>
             </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                근거 생기부 항목
-              </dt>
-              <dd className="mt-1">
-                <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-                  {q.basisSection}
-                </span>
-                <p className="mt-1 text-ink-700">{q.basisQuote}</p>
-              </dd>
-            </div>
+            {q.evidence.length > 0 && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  근거 생기부 항목
+                </dt>
+                <dd className="mt-1 space-y-2">
+                  {q.evidence.map((e, ei) => (
+                    <div key={ei}>
+                      <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                        {e.section}
+                      </span>
+                      <p className="mt-1 text-ink-700">{e.quote}</p>
+                    </div>
+                  ))}
+                </dd>
+              </div>
+            )}
             {q.followups.length > 0 && (
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
@@ -470,20 +517,58 @@ function DiagnosisPanelReal({ criteria }: { criteria: ResultViewModel['diagnosis
           </h3>
           <p className="mt-1 text-xs text-ink-500">{c.mapping}</p>
 
+          {c.summary && (
+            <p className="mt-3 text-sm leading-relaxed text-ink-700">{c.summary}</p>
+          )}
+
           <div className="mt-4 space-y-3">
-            {c.strength && (
+            {c.strengths.length > 0 && (
               <div className={cn('rounded-xl border p-3', flagStyle.strength)}>
-                <p className="text-xs font-semibold mb-1">◎ 강점</p>
-                <p className="text-sm leading-relaxed">{c.strength}</p>
+                <p className="text-xs font-semibold mb-2">◎ 강점</p>
+                <ul className="space-y-2">
+                  {c.strengths.map((s, si) => (
+                    <li key={si}>
+                      <p className="text-sm font-semibold leading-snug">{s.title}</p>
+                      {s.detail && (
+                        <p className="mt-0.5 text-sm leading-relaxed">{s.detail}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            {c.weakness && (
+            {c.gaps.length > 0 && (
               <div className={cn('rounded-xl border p-3', flagStyle.weakness)}>
-                <p className="text-xs font-semibold mb-1">△ 보완</p>
-                <p className="text-sm leading-relaxed">{c.weakness}</p>
+                <p className="text-xs font-semibold mb-2">△ 보완</p>
+                <ul className="space-y-2">
+                  {c.gaps.map((g, gi) => (
+                    <li key={gi}>
+                      <p className="text-sm font-semibold leading-snug">{g.title}</p>
+                      {g.detail && (
+                        <p className="mt-0.5 text-sm leading-relaxed">{g.detail}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
+
+          {c.nextSteps.length > 0 && (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+                앞으로 할 일
+              </p>
+              <ul className="space-y-1">
+                {c.nextSteps.map((s, si) => (
+                  <li key={si} className="flex gap-2 text-sm leading-relaxed text-ink-700">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {c.evidence.length > 0 && (
             <div className="mt-4 border-t border-ink-100 pt-3">
@@ -509,16 +594,55 @@ function DiagnosisPanelReal({ criteria }: { criteria: ResultViewModel['diagnosis
   );
 }
 
-function ImprovementsPanelReal({ items }: { items: ResultViewModel['improvements'] }) {
+/** 생기부 주제 태그 — 반복 횟수가 많을수록 진하게. 없으면 아무것도 렌더하지 않는다. */
+function KeywordCloud({ keywords }: { keywords: ResultViewModel['keywords'] }) {
+  if (keywords.length === 0) return null;
+  const max = Math.max(...keywords.map((k) => k.count));
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+        생기부에서 반복되는 주제
+      </p>
+      <ul className="flex flex-wrap gap-1.5">
+        {keywords.map((k, i) => (
+          <li
+            key={i}
+            className={cn(
+              'rounded-md px-2 py-0.5 text-xs font-medium',
+              k.count >= max * 0.7
+                ? 'bg-brand-100 text-brand-800'
+                : k.count >= max * 0.4
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'bg-ink-100 text-ink-600'
+            )}
+          >
+            {k.label}
+            <span className="ml-1 tabular-nums opacity-60">{k.count}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ImprovementsPanelReal({
+  items,
+  keywords,
+}: {
+  items: ResultViewModel['improvements'];
+  keywords: ResultViewModel['keywords'];
+}) {
   if (items.length === 0) {
     return (
       <section className="space-y-4">
+        <KeywordCloud keywords={keywords} />
         <p className="text-sm text-ink-500">이 프로필에 해당하는 보완 처방이 없습니다.</p>
       </section>
     );
   }
   return (
     <section className="space-y-4">
+      <KeywordCloud keywords={keywords} />
       <p className="text-sm text-ink-500">
         게이트 통과 합법 처방 {items.length}건 — 대입 반영 영역 기반
       </p>
@@ -535,9 +659,19 @@ function ImprovementsPanelReal({ items }: { items: ResultViewModel['improvements
               <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
                 {competencyLabel[item.competency]}
               </span>
+              {item.estimatedMinutes !== undefined && (
+                <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+                  약 {item.estimatedMinutes}분
+                </span>
+              )}
             </div>
             <p className="text-sm font-semibold text-ink-900">{item.text}</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-700">{item.rationale}</p>
+            {item.linkedQuestions.length > 0 && (
+              <p className="mt-2 text-xs text-ink-500">
+                대비하는 면접 질문 · {item.linkedQuestions.join(' · ')}
+              </p>
+            )}
             <div className="mt-3 rounded-md bg-brand-50 px-2 py-1 text-xs text-brand-700">
               <span className="font-medium">{item.evidence.section}</span>
               {item.evidence.quote && (

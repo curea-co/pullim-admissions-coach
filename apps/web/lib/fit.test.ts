@@ -11,9 +11,10 @@ describe('assessFit (deterministic, 정성 fit only)', () => {
   it('근거 2개+강점 → 강함, 근거 1개 → 적정, 근거 없음 → 보완필요', () => {
     // natural valuedCompetencies = ['ACADEMIC','CAREER']
     const diagnosis: Diagnosis = {
+      keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }],
       criteria: [
-        { key: 'ACADEMIC', mapping: 'm', strength: '강점 있음', weakness: 'w', evidence: ev(2) },
-        { key: 'CAREER', mapping: 'm', strength: '', weakness: 'w', evidence: ev(1) },
+        { key: 'ACADEMIC', mapping: 'm', summary: 's', strengths: [{ title: '강점 있음', detail: 'd' }], gaps: [{ title: 'w', detail: 'd' }], nextSteps: ['n'], evidence: ev(2) },
+        { key: 'CAREER', mapping: 'm', summary: 's', strengths: [], gaps: [{ title: 'w', detail: 'd' }], nextSteps: ['n'], evidence: ev(1) },
       ],
     }
     const out = assessFit('natural', diagnosis)
@@ -24,22 +25,23 @@ describe('assessFit (deterministic, 정성 fit only)', () => {
   })
 
   it('근거 없는 valued 역량은 보완필요', () => {
-    const diagnosis: Diagnosis = { criteria: [] }
+    const diagnosis: Diagnosis = { keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }], criteria: [] }
     const out = assessFit('engineering', diagnosis)
     expect(out.competencyFit.every((c) => c.level === '보완필요')).toBe(true)
   })
 
   it('caveat이 항상 존재', () => {
-    const out = assessFit('humanities', { criteria: [] })
+    const out = assessFit('humanities', { keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }], criteria: [] })
     expect(out.caveat.length).toBeGreaterThan(0)
   })
 
   it('점수·%·합격 표현이 어디에도 없다', () => {
     const diagnosis: Diagnosis = {
+      keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }],
       criteria: [
-        { key: 'ACADEMIC', mapping: 'm', strength: '강점', weakness: 'w', evidence: ev(3) },
-        { key: 'CAREER', mapping: 'm', strength: '강점', weakness: 'w', evidence: ev(2) },
-        { key: 'COMMUNITY', mapping: 'm', strength: '강점', weakness: 'w', evidence: ev(2) },
+        { key: 'ACADEMIC', mapping: 'm', summary: 's', strengths: [{ title: '강점', detail: 'd' }], gaps: [{ title: 'w', detail: 'd' }], nextSteps: ['n'], evidence: ev(3) },
+        { key: 'CAREER', mapping: 'm', summary: 's', strengths: [{ title: '강점', detail: 'd' }], gaps: [{ title: 'w', detail: 'd' }], nextSteps: ['n'], evidence: ev(2) },
+        { key: 'COMMUNITY', mapping: 'm', summary: 's', strengths: [{ title: '강점', detail: 'd' }], gaps: [{ title: 'w', detail: 'd' }], nextSteps: ['n'], evidence: ev(2) },
       ],
     }
     const blob = TRACKS.map((t) => JSON.stringify(assessFit(t, diagnosis))).join('\n')
@@ -52,7 +54,7 @@ describe('assessFit (deterministic, 정성 fit only)', () => {
 
   it('5개 트랙 모두 label을 반환', () => {
     for (const t of TRACKS) {
-      const out = assessFit(t, { criteria: [] })
+      const out = assessFit(t, { keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }], criteria: [] })
       expect(out.label.length).toBeGreaterThan(0)
       expect(out.track).toBe(t)
       expect(out.recommendedSubjects.length).toBeGreaterThan(0)
@@ -63,7 +65,7 @@ describe('assessFit (deterministic, 정성 fit only)', () => {
 })
 
 describe('assessFit — 목표 대학(universityFit)', () => {
-  const diagnosis: Diagnosis = { criteria: [] }
+  const diagnosis: Diagnosis = { keywords: [{ label: '검증 절차', count: 3 }, { label: '또래 멘토링', count: 2 }, { label: '자료 시각화', count: 2 }, { label: '알고리즘 구현', count: 1 }, { label: '학급 자치', count: 1 }], criteria: [] }
 
   it('목표 대학 미입력 시 universityFit 없음(기존 출력과 동일 shape)', () => {
     expect(assessFit('social', diagnosis).universityFit).toBeUndefined()

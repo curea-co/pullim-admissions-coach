@@ -106,7 +106,7 @@ export function assessFit(
   const competencyFit = criteria.valuedCompetencies.map((key) => {
     const d = byKey.get(key)
     const evidenceCount = d?.evidence.length ?? 0
-    const hasStrength = !!d?.strength?.trim()
+    const hasStrength = (d?.strengths ?? []).some((s) => s.title.trim() !== '')
     const label = KEY_LABEL[key]
 
     let level: '강함' | '적정' | '보완필요'
