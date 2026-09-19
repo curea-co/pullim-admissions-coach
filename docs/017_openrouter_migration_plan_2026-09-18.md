@@ -371,7 +371,7 @@ Gemini 경로에서 HTTP 200 인데도 실패하는 경우가 두 종류 관측�
 `cached_tokens` 가 0 이다** — Gemini 의 최소 캐시 프리픽스에 못 미치는 것으로 보인다. 어댑터가
 usage 에 `cached=` 를 로깅하므로 실환경에서 관측 가능하다.
 
-### 10.7 배포 선행 조건 — `OPENROUTER_API_KEY_ADMISSIONS` (dev 완료 · 운영 대기)
+### 10.7 배포 선행 조건 — `OPENROUTER_API_KEY_ADMISSIONS` (dev·prod 완료)
 
 **진단은 이 키 없이 동작하지 않는다.** 공유 `OPENROUTER_API_KEY` 폴백을 타지 않기 때문이다
 (ADR-093 동형 엄격 조회 — 폴백을 허용하면 다른 서비스 키로 진단이 조용히 돌아가 예산 분리가
@@ -384,17 +384,34 @@ usage 에 `cached=` 를 로깅하므로 실환경에서 관측 가능하다.
 | 코드 변경 | 불필요 — `OpenRouterLlmConfig` 가 `OPENROUTER_API_KEY_` 접두를 전수 스캔한다 |
 | 확인 | 부팅 로그 `serviceKeys=[…]` 에 `admissions` 가 보이는지. **`configured=…` 는 공유 키 기준이라 판정 축이 아니다**(ADR-093 주석) |
 
-**2026-09-19 dev 등록 완료.** `pullim/dev/backend` 68 → 69 키, 새 버전 `2f8ef1e8-7003-4833-8663-f6ea1706b844`(AWSCURRENT).
-기존 키 손실 0 · 값 변경 0. 이제 `OPENROUTER_*` 는 `_ADMISSIONS`·`_CLASSBOT`·`_WRITING` 셋이다.
+**2026-09-19 dev·prod 등록 완료.**
+
+| 환경 | 시크릿 | 키 수 | 새 버전 |
+|---|---|---|---|
+| dev | `pullim/dev/backend` | 68 → 69 | `2f8ef1e8-7003-4833-8663-f6ea1706b844` |
+| prod | `pullim/prod/backend` | 56 → 57 | `f9ac0cca-ab42-4f2b-a3f4-80d589057b01` |
+
+양쪽 모두 기존 키 손실 0 · 값 변경 0.
+
+**키 분리 축은 서비스다 — 환경이 아니다.** `_ADMISSIONS` 는 dev·prod 가 같은 값을 공유한다.
+`OPENROUTER_API_KEY_WRITING` 이 이미 그 모양이고(dev·prod 동일 값), 오너 결정으로 거기에 맞췄다.
+대시보드 사용량과 지출 한도가 **서비스 단위**로 갈리는 게 목적이고, 환경 단위 분리는 목적이 아니다.
 
 > blob 하나를 15개 서비스가 공유하므로 `put-secret-value` 는 전체 교체다. read → merge → 검증 → write
 > 순서를 지켰고, 쓰기 직전에 백업 시점 이후 다른 변경이 없는지 재확인했다. 되돌릴 때는 `AWSPREVIOUS`.
 
-⚠️ **남은 것 둘.**
-1. **운영 등록** — `pullim/prod/backend` 에는 아직 없다. 운영 전환 시 같은 절차로 등록한다.
-2. **dev 에 넣은 값은 비용 비교 실험에 쓰던 키다.** 서비스별 키를 나누는 목적이 대시보드 사용량
-   필터와 **키별 지출 한도**인데 지금은 그 목적이 반만 선다. 운영 전환 전에 admissions 전용 키를
-   새로 발급해 `_ADMISSIONS` 값만 교체한다.
+**dev 실환경 확인** — 배포 후 부팅 로그:
+
+```
+OpenRouter generate provider 설정 로드 완료
+(configured=false, serviceKeys=[writing,classbot,admissions])
+```
+
+`admissions` 가 올라왔다. `configured=false` 는 공유 키 기준이라 판정 축이 아니다(ADR-093).
+
+⚠️ **한 가지 남는다.** 이 키는 `pnpm test:gold`(§10.8)와 haiku↔gemini 벤치마크가 쓰던 값과 같다.
+즉 **로컬에서 골드 회귀를 돌리면 그 비용이 운영 키에 얹힌다.** 지출 한도를 걸 때 이걸 감안하거나,
+하네스용 키를 따로 뽑아 `.secrets/openrouter.key` 만 교체한다(블롭은 건드리지 않아도 된다).
 
 ### 10.8 골드 회귀 — 리포지토리에 상주한다
 
