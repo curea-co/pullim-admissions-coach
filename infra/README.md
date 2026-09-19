@@ -32,6 +32,13 @@
 
 워크플로: `.github/workflows/deploy-staging-web.yml` 이미 추가됨.
 
+> **2026-09-19 — 이 워크플로는 현재 수동 실행 전용(`workflow_dispatch`)이다.**
+> 아래 표의 변수·시크릿이 하나도 채워져 있지 않아(1단계 계정 생성이 회신 대기) dev 푸시마다
+> 첫 AWS 스텝에서 `Input required and not supplied: aws-region` 으로 실패했다. 그동안 실제
+> 배포는 Vercel 이 해왔으므로 이 실패는 아무것도 막지 않고 빨간불만 남겼다.
+> 표를 채운 뒤 수동 실행으로 한 번 성공시키고, 워크플로의 `push:` 블록 주석을 풀어
+> 자동 배포로 되돌린다.
+
 ### GitHub 리포지토리 설정 (DevOps가 채워야 할 값)
 
 **Repository Variables** (Settings → Secrets and variables → Actions → Variables):
@@ -201,7 +208,7 @@ Phase 0 web은 시크릿 없이 부트 가능. 아래는 Phase B 이후 추가�
 - [ ] GitHub OIDC IAM Role 생성, 신뢰정책 본 리포로 제한
 - [ ] GitHub Actions Repo/Env Variables·Secrets 입력
 - [ ] CloudWatch 로그 그룹 3개 생성
-- [ ] 첫 배포 트리거: GitHub Actions `deploy-staging-web` workflow 실행
+- [ ] 첫 배포 트리거: GitHub Actions `deploy-staging-web` 수동 실행 → 성공 시 `push:` 트리거 복구(§2)
 - [ ] **수동 확인**: `https://staging.pullim.curea.co` HTTPS 200, 5 라우트 클릭 시연 가능
 
 본 14개 모두 닫히면 Phase 0 종료. EPO·CEO 시연 URL 공유.
