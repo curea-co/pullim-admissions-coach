@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
 import { auth, isPullimAuth } from '@/lib/auth';
+import { osSettingsHref } from '@/lib/auth/os-login';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
@@ -319,14 +320,28 @@ function MyPageContent() {
             >
               {isLogoutPending ? '로그아웃 중…' : '로그아웃'}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowDeleteModal(true)}
-              disabled={isDeletePending}
-              className="rounded-xl border border-rose-200 px-5 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
-            >
-              회원탈퇴
-            </button>
+            {/* 회원탈퇴 — 실 auth 모드에서는 풀림 OS 설정이 정본이다.
+                실 어댑터의 deleteAccount 는 /account/delete 의 즉시삭제/유예 정책이
+                아직 TODO 라, 여기서 부르면 mock 에서만 동작하고 실 모드에서는 실패한다.
+                탈퇴는 되돌릴 수 없는 조작이라 "눌렀는데 실패" 가 가장 나쁜 결과다 —
+                실 모드에서는 OS 로 보낸다. OS URL 미설정이면 내부 모달을 그대로 쓴다. */}
+            {isPullimAuth && osSettingsHref() ? (
+              <a
+                href={osSettingsHref() as string}
+                className="rounded-xl border border-ink-100 px-5 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-ink-200 hover:bg-ink-50"
+              >
+                계정 설정·탈퇴
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                disabled={isDeletePending}
+                className="rounded-xl border border-rose-200 px-5 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
+              >
+                회원탈퇴
+              </button>
+            )}
           </div>
         </div>
       </section>
