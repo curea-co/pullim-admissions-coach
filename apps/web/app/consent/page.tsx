@@ -61,14 +61,21 @@ export default function ConsentPage() {
   // 법정대리인 동의 필요 여부 = 가입 생년월일로 산정된 **권위값**(user.ageBand, 만14 경계)에서만 온다.
   // 화면에서 임의 변경할 수 없다 — 스스로 성인으로 바꿔 동의를 우회하는 것을 막는다(#52).
   // 미확정(unknown)이면 보수적으로 '필요'. 기준이 만19 → 만14 로 정정된 경위는 lib/consent-gate.ts 주석.
-  const { user } = useAuth();
+  const { user, status } = useAuth();
   const guardianRequired = requiresGuardianConsent(user?.ageBand);
+  // 세션이 이 화면에서 만료되면 ageBand 가 사라져 guardianRequired 가 true 로 뒤집힌다.
+  // fail-closed 자체는 맞지만, 안내가 없으면 사용자는 **갑자기 못 채우는 체크박스**를 만난다
+  // (필수 2개 → 3개, 배지 '만 14세 이상' → '만 14세 미만'). 실제로 QA 중 그렇게 됐다.
+  // 상태를 말해 주고 로그인으로 보낸다 — 조용히 게이트만 조이지 않는다.
+  const sessionLost = status === 'guest';
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
     guardian: false,
   });
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  // 에러는 제목까지 함께 들고 다닌다 — 제목이 '동의가 부족합니다' 로 고정돼 있어서,
+  // 제출 데이터 분실·저장 실패에도 동의를 다시 보라고 엉뚱한 곳을 가리켰다(QA 2026-09-20).
+  const [submitError, setSubmitError] = useState<{ title: string; message: string } | null>(null);
 
   function toggle(id: ConsentItem['id'], v: boolean) {
     setChecked((prev) => ({ ...prev, [id]: v }));
@@ -98,9 +105,10 @@ export default function ConsentPage() {
       if (!checked.terms) missing.push('이용약관');
       if (!checked.privacy) missing.push('개인정보');
       if (guardianRequired && !checked.guardian) missing.push('법정대리인');
-      setSubmitError(
-        `진행하려면 ${missing.join(' · ')} 동의가 필요합니다.`
-      );
+      setSubmitError({
+        title: '동의가 부족합니다',
+        message: `진행하려면 ${missing.join(' · ')} 동의가 필요합니다.`,
+      });
       return;
     }
 
@@ -115,11 +123,10 @@ export default function ConsentPage() {
     const r = validate(consentSchema, payload);
     if (!r.ok) {
       const firstKey = Object.keys(r.errors)[0];
-      setSubmitError(
-        `동의 항목을 확인해주세요${
-          firstKey ? ` (${r.errors[firstKey]})` : ''
-        }.`
-      );
+      setSubmitError({
+        title: '동의가 부족합니다',
+        message: `동의 항목을 확인해주세요${firstKey ? ` (${r.errors[firstKey]})` : ''}.`,
+      });
       return;
     }
 
@@ -129,12 +136,18 @@ export default function ConsentPage() {
     // record에 동의값만 덮어 잘못 분석하는 것을 막는 fail-closed.
     const existing = loadSubmittedPayload();
     if (!existing || typeof existing !== 'object') {
-      setSubmitError('제출 데이터를 찾을 수 없어요. 처음부터 다시 제출해주세요.');
+      setSubmitError({
+        title: '제출 내용을 찾을 수 없습니다',
+        message: '생기부 입력 내용이 남아 있지 않아요. 처음부터 다시 제출해주세요.',
+      });
       return;
     }
     const merged = mergeConsentIntoPayload(existing, payload);
     if (!saveSubmittedPayload(merged)) {
-      setSubmitError('동의 정보를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+      setSubmitError({
+        title: '동의를 저장하지 못했습니다',
+        message: '잠시 후 다시 시도해주세요. 반복되면 브라우저의 시크릿 모드를 꺼 주세요.',
+      });
       return;
     }
 
@@ -158,9 +171,19 @@ export default function ConsentPage() {
           <StepIndicator current="consent" />
         </div>
         <p className="mb-6 text-ink-700">
-          학생부 종합 전형 진단 서비스를 진행하려면 아래 3가지 동의가 모두 필요합니다.
-          한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
+          학생부 종합 전형 진단 서비스를 진행하려면 아래 {guardianRequired ? 3 : 2}가지 동의가
+          모두 필요합니다. 한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
+
+        {sessionLost && (
+          <div className="mb-4">
+            <ErrorState
+              title="로그인이 풀렸습니다"
+              message="세션이 만료돼 연령 확인이 되지 않아요. 다시 로그인하면 원래 조건으로 돌아옵니다. (확인 전까지는 법정대리인 동의를 필수로 봅니다.)"
+              tone="warning"
+            />
+          </div>
+        )}
 
         {/* 연령 구간은 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
@@ -203,8 +226,8 @@ export default function ConsentPage() {
 
         {submitError ? (
           <ErrorState
-            title="동의가 부족합니다"
-            message={submitError}
+            title={submitError.title}
+            message={submitError.message}
             tone="warning"
             className="mt-6"
           />

@@ -505,8 +505,17 @@ export default function SubmitPage() {
             </Link>
             <button
               type="submit"
-              disabled={isPending}
-              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-60"
+              // 하드 차단(block-tier) PII 가 남아 있으면 **버튼도 잠근다.** 이전에는 제출 시점에만
+              // 막아서, 화면은 "가리기 전에는 제출할 수 없어요" 라고 하는데 버튼은 눌리는 상태로
+              // 보였다(QA 2026-09-20). 눌러야만 막힌다는 걸 알 방법이 없었다.
+              // 제출 핸들러의 재검사는 그대로 둔다 — 버튼 비활성은 표시, 차단은 핸들러 소관.
+              disabled={isPending || blockMatches.length > 0}
+              title={
+                blockMatches.length > 0
+                  ? '반드시 가려야 할 식별정보가 남아 있어요. [자동 가림]을 눌러주세요.'
+                  : undefined
+              }
+              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? '이동 중…' : '동의 단계로 →'}
             </button>
