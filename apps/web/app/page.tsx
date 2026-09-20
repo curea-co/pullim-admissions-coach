@@ -2,8 +2,12 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Hero3D } from '@/components/hero-3d';
 import { StartCta } from '@/components/auth/start-cta';
+import { RequireAuth } from '@/components/auth/require-auth';
 
 // ── 데이터 ─────────────────────────────────────────────────────────────
+
+// 베타 오픈일 — 노출면(히어로 배지·FAQ)에서 문자열 중복 시 드리프트 방지 위해 단일 상수(Codex #60).
+const BETA_OPEN_DATE = '2026-07-27';
 
 const steps = [
   {
@@ -73,7 +77,7 @@ const promises = [
 const faqs = [
   {
     q: '비용이 드나요?',
-    a: '2026-07-01 베타 서비스 오픈 예정입니다. 요금 정책은 베타 오픈 시 안내합니다.',
+    a: `입시코치 진단은 유료 서비스로, 입시 이용권 구매가 필요합니다. 구체적 요금 정책은 ${BETA_OPEN_DATE} 베타 오픈 시 안내합니다.`,
   },
   {
     q: '제 개인정보는 어디에 저장되나요?',
@@ -93,7 +97,9 @@ const seasons = [
 // ── 페이지 ─────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  // §7-1 게스트는 어떤 화면에도 진입 불가 — 홈(소개)도 로그인 벽. 무료 회원은 진입 가능(§7-2).
   return (
+    <RequireAuth>
     <div className="bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Hero */}
       <section className="w-full max-w-6xl px-6 pb-12 pt-8 sm:pt-12">
@@ -101,7 +107,7 @@ export default function LandingPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
               <span className="size-1.5 rounded-full bg-brand-500" />
-              베타 서비스 · 2026-07-01 오픈
+              베타 서비스 · {BETA_OPEN_DATE} 오픈
             </span>
             <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-[2.6rem] sm:leading-[1.18]">
               생기부를 넣으면
@@ -317,10 +323,11 @@ export default function LandingPage() {
         <div className="w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
           <p>© Curea · Pullim Admissions Coach</p>
           <p className="mt-1">
-            본 페이지는 Phase A 시각 프로토타입이며, 실제 사용자 데이터는 수집하지 않습니다.
+            본 페이지는 베타 미리보기이며, 실제 사용자 데이터는 수집하지 않습니다.
           </p>
         </div>
       </footer>
     </div>
+    </RequireAuth>
   );
 }

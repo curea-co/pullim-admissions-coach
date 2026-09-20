@@ -30,41 +30,153 @@ const TIER: Record<PiiCategory, PiiTier> = {
   name: 'warn', teacher: 'warn', birth_date: 'warn', address: 'warn',
 };
 
+// ── 이름 판별 보조(#17 후속) ────────────────────────────────────────────────
+// 라벨 없이 `○○ 학생` 형태만 보는 규칙은 관형어("서툰 학생")·일반명사("참여 학생")를
+// 이름으로 오검출해 세특 원문을 손상시킨다. 실측(테스트 생기부 1건)에서 오탐 4/5.
+// 두 신호를 함께 요구해 거른다: ① 첫 음절이 실제 한국 성씨 ② 토큰이 일반어가 아님.
+
+/** 상위 빈도 한국 성씨(단음절). 복성(남궁·선우…)도 첫 음절이 이 집합에 든다. */
+const SURNAMES = new Set(
+  ('김이박최정강조윤장임오한신서권황안송전홍유고문양손배백허남심노하곽성차주우구나지엄채원천방' +
+   '공현함변염여추도소석선설마길연위표명기반라왕금옥육인맹제모탁국어은편용예봉사진')
+    .split(''),
+);
+
+/**
+ * 성씨로 시작하지만 이름이 아닌 일반어 — 생기부에 반복 등장하는 것만 모았다.
+ * 관형형("서툰")과 명사구("참여")가 대부분이며, 성씨가 아닌 첫 음절(다른·많은…)은
+ * SURNAMES 검사에서 이미 걸러지므로 여기 담지 않는다.
+ */
+const NON_NAME_TOKENS = new Set([
+  // 관형형
+  '서툰', '우수한', '성실한', '강한', '약한', '정한', '정확한', '진지한', '차분한', '조용한',
+  '신중한', '선한', '남은', '고른', '고운', '나은', '주된', '지친', '마른', '여린', '도운',
+  '안된', '원하는', '신나는', '성장한', '문제된', '유사한', '상이한', '적절한', '충분한',
+  // 명사·수식구
+  '참여', '전학', '모든', '여러', '우리', '모범', '장애', '한국', '고교', '신입', '남녀',
+  '해당', '지원', '본인', '대상', '상담', '교우', '동료', '급우', '개별', '전체', '일반',
+  '성별', '성명', '이름', '학년', '학급', '번호', '비고', '확인', '서명', '사진', '구분',
+  '담임', '교사', '선생', '지도', '보호', '학부', '학교', '기타', '연락', '주소', '기록',
+]);
+
+/** 사람 이름처럼 보이는가 — 성씨 whitelist + 일반어 stopword. warn 티어 휴리스틱이다. */
+function looksLikeKoreanName(token: string): boolean {
+  if (token.length < 2 || token.length > 4) return false;
+  if (!SURNAMES.has(token[0]!)) return false;
+  return !NON_NAME_TOKENS.has(token);
+}
+
 // group: 민감 토큰이 들어있는 캡처그룹 번호(0 = 전체 매치). 'd'(hasIndices) 플래그로 위치 추출.
-interface Rule { category: PiiCategory; re: RegExp; group: number }
+// validate: 캡처 토큰 추가 검증(선택). 라벨 앵커가 약한 규칙에만 붙인다.
+interface Rule {
+  category: PiiCategory;
+  re: RegExp;
+  group: number;
+  validate?: (token: string) => boolean;
+}
 const RULES: Rule[] = [
-  { category: 'rrn',     re: /\d{6}-?[1-4]\d{6}/gd, group: 0 },
+  // 뒤 7자리를 `[\d*]{6}` 로 완화 — `070315-3******` 처럼 부분 마스킹된 값도 잡는다.
+  // 앞 6자리(생년월일)가 그대로 남는 것이 §6.3 위반이므로 block 티어를 유지한다.
+  { category: 'rrn',     re: /\d{6}-?[1-4](?:[\d*]{6}|\*{1,5})/gd, group: 0 },
   { category: 'phone',   re: /01[016789]-?\d{3,4}-?\d{4}/gd, group: 0 },
   { category: 'phone',   re: /0\d{1,2}-\d{3,4}-\d{4}/gd, group: 0 },
   { category: 'email',   re: /[\w.+-]+@[\w-]+\.[\w.-]+/gd, group: 0 },
   { category: 'school',  re: /[가-힣]{2,}(?:초등학교|중학교|고등학교)/gd, group: 0 }, // 대학교는 제외 — 고등학생 생기부에서 대학교는 목표/참조이지 본인 식별정보가 아님(#17 최종리뷰).
-  { category: 'name',    re: /(?:이름|성명)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
-  { category: 'name',    re: /([가-힣]{2,4})\s*(?:학생|군|양)(?:은|는|이|가|을|를|의|에|도|만|과|와|께)?(?![가-힣])/gd, group: 1 },
-  { category: 'teacher', re: /(?:담임|교사)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
-  { category: 'teacher', re: /([가-힣]{2,4})\s*선생님/gd, group: 1 },
-  { category: 'birth_date', re: /\d{4}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*일?/gd, group: 0 },
+  // `담임성명`·`담임 성명`은 교사 라벨이다 — 학생 이름으로 분류하면 maskedField 가
+  // student_name 으로 잘못 기록된다(마스킹 자체는 되지만 감사 기록이 틀어진다).
+  { category: 'name',    re: /(?<!담임\s*)(?:이름|성명)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1 },
+  { category: 'name',    re: /([가-힣]{2,4})\s*(?:학생|군|양)(?:은|는|이|가|을|를|의|에|도|만|과|와|께)?(?![가-힣])/gd, group: 1, validate: looksLikeKoreanName },
+  // `담임성명` 같은 합성 라벨에서 뒤 라벨어("성명")를 이름으로 잡던 오탐을 validate 로 차단.
+  // 이름이 라벨 앞에 오는 표기(`김영수 담임교사`)도 별도 규칙으로 받는다.
+  { category: 'teacher', re: /(?:담임교사|담임\s*성명|담임|교사)\s*[:：]?\s*([가-힣]{2,4})/gd, group: 1, validate: looksLikeKoreanName },
+  { category: 'teacher', re: /([가-힣]{2,4})\s*(?:담임교사|담임)(?![가-힣])/gd, group: 1, validate: looksLikeKoreanName },
+  { category: 'teacher', re: /([가-힣]{2,4})\s*선생님/gd, group: 1, validate: looksLikeKoreanName },
+  // 라벨 인접만 — 앵커 없이 날짜 형태만 보면 수상·활동 연월일이 전부 [생년월일]로 치환돼
+  // 시간 순서 분석이 불가능해진다(실측 17건 과마스킹). 파일 상단 "라벨 인접만" 원칙과도 어긋났다.
+  { category: 'birth_date', re: /(?:생년월일|생일|출생일|출생)\s*[:：]?\s*(\d{4}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*일?)/gd, group: 1 },
   { category: 'address', re: /[가-힣]+(?:시|도)\s?[가-힣]+(?:시|군|구)\s?[가-힣]+(?:읍|면|동|로|길)/gd, group: 0 },
 ];
+
+/**
+ * 표 레이아웃의 담임 성명 열 — `담임성명` 헤더 아래 행에 이름만 놓이는 형태.
+ * 라벨이 이름에 인접하지 않아 정규식 규칙이 전부 놓친다(실측 3명 전원 누출).
+ * 헤더 줄 다음부터 빈 줄 전까지를 표 본문으로 보고, 성씨 whitelist를 통과한 토큰만 집는다.
+ */
+const TEACHER_TABLE_HEADER = /담임\s*(?:성명|이름)/g;
+/** 인적·학적사항 표는 학년당 1행이라 3행이면 충분하다. 넉넉히 4행까지만 본다. */
+const MAX_TABLE_ROWS = 4;
+/** 표 본문 행의 표식 — 학년·반·번호 칸이 있어 독립된 숫자 토큰이 반드시 하나는 있다. */
+const TABLE_ROW_MARKER = /(?:^|\s)\d{1,3}(?=\s|$)/;
+
+function detectTeacherTableNames(text: string): PiiMatch[] {
+  const out: PiiMatch[] = [];
+  for (const header of text.matchAll(TEACHER_TABLE_HEADER)) {
+    const headerEnd = text.indexOf('\n', header.index!);
+    if (headerEnd === -1) continue;
+    let cursor = headerEnd + 1;
+    for (let row = 0; row < MAX_TABLE_ROWS; row++) {
+      let lineEnd = text.indexOf('\n', cursor);
+      if (lineEnd === -1) lineEnd = text.length;
+      const line = text.slice(cursor, lineEnd);
+      // 표 본문이 아니면 즉시 멈춘다. 빈 줄만 보고 계속 내려가면 표 아래 산문까지 스캔해
+      // "성적 정보 조사" 같은 일반어를 교사명으로 치환한다(성·정·조 모두 성씨라 걸린다).
+      if (line.trim() === '' || !TABLE_ROW_MARKER.test(line)) break;
+      // 행당 최대 1명 — 담임 성명은 한 칸이다. 여러 개를 집으면 본문을 망가뜨린다.
+      for (const tok of line.matchAll(/[가-힣]{2,4}/g)) {
+        if (!looksLikeKoreanName(tok[0])) continue;
+        out.push({
+          category: 'teacher',
+          tier: TIER.teacher,
+          index: cursor + tok.index!,
+          length: tok[0].length,
+          value: tok[0],
+          placeholder: PLACEHOLDER.teacher,
+          maskedField: MASKED_FIELD.teacher,
+        });
+        break;
+      }
+      if (lineEnd === text.length) break;
+      cursor = lineEnd + 1;
+    }
+  }
+  return out;
+}
 
 export function detectPii(text: string): PiiMatch[] {
   const raw: PiiMatch[] = [];
   for (const rule of RULES) {
-    for (const m of text.matchAll(rule.re)) {
-      const span = (m as RegExpMatchArray & { indices?: Array<[number, number] | undefined> })
+    // matchAll 이 아니라 exec 루프인 이유: validate 가 후보를 거절했을 때 **그 매치가 삼킨 구간을
+    // 버리면 안 된다.** 탐욕 매칭이 앞 글자까지 끌어오는 경우가 있어서다 —
+    // "열심히김민수 학생이" 는 `히김민수` 로 잡히고, 거절 후 그냥 넘어가면 뒤의 진짜 이름
+    // `김민수` 가 그대로 새어나간다. PDF 추출 생기부는 띄어쓰기가 자주 붙어 실제로 발생한다.
+    // 거절 시 시작점 +1 에서 다시 스캔한다.
+    rule.re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = rule.re.exec(text)) !== null) {
+      const span = (m as RegExpExecArray & { indices?: Array<[number, number] | undefined> })
         .indices?.[rule.group];
-      if (!span) continue;
+      if (!span) {
+        if (rule.re.lastIndex <= m.index) rule.re.lastIndex = m.index + 1;
+        continue;
+      }
       const [start, end] = span;
+      const value = text.slice(start, end);
+      if (rule.validate && !rule.validate(value)) {
+        rule.re.lastIndex = start + 1;
+        continue;
+      }
       raw.push({
         category: rule.category,
         tier: TIER[rule.category],
         index: start,
         length: end - start,
-        value: text.slice(start, end),
+        value,
         placeholder: PLACEHOLDER[rule.category],
         maskedField: MASKED_FIELD[rule.category],
       });
     }
   }
+  raw.push(...detectTeacherTableNames(text));
   // index 오름차순, 같은 시작이면 더 긴 매치 우선. 겹치는 매치는 앞선 것만 남긴다.
   raw.sort((a, b) => a.index - b.index || b.length - a.length);
   const out: PiiMatch[] = [];

@@ -13,4 +13,7 @@ import type { AuthAdapter } from './types';
 const usePullimApi = process.env.NEXT_PUBLIC_AUTH_BACKEND === 'pullim';
 export const auth: AuthAdapter = usePullimApi ? pullimApiAuthAdapter : mockAuthAdapter;
 
+/** 실 auth(pullim-api) 모드 여부 — mock/데모(false)에는 엔타이틀먼트/구매 벽 개념이 없다. */
+export const isPullimAuth = usePullimApi;
+
 export * from './types';

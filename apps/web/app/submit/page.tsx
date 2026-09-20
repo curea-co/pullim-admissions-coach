@@ -10,6 +10,7 @@ import {
   schoolTypeLabel,
   type TargetTrack,
   type SchoolType,
+  type Consent,
   detectPii,
   redactPii,
   type PiiMatch,
@@ -19,13 +20,14 @@ import { PiiScanPanel } from '@/components/pii-scan-panel';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
-import { validate, type FieldErrors } from '@/lib/validation';
+import { fieldLabel, validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { saveSubmittedPayload } from '@/lib/submitted-payload';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 
 type InputType = 'pdf_upload' | 'text_paste';
 
@@ -77,7 +79,7 @@ export default function SubmitPage() {
   );
   const [universities, setUniversities] = useState<
     { name: string; department?: string }[]
-  >(parkJunho.profile.targetUniversities.map((u) => ({ ...u })));
+  >([{ name: '' }, { name: '' }, { name: '' }]);
   const [grade, setGrade] = useState<number>(parkJunho.identity.grade);
   const [semester, setSemester] = useState<1 | 2>(
     parkJunho.identity.semester as 1 | 2
@@ -196,13 +198,21 @@ export default function SubmitPage() {
       selfReportedWeakAreas: weakAreas || undefined,
       // /submit 단계에서는 *식별* 부분만 검증; consent는 다음 화면에서 추가됨.
       // 여기서는 schema 통과를 위해 stub consent를 만들고 /consent에서 다시 받는다.
+      //
+      // **`Consent` 타입을 명시한다.** 이 객체는 consentSchema 의 모양을 손으로 베껴 둔 것이라,
+      // 스키마 필드가 바뀌면 여기만 조용히 뒤처진다. 실제로 그렇게 깨졌다 — 필드가
+      // `isMinor` → `guardianRequired` 로 바뀌었는데(만14 정정) 이 stub 이 안 따라와
+      // `/submit` 의 모든 제출이 `consent.guardianRequired: Required` 로 막혔다.
+      // 그 키는 FIELD_LABELS 에도 `data-field-error` 앵커에도 없어서 화면에는
+      // "1개 항목을 확인해주세요. (입력 항목)" 만 뜨고 **어느 칸이 문제인지 표시되지 않았다.**
+      // 타입을 붙이면 다음 리네임은 런타임이 아니라 tsc 에서 걸린다.
       consent: {
-        isMinor: true,
+        guardianRequired: true,
         termsAgreed: true,
         privacyPolicyAgreed: true,
         guardianConsentObtained: true,
         consentTimestamp: new Date().toISOString(),
-      },
+      } satisfies Consent,
     };
   }
 
@@ -232,7 +242,7 @@ export default function SubmitPage() {
       const first = Object.keys(result.errors)[0];
       setSubmitError(
         `${Object.keys(result.errors).length}개 항목을 확인해주세요.${
-          first ? ` (예: ${first})` : ''
+          first ? ` (${fieldLabel(first)})` : ''
         }`
       );
       // 첫 에러 필드로 포커스 이동
@@ -266,9 +276,18 @@ export default function SubmitPage() {
 
   return (
     <RequireAuth>
+    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
+        {/* 유료 화면 표시 — 콘텐츠 영역 우측 상단. 제목·단계 표시와 같은 줄에 두면 좁은 화면에서
+            셋이 서로 밀리므로 한 줄을 따로 쓴다(우측 정렬 유지). 개발용 우회로 열려 있어도 이
+            화면이 이용권 전용이라는 사실은 변하지 않으므로 우회 여부와 무관하게 항상 보인다. */}
+        <div className="mb-2 flex justify-end">
+          <span className="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+            유료 화면
+          </span>
+        </div>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             생기부 제출
@@ -486,8 +505,17 @@ export default function SubmitPage() {
             </Link>
             <button
               type="submit"
-              disabled={isPending}
-              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-60"
+              // 하드 차단(block-tier) PII 가 남아 있으면 **버튼도 잠근다.** 이전에는 제출 시점에만
+              // 막아서, 화면은 "가리기 전에는 제출할 수 없어요" 라고 하는데 버튼은 눌리는 상태로
+              // 보였다(QA 2026-09-20). 눌러야만 막힌다는 걸 알 방법이 없었다.
+              // 제출 핸들러의 재검사는 그대로 둔다 — 버튼 비활성은 표시, 차단은 핸들러 소관.
+              disabled={isPending || blockMatches.length > 0}
+              title={
+                blockMatches.length > 0
+                  ? '반드시 가려야 할 식별정보가 남아 있어요. [자동 가림]을 눌러주세요.'
+                  : undefined
+              }
+              className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? '이동 중…' : '동의 단계로 →'}
             </button>
@@ -495,6 +523,7 @@ export default function SubmitPage() {
         </form>
       </div>
     </>
+    </RequireAdmissionsAccess>
     </RequireAuth>
   );
 }

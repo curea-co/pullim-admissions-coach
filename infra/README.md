@@ -1,5 +1,30 @@
 # Phase 0 Infra Runbook — DevOps 핸드오프
 
+> **⚠️ 이 런북은 실행되지 않았다 (2026-09-20 확인).**
+>
+> 1단계(AWS Organizations + 계정 3개)가 회신 없이 멈췄고, 그 사이 **ADR-058 로 진단 백엔드가
+> 기존 `pullim-api` 안으로 들어가 전용 계정이 필요 없어졌다.** 2~14단계는 통째로 돌지 않았다.
+>
+> **계정 3개는 검수자가 정한 적이 없다.** 1단계가 근거로 단 "검수자 결정 4.4" 는 실제로는
+> *데이터 분류·암호화 정책 v1 = Phase 0 산출물* 이고 계정과 무관하다. 관련 있는 4.1(회사 표준
+> 채택)·4.2(staging 에서 시연) 어느 쪽도 계정 수를 말하지 않으며, `docs/005` §6 은
+> "독립 AWS 계정 **또는** 독립 VPC" 로 열어 뒀다. 이 런북이 그것을 계정으로 닫으면서 근거를
+> 잘못 달았고, `docs/008`·`docs/009` 가 그 전제를 사실처럼 인용했다.
+>
+> **2026-09-19 실측:**
+
+> ```
+> 계정          022038145489  (하나)
+> ECS 클러스터   pullim        (하나)
+> 환경          local · dev · prod   ← staging 없음
+> 시크릿        pullim/{local,dev,prod}/backend
+> 앱            apps/web 하나 (api·admin 은 만들어지지 않았다)
+> 배포          Vercel (프론트) + pullim-api (진단 백엔드)
+> ```
+
+> 아래 14단계는 **그 계획이 어떤 모양이었는지의 기록**으로만 읽을 것. 인프라 작업의 기준이 아니다.
+
+
 작성: 2026-05-28 · `pullim-infra` 트랙 (PM 대리 작성)
 연관: `docs/004_..._coding_plan_v0.1.md` · `docs/005_..._architecture_v0.1.md` · `docs/006_..._data_security_policy_v0.1.md`
 
@@ -31,6 +56,13 @@
 ## 2. GitHub Actions 측 요구사항
 
 워크플로: `.github/workflows/deploy-staging-web.yml` 이미 추가됨.
+
+> **2026-09-19 — 이 워크플로는 현재 수동 실행 전용(`workflow_dispatch`)이다.**
+> 아래 표의 변수·시크릿이 하나도 채워져 있지 않아(1단계 계정 생성이 회신 대기) dev 푸시마다
+> 첫 AWS 스텝에서 `Input required and not supplied: aws-region` 으로 실패했다. 그동안 실제
+> 배포는 Vercel 이 해왔으므로 이 실패는 아무것도 막지 않고 빨간불만 남겼다.
+> 표를 채운 뒤 수동 실행으로 한 번 성공시키고, 워크플로의 `push:` 블록 주석을 풀어
+> 자동 배포로 되돌린다.
 
 ### GitHub 리포지토리 설정 (DevOps가 채워야 할 값)
 
@@ -201,7 +233,7 @@ Phase 0 web은 시크릿 없이 부트 가능. 아래는 Phase B 이후 추가�
 - [ ] GitHub OIDC IAM Role 생성, 신뢰정책 본 리포로 제한
 - [ ] GitHub Actions Repo/Env Variables·Secrets 입력
 - [ ] CloudWatch 로그 그룹 3개 생성
-- [ ] 첫 배포 트리거: GitHub Actions `deploy-staging-web` workflow 실행
+- [ ] 첫 배포 트리거: GitHub Actions `deploy-staging-web` 수동 실행 → 성공 시 `push:` 트리거 복구(§2)
 - [ ] **수동 확인**: `https://staging.pullim.curea.co` HTTPS 200, 5 라우트 클릭 시연 가능
 
 본 14개 모두 닫히면 Phase 0 종료. EPO·CEO 시연 URL 공유.

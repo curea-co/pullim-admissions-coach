@@ -21,6 +21,11 @@ export interface ApiError extends Error {
   fieldErrors?: Record<string, string>;
   /** 인증 만료(401 + refresh 실패) 구분 플래그 — 호출자가 /login 유도. */
   authExpired?: boolean;
+  /**
+   * 서버가 준 기계 판독 오류 코드(있으면). 호출자는 **메시지 문구가 아니라 이 값으로 분기**한다 —
+   * 문구는 레포가 다르고 계약 테스트가 없어 문안을 다듬는 순간 분기가 조용히 깨진다.
+   */
+  code?: string;
 }
 
 function makeApiError(
@@ -115,14 +120,20 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   async function normalizeError(res: Response): Promise<never> {
     let message = '요청을 처리하지 못했습니다.';
     let fieldErrors: Record<string, string> | undefined;
+    let code: string | undefined;
     try {
-      const data = (await res.json()) as { message?: string; fieldErrors?: Record<string, string> };
+      const data = (await res.json()) as {
+        message?: string;
+        fieldErrors?: Record<string, string>;
+        code?: string;
+      };
       if (data.message) message = data.message;
       if (data.fieldErrors) fieldErrors = data.fieldErrors;
+      if (data.code) code = data.code;
     } catch {
       // 본문 없음/비JSON — 기본 메시지 유지.
     }
-    throw makeApiError(message, res.status, { fieldErrors });
+    throw makeApiError(message, res.status, { fieldErrors, code });
   }
 
   async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {

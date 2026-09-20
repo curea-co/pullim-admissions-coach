@@ -19,7 +19,7 @@ function makeProfile(overrides: Partial<StudentProfile> = {}): StudentProfile {
       schoolType: 'special_purpose',
     },
     consent: {
-      isMinor: false,
+      guardianRequired: false,
       termsAgreed: true,
       privacyPolicyAgreed: true,
       guardianConsentObtained: false,
@@ -62,10 +62,10 @@ describe('toAnalysisInput', () => {
     expect(toAnalysisInput(profile, 2026).saengbu).toBe(text)
   })
 
-  it('isMinor=true → consent.guardian=true', () => {
+  it('guardianRequired=true → consent.guardian=true', () => {
     const profile = makeProfile({
       consent: {
-        isMinor: true,
+        guardianRequired: true,
         termsAgreed: true,
         privacyPolicyAgreed: true,
         guardianConsentObtained: true,

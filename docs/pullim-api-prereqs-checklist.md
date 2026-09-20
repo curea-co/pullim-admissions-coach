@@ -86,7 +86,7 @@ curl -i -X OPTIONS http://localhost:3000/auth/login \
 - [ ] `GET /me` (필드: `sub`·`email`·`displayName`·`ageBand`·**`isMinor`**·`guardianConsent`)
 - [ ] `GET /me/entitlements` (`package`·`tier`)
 - [ ] `POST /account/delete`
-- [ ] ⚠️ **미성년 판정은 `isMinor`(만19) 필드** — `ageBand`(만14)와 혼동 금지. `/me`에 `isMinor`가 없으면 추가 제공.
+- [ ] ⚠️ **법정대리인 동의 판정은 `ageBand`(만14)** — `isMinor`(만19)는 민법상 미성년 사실값이라 표시용이다. 2026-09-20 정정 전에는 이 줄이 반대로 적혀 있었다(경위: `apps/web/lib/consent-gate.ts`).
 - [ ] 위 응답 DTO 필드명을 어댑터의 `TODO(B)`(7곳)에 반영.
 
 ---

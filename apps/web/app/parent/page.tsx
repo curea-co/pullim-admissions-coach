@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { parkJunho } from '@/lib/mock/park-junho';
 import { useAuth } from '@/components/auth/auth-provider';
+import { RequireAuth } from '@/components/auth/require-auth';
 import { getParentSummary, type ParentSummaryDto } from '@/lib/admissions-api';
 
 // 정의 §6.3 가드: 자녀 생기부 원문·결과물 전문 미노출. 진행 요약만.
@@ -69,7 +70,9 @@ function RealSummaryCard() {
 
 export default function ParentReportPage() {
   const r = parkJunho.parentReport;
+  // §7-1 게스트 진입 불가 — 학부모 리포트도 로그인 벽.
   return (
+    <RequireAuth>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -142,11 +145,12 @@ export default function ParentReportPage() {
             ← 처음으로
           </Link>
           <span className="text-xs text-ink-500">
-            주간 리포트는 매주 일요일 이메일로도 발송됩니다 (Phase E)
+            주간 리포트 이메일 발송 기능은 준비 중이에요
           </span>
         </div>
       </div>
     </>
+    </RequireAuth>
   );
 }
 

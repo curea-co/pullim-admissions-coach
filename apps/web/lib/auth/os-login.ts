@@ -40,3 +40,19 @@ function osAuthHref(path: string, returnUrl: string): string | null {
     return null;
   }
 }
+
+/**
+ * OS 설정 화면 URL(`{NEXT_PUBLIC_OS_URL}/settings`)을 만든다.
+ * 설정은 각 앱이 소유하지 않고 풀림 OS(pullim-web)가 정본 — 프로필 메뉴에서 하드 네비게이션한다
+ * (쿠키 Domain=.pullim.ai 공유). 세 소비 앱(Q·플래너·라이팅코치) 공통 패턴.
+ * @returns 설정 URL, 또는 NEXT_PUBLIC_OS_URL 미설정/형식 오류 시 null(호출부가 항목째 숨김).
+ */
+export function osSettingsHref(): string | null {
+  const base = process.env.NEXT_PUBLIC_OS_URL;
+  if (!base) return null;
+  try {
+    return new URL('/settings', base).toString();
+  } catch {
+    return null;
+  }
+}

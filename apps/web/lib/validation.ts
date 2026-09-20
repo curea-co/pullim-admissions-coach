@@ -5,6 +5,24 @@ import type { ZodError, ZodSchema } from 'zod';
 
 export type FieldErrors = Record<string, string>;
 
+const FIELD_LABELS: Record<string, string> = {
+  'record.text': '생기부 본문',
+  'record.maskingApplied': '개인정보 마스킹 확인',
+  targetTrack: '지원 학부',
+  'currentStanding.grade': '학년',
+  'currentStanding.semester': '학기',
+  'currentStanding.schoolType': '학교 유형',
+  targetUniversities: '목표 대학',
+  selfReportedWeakAreas: '보완이 필요한 영역',
+  // /submit 의 stub consent 가 스키마와 어긋나면 여기로 떨어진다. 라벨이 없으면 화면에
+  // "(입력 항목)" 만 뜨고 사용자는 어느 칸을 고쳐야 할지 알 수 없다 — 실제로 그렇게 막혔다.
+  consent: '동의 정보',
+};
+
+export function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? FIELD_LABELS[key.split('.')[0]] ?? '입력 항목';
+}
+
 export function flattenErrors(err: ZodError): FieldErrors {
   const out: FieldErrors = {};
   for (const issue of err.issues) {

@@ -12,3 +12,5 @@ export * from './interview-formats';
 export * from './cohort';
 export * from './legality';
 export * from './analysis-input';
+// 운영 채널 — 건의하기 제출(FE 폼 + /api/feedback 라우트 공용)
+export * from './feedback';

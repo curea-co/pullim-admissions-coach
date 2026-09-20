@@ -35,18 +35,22 @@ export const mockAuthAdapter: AuthAdapter = {
     if (Object.values(users).some((r) => r.user.email === input.email))
       throw new Error('이미 가입된 이메일입니다.');
     const minor = isMinorByBirth(input.birthDate);
+    // 보호자 동의 대기 여부는 **만14**(ageBand)로 가른다 — 만19(isMinor)는 민법상 미성년 사실일 뿐
+    // 동의 축이 아니다(경위: lib/consent-gate.ts).
+    const guardianRequired = ageBandFromBirth(input.birthDate) !== 'over14';
     // uuid로 생성 — 순번(`user_${count+1}`)은 삭제 후 재가입 시 id가 재사용되어
     // 사용자 스코프 저장소(result scope)에서 이전 계정 데이터가 섞일 수 있다.
     const id = `user_${safeRandomUUID()}`;
     const user: User = {
       id, email: input.email, displayName: input.displayName,
-      ageBand: ageBandFromBirth(input.birthDate), // 만14 경계(개인정보 동의) — isMinor(만19)와 별개
-      isMinor: minor, guardianConsent: minor ? 'pending' : 'none',
+      ageBand: ageBandFromBirth(input.birthDate), // 만14 경계(개인정보 동의) = 법정대리인 동의 축
+      isMinor: minor, // 만19(민법상 미성년) — 마이페이지 배지 표시용. 동의 게이트는 쓰지 않는다.
+      guardianConsent: guardianRequired ? 'pending' : 'none',
       package: 'home', tier: 'free',
     };
     users[id] = { user, password: input.password };
     write(users); setSession(id);
-    return delay({ user, needsEmailVerify: true, needsGuardianConsent: minor });
+    return delay({ user, needsEmailVerify: true, needsGuardianConsent: guardianRequired });
   },
   async verifyEmail(_code: string) { return delay(undefined); }, // mock: 항상 성공
   async submitGuardianConsent(_input: GuardianInput) {

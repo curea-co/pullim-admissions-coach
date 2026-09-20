@@ -1,0 +1,110 @@
+'use client';
+
+// 구매 벽 — 회원 플랜: 입시코치는 유료 전용(체험·게스트 없음). 로그인해도 `exam` 미보유면
+// 앱을 쓸 수 없다. 게이트키퍼 지침: 접근제어는 **앱 내부**에서 강제(OS 카드 알럿은 보조).
+// URL 직접 진입(deep-link)에도 이 벽으로 막는다.
+//
+// 획득 경로(확정): OS 토스 결제 → billing→auth 로 exam grant → ent_epoch++ → 재진입.
+// TODO(P0-8·게이트키퍼/OS): 아래 구매 링크의 정확한 exam 결제 진입 URL 확정
+//   (현재는 NEXT_PUBLIC_OS_URL 홈으로 폴백 — OS 스토어/결제 딥링크가 정해지면 교체).
+
+import { CouponRedeemForm } from './coupon-redeem-form';
+
+const OS_URL = process.env.NEXT_PUBLIC_OS_URL ?? '';
+
+/** OS 결제(구매) 진입 URL. 미설정/형식오류 시 null → 버튼 대신 "준비 중" 안내. */
+function osPurchaseHref(): string | null {
+  if (!OS_URL) return null;
+  try {
+    // 절대 URL + **스킴 제한**(http/https만) — `javascript:` 등 위험 스킴이 클릭 가능한 href 로
+    // 새는 것을 차단(잘못 설정된 NEXT_PUBLIC_OS_URL 방어).
+    // TODO(P0·OS 소관): admissions 상품 결제 딥링크·복귀 파라미터 확정 시 경로 교체(현재는 OS 홈 폴백).
+    const url = new URL(OS_URL);
+    // 운영은 https 강제 — 인증 사용자를 평문(http) 결제 페이지로 보내지 않는다.
+    // http 는 로컬 개발 호스트(localhost·127.0.0.1·*.pullim.local)만 예외 허용.
+    const isLocalHost = /^(localhost|127\.0\.0\.1|(.+\.)?pullim\.local)$/.test(url.hostname);
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHost)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function PurchaseWall({
+  onRecheck,
+  // 개발용 엔타이틀먼트 우회 핸들러. 이중 잠금(빌드 플래그 + 호스트 allowlist, lib/dev-bypass.ts)이
+  // 열린 개발 환경에서만 넘어온다 — 운영에서는 항상 undefined 라 아래 블록 자체가 렌더되지 않는다.
+  onDevBypass,
+}: {
+  onRecheck?: () => void;
+  onDevBypass?: () => void;
+}) {
+  const href = osPurchaseHref();
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md rounded-2xl border border-ink-100 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-brand-50 text-2xl" aria-hidden>
+          🔒
+        </div>
+        <h1 className="text-xl font-bold tracking-tight text-ink-900">유료 회원만 이용할 수 있어요</h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-500">
+          입시코치 진단은 <span className="font-medium text-ink-700">입시 이용권</span>을 구매한
+          회원만 사용할 수 있습니다. 구매 후 이 화면에서 다시 확인해 주세요.
+        </p>
+
+        {href ? (
+          <a
+            href={href}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+          >
+            이용권 구매하기
+          </a>
+        ) : (
+          <p className="mt-6 rounded-xl border border-ink-100 bg-ink-50 px-4 py-2.5 text-sm text-ink-500">
+            구매 페이지 준비 중입니다.
+          </p>
+        )}
+
+        {/* 결제 완료 후 같은 탭 복귀 시 재검증(Codex #59) — 구매 반영되면 통과.
+            **구매 CTA 바로 아래**에 둔다: 이 링크는 구매 흐름에 속한다. 아래 쿠폰 폼은 자체
+            구분선을 갖고 있어서, 순서를 바꾸면 이 링크가 쿠폰 블록에 딸린 것처럼 읽힌다. */}
+        {onRecheck && (
+          <button
+            type="button"
+            onClick={onRecheck}
+            className="mt-3 text-sm text-ink-500 underline decoration-ink-200 underline-offset-2 transition hover:text-ink-700"
+          >
+            구매를 완료했다면 다시 확인
+          </button>
+        )}
+
+        {/* 쿠폰 등록 — OS 결제 딥링크가 없는 동안 **실제로 동작하는 유일한 획득 경로**다.
+            벽에 막힌 사람이 다른 화면으로 가지 않고 그 자리에서 풀 수 있어야 해서 여기 둔다.
+            성공(admissions grant)하면 onRecheck 배관을 그대로 타 게이트가 재판정한다. */}
+        <CouponRedeemForm tone="wall" onGranted={onRecheck} />
+
+        {/* 개발자 구역 — 실 구매 CTA 와 확실히 분리한다(구분선 + 낮은 채도 + 작은 글씨).
+            실제 권한처럼 보이면 안 되므로 버튼 톤도 회색 계열로 낮춘다. */}
+        {onDevBypass && (
+          <div className="mt-6 border-t border-dashed border-ink-100 pt-4 text-left">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-300">
+              개발 환경 전용
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">
+              이용권 없이 <span className="font-medium text-ink-700">화면만</span> 열어 보는 개발용
+              스위치입니다. 실제 이용권이 생기지는 않으며, 진단 API 는 그대로 403 이라 처리 단계에서
+              실패합니다.
+            </p>
+            <button
+              type="button"
+              onClick={onDevBypass}
+              className="mt-2 rounded-lg border border-ink-100 px-3 py-1.5 text-xs font-medium text-ink-500 transition hover:bg-ink-100/60 hover:text-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300"
+            >
+              개발용으로 화면만 열기
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

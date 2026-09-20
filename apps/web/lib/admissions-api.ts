@@ -15,6 +15,65 @@ import { api } from '@/lib/api';
 import type { StudentProfile } from '@pullim/shared';
 import type { AnalyzeResult } from './analyze';
 
+// ── 엔타이틀먼트(구매 벽) — 회원플랜: 입시코치는 admissions 이용권 보유자만(유료 전용) ──────
+
+/** `GET /me/entitlements` 응답(부분) — pullim-api #348. flags 가 서비스별 등급 맵. */
+interface MeEntitlementsResponse {
+  flags: Record<string, number>;
+  package: string;
+  tier: string;
+}
+
+// 세션 내 캐시 — 게이트가 페이지마다(submit→consent→processing) 재마운트되며 매번 /me/entitlements
+// 를 치지 않도록 결과를 재사용한다. **진행 중 Promise 도 캐시**(single-flight) — 첫 응답 전 동시 호출
+// (StrictMode 이중 마운트 등)에도 요청은 1회. 사용자 전환·결제 후 재검증 시 무효화(교차사용자 잔존 방지).
+let accessCache: boolean | null = null;
+let accessInflight: Promise<boolean> | null = null;
+// 캐시 세대 — 무효화할 때마다 증가한다. 무효화 시점에 **이미 날아간 요청은 취소되지 않으므로**,
+// 그 응답이 늦게 도착해 이전 사용자의 판정을 캐시에 쓰는 경합이 있었다(A 조회 중 A→B 전환 시
+// B 가 A 의 이용권으로 판정됨 — Codex #70 P1). 요청 시작 시 세대를 찍어두고, 응답 시점에 세대가
+// 바뀌었으면 **캐시에 쓰지 않고 버린다**.
+let accessGeneration = 0;
+
+/** 엔타이틀먼트 캐시 무효화 — auth-provider(로그인/로그아웃) · 결제 후 재검증에서 호출. */
+export function clearAdmissionsAccessCache(): void {
+  accessCache = null;
+  accessInflight = null;
+  accessGeneration += 1;
+}
+
+/**
+ * admissions 이용권 보유 여부 — **권위 신호** `GET /me/entitlements` 의 `flags.admissions`(#348).
+ * ≥1 = 보유(진입 허용), 부재/0 = 미보유(free 회원 → 구매 벽). 진입 즉시 사전 판정(403 프로브 대체).
+ * 세션 캐시 + single-flight(중복 요청 방지) — 갱신은 clearAdmissionsAccessCache(). 401/네트워크는 전파.
+ */
+export function hasAdmissionsAccess(): Promise<boolean> {
+  if (accessCache !== null) return Promise.resolve(accessCache);
+  if (accessInflight) return accessInflight;
+  const generation = accessGeneration; // 이 요청이 속한 세대(사용자) 고정
+  accessInflight = (async () => {
+    try {
+      const ent = await api.get<MeEntitlementsResponse>('/me/entitlements');
+      // 응답 형태 검증 — flags 누락(부분 배포·스키마 어긋남)을 "미보유=구매 벽"으로 오분류하면
+      // 유료 사용자가 차단된다 → 판정 불가로 throw(게이트가 error+재시도로 분기, Codex #59).
+      if (!ent || typeof ent.flags !== 'object' || ent.flags === null) {
+        throw Object.assign(new Error('엔타이틀먼트 응답 형식 오류(flags 누락) — 판정 불가'), {
+          status: 0,
+        });
+      }
+      const has = (ent.flags.admissions ?? 0) >= 1;
+      // 세대가 바뀌었다면 응답이 도착하기 전에 사용자가 전환된 것 — 캐시 오염을 막기 위해
+      // 쓰지 않는다(호출자는 자기 세대의 값을 그대로 받는다).
+      if (generation === accessGeneration) accessCache = has;
+      return has;
+    } finally {
+      // 내 세대일 때만 비운다 — 전환 후 새로 시작된 요청의 single-flight 를 덮어쓰지 않게.
+      if (generation === accessGeneration) accessInflight = null;
+    }
+  })();
+  return accessInflight;
+}
+
 // ── 백엔드 DTO(응답) ─────────────────────────────────────────────────────────
 export interface SubmissionDto {
   id: string;

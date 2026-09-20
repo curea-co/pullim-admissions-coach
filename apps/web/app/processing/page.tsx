@@ -9,6 +9,7 @@ import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
 import { studentProfileSchema } from '@pullim/shared';
 import { clearAnalyzeResult } from '@/lib/result-view';
@@ -24,6 +25,11 @@ import type { ApiError } from '@/lib/api';
 // 분석 진행 — admissions 백엔드(ADR-058): 제출 영속→동의 적재→진단 enqueue→워커 완료 폴링.
 // 결과 본문은 서버(diagnosis_results)가 정본 — 세션엔 진단 id 만 남긴다.
 
+/** pullim-api `ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED_CODE` 와 같은 값이어야 한다. */
+const QUOTA_EXCEEDED_CODE = 'ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED';
+/** EntitlementGuard('admissions') 가 내는 403. 전역 필터가 403 에 붙이는 기본 code 다. */
+const FORBIDDEN_CODE = 'FORBIDDEN';
+
 type AnalysisPhase = 'submitting' | 'analyzing' | 'done' | 'error';
 
 const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
@@ -32,14 +38,33 @@ const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
   { key: 'done', label: '결과 도착', detail: '결과 화면을 불러옵니다' },
 ];
 
-/** 폴링 간격·상한 — opus 3콜(진단·처방·면접) 비동기 워커라 넉넉히 잡는다. */
+/** 폴링 간격·상한 — 3콜(진단·면접·처방) 비동기 워커라 넉넉히 잡는다. */
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_MS = 8 * 60 * 1000;
 
+// 게이트를 페이지 최상위에서 렌더 — 분석 흐름(effect 포함)은 게이트 **하위 자식**으로 둔다.
+// 페이지 컴포넌트 자신에 effect 를 두면 게이트가 JSX 렌더만 막고 마운트 effect(제출·진단 호출)는
+// 그대로 실행되므로(Codex #59), 미보유 사용자의 deep-link 에서도 API 가 발사되지 않게 분리.
 export default function ProcessingPage() {
+  return (
+    <RequireAuth>
+      <RequireAdmissionsAccess>
+        <ProcessingFlow />
+      </RequireAdmissionsAccess>
+    </RequireAuth>
+  );
+}
+
+function ProcessingFlow() {
   const router = useRouter();
   const [phase, setPhase] = useState<AnalysisPhase>('submitting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 재시도가 통하지 않는 오류(계정 진단 한도 소진)인지. 이때 "다시 시도" 버튼을 숨긴다 —
+  // 리셋되지 않는 한도라 눌러도 같은 403 이 돌아온다.
+  const [retryable, setRetryable] = useState(true);
+  // 이용권 미보유(403 FORBIDDEN)인가. 재시도가 아니라 **이용권 등록**으로 보내야 한다 —
+  // QA 에서 이 경우에도 "다시 시도" 만 떠 있었고, 눌러도 영원히 같은 403 이었다.
+  const [needsEntitlement, setNeedsEntitlement] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,8 +174,20 @@ export default function ProcessingPage() {
       } catch (err) {
         if (cancelled) return;
         const e = err as ApiError;
+        // 403 = 소유·동의·한도 게이트. 한도 소진만 재시도 불가라 버튼을 내린다.
+        // **문구가 아니라 서버 코드로 분기한다** — 메시지는 pullim-api 소유이고 계약 테스트가
+        // 없어, 문안을 다듬는 순간 이 분기가 조용히 깨진다(사용자는 같은 403 에 계속 재시도).
+        if (e?.code === QUOTA_EXCEEDED_CODE) setRetryable(false);
+        // 이용권 게이트. 한도 소진과 달리 사용자가 **지금 풀 수 있는** 상태라 경로를 준다.
+        const entitlementBlocked = e?.status === 403 && e?.code === FORBIDDEN_CODE;
+        if (entitlementBlocked) {
+          setRetryable(false);
+          setNeedsEntitlement(true);
+        }
         setErrorMsg(
-          e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.')
+          entitlementBlocked
+            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 마이페이지에서 등록해 주세요.'
+            : (e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.'))
         );
         setPhase('error');
       }
@@ -165,6 +202,7 @@ export default function ProcessingPage() {
 
   function handleRetry() {
     setErrorMsg(null);
+    setRetryable(true);
     setPhase('submitting');
     // useEffect 의존성을 트리거하지 않으므로 페이지 리로드
     window.location.reload();
@@ -174,7 +212,6 @@ export default function ProcessingPage() {
   const activeIdx = currentStepIdx < 0 ? 0 : currentStepIdx;
 
   return (
-    <RequireAuth>
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
@@ -184,19 +221,25 @@ export default function ProcessingPage() {
           </h1>
           <StepIndicator current="processing" />
         </div>
-        <p className="mb-6 text-ink-700">
-          제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
-        </p>
+        {/* 에러 상태에서는 감춘다 — "접수되었습니다" 와 "오류가 발생했습니다" 가 같이 떠 있으면
+            사용자는 제출이 된 건지 안 된 건지 판단할 수 없다(QA 2026-09-20). */}
+        {phase !== 'error' && (
+          <p className="mb-6 text-ink-700">
+            제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
+          </p>
+        )}
 
         <GuardrailLabel variant="general" className="mb-6" />
 
         {phase === 'error' ? (
           <div className="space-y-4">
             <ErrorState
-              title="분석 중 오류가 발생했습니다"
+              title={retryable ? '분석 중 오류가 발생했습니다' : '진단을 시작할 수 없습니다'}
               message={errorMsg ?? '알 수 없는 오류'}
+              tone={retryable ? 'error' : 'warning'}
             />
             <div className="flex gap-3">
+              {retryable && (
               <button
                 type="button"
                 onClick={handleRetry}
@@ -204,6 +247,15 @@ export default function ProcessingPage() {
               >
                 다시 시도
               </button>
+              )}
+              {needsEntitlement && (
+                <Link
+                  href="/mypage"
+                  className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                >
+                  이용권·쿠폰 등록하기
+                </Link>
+              )}
               <Link
                 href="/submit"
                 className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
@@ -246,7 +298,6 @@ export default function ProcessingPage() {
         </div>
       </div>
     </>
-    </RequireAuth>
   );
 }
 

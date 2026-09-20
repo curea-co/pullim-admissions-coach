@@ -65,3 +65,86 @@ describe('redactPii', () => {
     expect(redactPii(once, detectPii(once))).toBe(once);
   });
 });
+
+// ── #17 후속: 실제 생기부 1건 스캔에서 드러난 누출 2 · 오탐 2 회귀 (doc 016 §3.2) ──
+describe('detectPii — 누출 회귀', () => {
+  it('부분 마스킹된 주민번호도 검출(앞 6자리=생년월일 노출 차단)', () => {
+    expect(cats('주민등록번호： 070315-3******')).toContain('rrn');
+    expect(hasBlockingPii('070315-3******')).toBe(true);
+  });
+  it('주민번호 전체 표기는 계속 검출', () => {
+    expect(cats('980101-1234567')).toContain('rrn');
+  });
+  it('표 레이아웃의 담임 성명 열 — 헤더 아래 행의 이름을 검출', () => {
+    const t = ['학년\t반\t번호\t담임성명', '1\t3\t12\t김민수', '2\t5\t8\t이지현', '3\t2\t15\t박정우', ''].join('\n');
+    const teachers = detectPii(t).filter((m) => m.category === 'teacher').map((m) => m.value);
+    expect(teachers).toEqual(['김민수', '이지현', '박정우']);
+  });
+  it('표 본문은 빈 줄에서 끝난다 — 이후 단락의 이름 후보는 집지 않음', () => {
+    const t = ['담임성명', '김민수', '', '박정우 관련 서술은 표 밖이다'].join('\n');
+    const teachers = detectPii(t).filter((m) => m.category === 'teacher').map((m) => m.value);
+    expect(teachers).toEqual(['김민수']);
+  });
+  it('이름이 라벨 앞에 오는 표기도 검출', () => {
+    expect(cats('김영수 담임교사 확인')).toContain('teacher');
+  });
+});
+
+describe('detectPii — 오탐 회귀(세특 원문 손상 방지)', () => {
+  it.each(['기능이 서툰 학생이 많았다', '또래 멘토링에 참여 학생의 반응', '이해가 부족한 학생을 도왔다', '다른 학생과 협력함'])(
+    '관형어·일반명사 + 학생은 이름이 아니다: %s',
+    (t) => expect(detectPii(t).filter((m) => m.category === 'name')).toHaveLength(0),
+  );
+  it('합성 라벨의 뒤 라벨어를 이름으로 잡지 않음(담임성명 → "성명")', () => {
+    expect(detectPii('담임성명').filter((m) => m.category === 'teacher')).toHaveLength(0);
+  });
+  it('수상·활동 연월일은 생년월일로 치환하지 않음', () => {
+    const t = '2024.05.30 교내 과학탐구대회 최우수상, 2023년 6월 14일 봉사 시작';
+    expect(detectPii(t).filter((m) => m.category === 'birth_date')).toHaveLength(0);
+    expect(redactPii(t, detectPii(t))).toBe(t);
+  });
+  it('라벨이 붙은 생년월일은 계속 검출', () => {
+    expect(cats('생년월일： 2008.03.15')).toContain('birth_date');
+    expect(cats('출생 2008년 3월 15일')).toContain('birth_date');
+  });
+});
+
+// ── 코드리뷰가 잡은 자기회귀 2건 — 둘 다 이 모듈이 스스로 만든 문제였다 ──────────
+describe('detectPii — 표 스캔 범위(일반어 파괴 방지)', () => {
+  it('표 아래 산문까지 내려가 일반어를 교사명으로 치환하지 않는다', () => {
+    // 성·정·조·문·우 가 모두 성씨라 성씨 whitelist 만으로는 못 막는다.
+    // 표 본문 행에는 학년·반·번호 칸(독립 숫자)이 있고 산문에는 없다 — 그걸로 끊는다.
+    const t = [
+      '학년\t반\t번호\t담임성명',
+      '1\t3\t12\t김민수',
+      '성적 정보 조사 결과',
+      '문학 과목 성적 우수',
+    ].join('\n');
+    const r = redactPii(t, detectPii(t));
+    expect(r).toContain('[교사]');
+    expect(r).not.toContain('김민수');
+    expect(r).toContain('성적 정보 조사 결과');
+    expect(r).toContain('문학 과목 성적 우수');
+  });
+
+  it('행당 1명만 집는다 — 같은 행의 다른 토큰은 건드리지 않는다', () => {
+    const t = ['담임성명', '1\t김민수\t비고 없음 정상 확인'].join('\n');
+    const teachers = detectPii(t).filter((m) => m.category === 'teacher');
+    expect(teachers).toHaveLength(1);
+    expect(teachers[0].value).toBe('김민수');
+  });
+});
+
+describe('detectPii — validate 거절이 뒤의 진짜 이름을 삼키지 않는다', () => {
+  it.each([
+    ['열심히김민수 학생이 발표했다', '김민수'],
+    ['적극적으로김민수 학생이', '김민수'],
+    ['멘토링에김민수 학생이', '김민수'],
+  ])('%s → 이름이 가려진다', (text, name) => {
+    // 탐욕 매칭이 앞 글자를 끌어와('히김민수') validate 가 거절하면, 그 구간을 버리지 않고
+    // 시작점 +1 에서 다시 스캔해야 뒤의 실제 이름을 잡는다. 버리면 PII 가 그대로 샌다.
+    const r = redactPii(text, detectPii(text));
+    expect(r).not.toContain(name);
+    expect(r).toContain('[이름]');
+  });
+});

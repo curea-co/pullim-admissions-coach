@@ -1,0 +1,148 @@
+'use client';
+
+// 앱 내부 엔타이틀먼트 게이트(구매 벽) — 회원플랜: 입시코치는 `admissions` 이용권 보유자만.
+// 게이트키퍼 지침: OS 카드 알럿에 의존하지 않고 **앱 내부**에서 강제(URL 직접 진입/deep-link 안전).
+// 권위 신호 = `GET /me/entitlements` 의 flags.admissions(pullim-api #348) — authed 확인 후 사전 판정.
+// 반드시 RequireAuth 하위에서 쓴다(인증 선행 전제). BE EntitlementGuard 403은 백스톱으로 항상 유효.
+
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from './auth-provider';
+import { PurchaseWall } from './purchase-wall';
+import { DevBypassBadge } from './dev-bypass-badge';
+import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
+import {
+  devBypassAvailable,
+  devGateBypassEnabled,
+  readDevBypass,
+  writeDevBypass,
+} from '@/lib/dev-bypass';
+import { isPullimAuth } from '@/lib/auth';
+import { decideAccessOnError } from '@/lib/admissions-access-state';
+import type { ApiError } from '@/lib/api';
+
+type Access = 'checking' | 'ok' | 'denied' | 'error';
+
+export function RequireAdmissionsAccess({ children }: { children: React.ReactNode }) {
+  const { user, status, refresh } = useAuth();
+  // mock/데모 모드(비실 auth)에는 엔타이틀먼트/구매 벽 개념이 없다 — 게이트 무효화(통과).
+  // 실 auth(NEXT_PUBLIC_AUTH_BACKEND=pullim)에서만 /me/entitlements 로 판정(Codex #59):
+  // mock 모드에서 실 API 를 호출하면 NEXT_PUBLIC_PULLIM_API 미설정 시 전 페이지가 막힌다.
+  const [access, setAccess] = useState<Access>(() => (isPullimAuth ? 'checking' : 'ok'));
+  // 재검증 트리거(Codex #59) — 결제 완료 후 같은 탭 복귀(denied) 또는 일시 오류(error)에서 재확인.
+  const [nonce, setNonce] = useState(0);
+  // 401 후 refresh 재검증은 **1회로 제한** — 세션 만료가 아닌 이유로 /me/entitlements 가 계속 401이면
+  // refresh 성공(status 유지)+nonce++ 가 무한 루프가 되므로, 1회 재시도 후에도 401이면 error 로 종료.
+  const authRetryRef = useRef(0);
+  // 개발용 우회로 통과한 상태인가(lib/dev-bypass.ts ①). true 면 실제 이용권이 아니므로 배지를 붙인다.
+  const [bypassed, setBypassed] = useState(false);
+  // 개발용 게이트 우회(②) — 인증까지 넘기는 스위치라 status 검사보다 앞선다. RequireAuth 와 같은
+  // 이유로 **마운트 후에만** 켠다(호스트 의존 판정 → SSR 과 클라 첫 렌더가 어긋나면 hydration 파손).
+  const [gateBypass, setGateBypass] = useState(false);
+  useEffect(() => {
+    setGateBypass(devGateBypassEnabled());
+  }, []);
+  // 재검증은 캐시를 비우고(결제 반영·장애 복구 위해 fresh fetch 강제) effect 를 재실행한다.
+  const recheck = () => {
+    clearAdmissionsAccessCache();
+    authRetryRef.current = 0;
+    setNonce((n) => n + 1);
+  };
+  // 개발용 우회 on/off — 기존 recheck() 배관을 그대로 탄다(캐시 비우고 nonce++ → effect 재실행).
+  // 별도 경로를 만들면 우회 해제 후 상태가 어긋날 수 있어, 판정은 항상 effect 한 곳에서만 한다.
+  const enableDevBypass = () => {
+    writeDevBypass(true);
+    recheck();
+  };
+  const disableDevBypass = () => {
+    writeDevBypass(false);
+    recheck();
+  };
+
+  useEffect(() => {
+    // 게이트 전체 우회(②)는 **가장 먼저** 본다 — 미인증(status!=='authed')에서도 열어야 하는 게
+    // 이 스위치의 목적이라, 아래 두 early return 뒤에 두면 'checking' 에 갇힌다.
+    if (devGateBypassEnabled()) {
+      setAccess('ok');
+      return;
+    }
+    if (!isPullimAuth) return; // mock/데모: 초기값 'ok' 유지(통과)
+    if (status !== 'authed') return;
+    // 개발용 엔타이틀먼트 우회 — 창구가 열린 개발 환경에서만 true(운영은 호스트 잠금으로 항상 false).
+    // 이 경우 hasAdmissionsAccess() 를 **아예 호출하지 않는다**: dev 는 flags 에 admissions 자리가
+    // 없어 어차피 denied 로 떨어지고, 불필요한 /me/entitlements 왕복도 없앤다.
+    if (readDevBypass()) {
+      setBypassed(true);
+      setAccess('ok');
+      return;
+    }
+    setBypassed(false);
+    let alive = true;
+    setAccess('checking');
+    hasAdmissionsAccess()
+      .then((ok) => {
+        if (!alive) return;
+        authRetryRef.current = 0; // 성공 → 재시도 카운터 리셋
+        setAccess(ok ? 'ok' : 'denied');
+      })
+      .catch((err: ApiError) => {
+        if (!alive) return;
+        // 401(세션 만료)은 세션 갱신 후 **1회** 재검증(갱신 성공 시 nonce++ 재확인, 실패 시
+        // auth-provider 가 guest→상위 RequireAuth redirect). 재시도 소진·5xx·네트워크는 error.
+        if (decideAccessOnError(err, authRetryRef.current) === 'retry') {
+          authRetryRef.current += 1;
+          void refresh().finally(() => alive && setNonce((n) => n + 1));
+          return;
+        }
+        setAccess('error');
+      });
+    return () => {
+      alive = false;
+    };
+    // user?.id 구독 — 같은 탭 사용자 전환(A→B, 둘 다 authed)에도 게이트 재평가(auth-provider 가
+    // 캐시를 비우므로 새 사용자로 재조회). status/refresh 만으로는 재실행되지 않던 회귀(Codex #59).
+  }, [status, refresh, nonce, user?.id]);
+
+  // 게이트 우회(②) 중에는 미인증이어도 렌더를 계속한다(토큰 없이 화면만 여는 개발 경로).
+  if (status !== 'authed' && !gateBypass) return null;
+  // 결제 완료 후 같은 탭 복귀 시 "다시 확인"으로 재검증 → 구매 반영되면 통과(구매 벽에 갇히지 않음).
+  // devBypassAvailable() 을 렌더 중에 부르지만 hydration mismatch 는 없다 — status 초기값이
+  // 'loading' 이라 서버 렌더에서는 이 줄 위의 `status !== 'authed'` 에서 null 로 끝난다.
+  if (access === 'denied')
+    return (
+      <PurchaseWall
+        onRecheck={recheck}
+        onDevBypass={devBypassAvailable() ? enableDevBypass : undefined}
+      />
+    );
+  // 일시 장애(5xx/네트워크) — 유효 유료 사용자가 갇히지 않게 재시도 버튼 제공.
+  if (access === 'error') {
+    return (
+      <div className="px-6 py-10 text-sm text-ink-600">
+        <p className="mb-3">이용 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.</p>
+        <button
+          type="button"
+          onClick={recheck}
+          className="rounded-xl border border-brand-300 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        >
+          다시 시도
+        </button>
+      </div>
+    );
+  }
+  if (access === 'checking') {
+    return <div className="px-6 py-10 text-sm text-ink-500">확인 중…</div>;
+  }
+  // 우회로 열린 화면은 실제 권한과 눈으로 구분돼야 한다 — 통과 렌더 앞에 경고 배지를 붙인다.
+  // ②는 세션 토글이 아니라 빌드 플래그라 이 화면에서 끌 수 없다 → 해제 버튼 없이 문구만 바꾼다.
+  // (②가 켜지면 위 effect 가 ① 경로에 닿기 전에 반환하므로 bypassed 와 동시에 참이 되지 않는다.)
+  return (
+    <>
+      {gateBypass ? (
+        <DevBypassBadge message="개발 게이트 우회 중 · 인증·이용권 검사 꺼짐" />
+      ) : (
+        bypassed && <DevBypassBadge onDisable={disableDevBypass} />
+      )}
+      {children}
+    </>
+  );
+}

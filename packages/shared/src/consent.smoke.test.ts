@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { consentSchema } from './schemas';
 
+// 2026-09-20: 필드가 isMinor(만19) → guardianRequired(만14) 로 정정됐다.
+// 경위는 apps/web/lib/consent-gate.ts 주석.
 describe('consentSchema (러너 동작 확인)', () => {
-  it('미성년자는 법정대리인 동의 없으면 실패한다', () => {
+  it('만 14세 미만은 법정대리인 동의 없으면 실패한다', () => {
     const r = consentSchema.safeParse({
-      isMinor: true,
+      guardianRequired: true,
       termsAgreed: true,
       privacyPolicyAgreed: true,
       guardianConsentObtained: false,
@@ -15,7 +17,7 @@ describe('consentSchema (러너 동작 확인)', () => {
 
   it('필수 동의가 모두 true면 통과한다', () => {
     const r = consentSchema.safeParse({
-      isMinor: false,
+      guardianRequired: false,
       termsAgreed: true,
       privacyPolicyAgreed: true,
       guardianConsentObtained: false,
