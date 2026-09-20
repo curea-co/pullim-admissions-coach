@@ -7,6 +7,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { useAuth } from '@/components/auth/auth-provider';
 import { auth, isPullimAuth } from '@/lib/auth';
 import { osSettingsHref } from '@/lib/auth/os-login';
+import { CouponRedeemForm } from '@/components/auth/coupon-redeem-form';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
@@ -252,6 +253,13 @@ function MyPageContent() {
             >
               {admissions === 'error' ? '다시 시도' : '구매를 완료했다면 다시 확인'}
             </button>
+          )}
+          {/* 쿠폰 등록 — 이미 보유 중이면 숨긴다(중복 등록은 409 로 막히지만, 가진 사람에게
+              보여줄 이유가 없다). mock 모드에는 이용권 개념이 없어 실 auth 에서만 띄운다. */}
+          {isPullimAuth && admissions !== 'has' && (
+            <div className="mt-4 border-t border-ink-100 pt-4">
+              <CouponRedeemForm onGranted={recheckAdmissions} />
+            </div>
           )}
         </div>
       </section>
