@@ -27,6 +27,8 @@ import type { ApiError } from '@/lib/api';
 
 /** pullim-api `ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED_CODE` 와 같은 값이어야 한다. */
 const QUOTA_EXCEEDED_CODE = 'ADMISSIONS_DIAGNOSIS_QUOTA_EXCEEDED';
+/** EntitlementGuard('admissions') 가 내는 403. 전역 필터가 403 에 붙이는 기본 code 다. */
+const FORBIDDEN_CODE = 'FORBIDDEN';
 
 type AnalysisPhase = 'submitting' | 'analyzing' | 'done' | 'error';
 
@@ -60,6 +62,9 @@ function ProcessingFlow() {
   // 재시도가 통하지 않는 오류(계정 진단 한도 소진)인지. 이때 "다시 시도" 버튼을 숨긴다 —
   // 리셋되지 않는 한도라 눌러도 같은 403 이 돌아온다.
   const [retryable, setRetryable] = useState(true);
+  // 이용권 미보유(403 FORBIDDEN)인가. 재시도가 아니라 **이용권 등록**으로 보내야 한다 —
+  // QA 에서 이 경우에도 "다시 시도" 만 떠 있었고, 눌러도 영원히 같은 403 이었다.
+  const [needsEntitlement, setNeedsEntitlement] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,8 +178,16 @@ function ProcessingFlow() {
         // **문구가 아니라 서버 코드로 분기한다** — 메시지는 pullim-api 소유이고 계약 테스트가
         // 없어, 문안을 다듬는 순간 이 분기가 조용히 깨진다(사용자는 같은 403 에 계속 재시도).
         if (e?.code === QUOTA_EXCEEDED_CODE) setRetryable(false);
+        // 이용권 게이트. 한도 소진과 달리 사용자가 **지금 풀 수 있는** 상태라 경로를 준다.
+        const entitlementBlocked = e?.status === 403 && e?.code === FORBIDDEN_CODE;
+        if (entitlementBlocked) {
+          setRetryable(false);
+          setNeedsEntitlement(true);
+        }
         setErrorMsg(
-          e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.')
+          entitlementBlocked
+            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 마이페이지에서 등록해 주세요.'
+            : (e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.'))
         );
         setPhase('error');
       }
@@ -208,9 +221,13 @@ function ProcessingFlow() {
           </h1>
           <StepIndicator current="processing" />
         </div>
-        <p className="mb-6 text-ink-700">
-          제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
-        </p>
+        {/* 에러 상태에서는 감춘다 — "접수되었습니다" 와 "오류가 발생했습니다" 가 같이 떠 있으면
+            사용자는 제출이 된 건지 안 된 건지 판단할 수 없다(QA 2026-09-20). */}
+        {phase !== 'error' && (
+          <p className="mb-6 text-ink-700">
+            제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
+          </p>
+        )}
 
         <GuardrailLabel variant="general" className="mb-6" />
 
@@ -230,6 +247,14 @@ function ProcessingFlow() {
               >
                 다시 시도
               </button>
+              )}
+              {needsEntitlement && (
+                <Link
+                  href="/mypage"
+                  className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                >
+                  이용권·쿠폰 등록하기
+                </Link>
               )}
               <Link
                 href="/submit"
