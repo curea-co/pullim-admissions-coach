@@ -50,6 +50,10 @@
 | [golden/](docs/golden/) | Phase D 회귀 기준 5 케이스 + §6 NG 셋 | v0.1 |
 | [002_Admissions_Coach_definition_v.2.md](docs/002_Admissions_Coach_definition_v.2.md) | 정의 v0.2 (자소서 폐지 패치 노트, 이력용) | v0.2 |
 | [002_definition_pivot_memo_v.1.md](docs/002_definition_pivot_memo_v.1.md) | 자소서 폐지 대응 방향 메모 (이력용) | v0.1 |
+| [012_policy_v2_screen_and_backend_plan_v0.1.md](docs/012_policy_v2_screen_and_backend_plan_v0.1.md) | 회원플랜 v2 화면·백엔드 계획 (이용권 게이트) | v0.1 |
+| [013_admissions_BE_P0_design_v0.1.md](docs/013_admissions_BE_P0_design_v0.1.md) | admissions 백엔드 P0 설계 | v0.1 |
+| [016_llm_integration_trial_2026-09-18.md](docs/016_llm_integration_trial_2026-09-18.md) | **LLM 연결 1차 시험 기록** (비용 실측·PII 버그·스키마 확장) | 2026-09-19 갱신 |
+| [017_openrouter_migration_plan_2026-09-18.md](docs/017_openrouter_migration_plan_2026-09-18.md) | **OpenRouter 전환 실행 기록** (골드 5건 회귀·운영 키) | 2026-09-19 갱신 |
 
 > **읽는 순서:** definition v0.3 → personas → WBS. v0.2·pivot memo는 의사결정 이력 참고용입니다.
 
@@ -63,28 +67,48 @@
 
 ---
 
-## 현재 상태 (2026-06-01, 출시 D-62)
+## 현재 상태 (2026-09-20)
 
-**확정:** 한 줄 정의, 산출물 3종, §6 가드레일, 24h SLA 측정 정의, 8/1 출시, 명칭("진단"·"준비"), 5계열·4학교유형 enum, 미성년자 정책 P0 격상, PR 워크플로 + main 브랜치 보호.
+> 이 절이 **현재 상태를 말하는 유일한 문서**다. `docs/008`·`docs/009`·`infra/README.md` 는
+> 각각 어느 시점의 기록이며 상단 배너로 유효 범위를 밝혀 뒀다.
 
-**완료 (SSOT 9건 + 코드):**
-- [docs/002_Admissions_Coach_definition_v.3.md](docs/002_Admissions_Coach_definition_v.3.md) — 정의 v0.3.1 (§6 가드레일 3선 + 5계열·4학교유형)
-- [docs/004_Admissions_Coach_coding_plan_v0.1.md](docs/004_Admissions_Coach_coding_plan_v0.1.md) — 6 Phase 코딩 계획
-- [docs/005_Admissions_Coach_architecture_v0.1.md](docs/005_Admissions_Coach_architecture_v0.1.md) — 시스템 아키텍처
-- [docs/006_Admissions_Coach_data_security_policy_v0.1.md](docs/006_Admissions_Coach_data_security_policy_v0.1.md) — 데이터 정책 (§6.3 P0 운영 사양)
-- [docs/007_Admissions_Coach_member_db_v0.1.md](docs/007_Admissions_Coach_member_db_v0.1.md) — 회원·인증 DB 모델 5 엔티티
-- [docs/008_Admissions_Coach_vercel_demo_v0.1.md](docs/008_Admissions_Coach_vercel_demo_v0.1.md) — Vercel demo 운영 정책
-- [docs/009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md](docs/009_Admissions_Coach_demo_scenario_2026-06-01_v0.1.md) — 6/1 CEO 시연 시나리오
-- [docs/prompt_v0.1.md](docs/prompt_v0.1.md) — **★ M2 시스템 프롬프트 SSOT** (§6 가드 코드화, NG 정규식, 회귀 게이트)
-- [docs/student_profile_schema_v0.1.json](docs/student_profile_schema_v0.1.json) — 입력 5항목 + 마스킹·동의 강제
-- [docs/golden/](docs/golden/) — Phase D 회귀 기준 5 케이스 (5계열·4학교유형 100% 커버)
+8/1 출시 목표는 지났다. 진단 파이프라인은 끝까지 동작하고, 남은 차단은 이용권 쪽이다.
 
-**Phase A+B 시각 셸 라이브:** https://pullim-admissions-coach.vercel.app/ (Vercel demo, AWS staging 대기 중)
+**동작하는 것**
 
-**다음 의존 산출물 (대기):**
-- `prompt_parent_report_v0.1.md` (M3) — 학부모 주간 리포트 프롬프트
-- Phase 0 AWS 인프라 — Gate keeper의 AWS Organizations + 3계정 회신 대기 (외부 의존)
-- 사고 대응 플레이북 / 약관 / 개인정보처리방침 / 법정대리인 동의서 (Phase E 법무 검토 필요)
+- **진단 3콜 파이프라인** — OpenRouter + `google/gemini-3.8-flash`. 되돌리기는 `ADMISSIONS_LLM_GATEWAY=anthropic`(haiku-4.5 직결). 엔진에서 `@anthropic-ai/sdk` import 가 사라졌다 (017)
+- **골드 5건 전부 통과** — §6 가드레일 위반 0 · 문체 플래그 0. 5계열·4학교유형 커버. 실측 분석 1건 $0.0848 / 99초 (016 §5.5)
+- **FE 실 API 배선** — `/admissions/submissions` → `/consents` → `/diagnose` → 폴링 → `/results/{id}`. mock 이 아니다
+- **쿠폰 등록** — `POST /billing/coupons/redeem`. OS 결제 딥링크가 없는 동안 이용권을 얻는 **유일한 경로**이고, 실제로 벽을 연다 (#90)
+- 회귀 테스트 704건 (51파일)
+
+**막혀 있는 것**
+
+- **`admissions` 이용권 카탈로그 등록** — OS 소관이라 이 저장소에서 못 고친다. dev 의 `/me/entitlements` flags 에 `admissions` 자리가 없어 번들로는 아무도 통과하지 못한다. 쿠폰이 그 차단을 우회한다
+- **`/me` 의 `consentStatus` 노출** — 법정대리인 동의를 자기신고가 아닌 권위값으로 판정하려면 필요하다 (#91 참조). BE 작업 선행
+
+**인프라 — 실측 (2026-09-19)**
+
+```
+계정          022038145489  (하나)
+ECS 클러스터   pullim        (하나)
+환경          local · dev · prod   ← staging 없음
+시크릿        pullim/{local,dev,prod}/backend
+앱            apps/web 하나 (api·admin 은 만들어지지 않았다)
+배포          Vercel (프론트) + pullim-api (진단 백엔드)
+```
+
+3계정 분리 · `staging.pullim.curea.co` · `apps/api`·`apps/admin` 3앱 계획은 **실행되지 않았고
+ADR-058 로 불필요해졌다.** 진단 백엔드가 기존 `pullim-api` 안으로 들어가면서 전용 계정이
+필요 없어졌고, 입시코치는 프론트만 Vercel 에 남았다. 경위는 `infra/README.md` 배너.
+
+**프론트:** https://pullim-admissions-coach.vercel.app/
+
+**연령 기준 (2026-09-20 정정)**
+
+법정대리인 동의는 **만 14세 미만**이 기준이다(개인정보 동의 경계). 이전 문서의 "만 19세 미만"은
+근거 없이 굳은 오기였다 — 경위는 `apps/web/lib/consent-gate.ts` 주석과 #91. 만 14세 이상은
+본인 동의로 진행하되 보호자 고지를 권한다.
 
 ## 진행 단계 (Phase)
 
@@ -92,11 +116,11 @@
 
 | Phase | 기간 | 목표 |
 |---|---|---|
-| **0. 인프라 부트스트랩** | ~1주 | AWS 서울 ECS·RDS·Redis·S3·WAF·SES 셸 (회사 표준 채택) |
+| **0. 인프라 부트스트랩** | ~1주 | ~~AWS 전용 계정 3개~~ — **폐기.** ADR-058 로 `pullim-api` 에 합류, 프론트는 Vercel |
 | **A. Visual Skeleton** | ~1주 | Next.js 5화면 + 박준호 mock, staging URL 시연 |
 | **B. Interactive Form** | ~1주 | Zod 검증·동의 게이트·24h SLA 상태머신 |
-| **C. Backend Stubs** | ~1주 | NestJS api + Prisma + BullMQ + Admin 검수 큐 |
-| **D. AI 통합** | ~2주 | Anthropic + §6 가드레일 프롬프트 + 골드 회귀 |
+| **C. Backend Stubs** | ~1주 | NestJS api + BullMQ — **`pullim-api` 안에서 완료**(이 레포에 `apps/api` 는 없다) |
+| **D. AI 통합** | ~2주 | LLM + §6 가드레일 프롬프트 + 골드 회귀 — **완료**(OpenRouter 전환, 017) |
 | **E. 운영 출시** | M3~M4 | 인증·결제·동의 채널·KMS·보관/삭제·모니터링 (8/1 출시) |
 
 ## 트랙 분담

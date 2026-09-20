@@ -1,5 +1,12 @@
 # 6/1 CEO 평가 시연 시나리오 v0.1
 
+> **📌 2026-06-01 시연 당일의 기록이다. 본문은 그대로 둔다.**
+>
+> 단, §8 과 Q&A 답변이 전제하는 **"AWS 계정 3개 + staging, Gate keeper 회신 대기"** 는
+> 이후 폐기됐다(`infra/README.md` 배너). 그 계획은 실행된 적이 없고 ADR-058 로 불필요해졌다.
+> 이 문서를 근거로 인프라 범위를 잡지 말 것 — 현재 상태는 `README.md` 다.
+
+
 > 작성일: 2026-05-31 (D-1, 출시 D-62) / 최선혜 (PM/EPO)
 > 대상: `pullim-admissions-coach` 6/1 평가 (8/1 출시까지 D-62 시점 진척 보고)
 > 환경: https://pullim-admissions-coach.vercel.app/ (Vercel demo, main `620e9c2` 기준)

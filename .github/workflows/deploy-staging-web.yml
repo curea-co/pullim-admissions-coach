@@ -18,6 +18,10 @@
 #   - api/admin services get sibling workflows in Phase C.
 #
 # ⚠️ 2026-09-19 — 수동 실행 전용(workflow_dispatch)으로 내렸다.
+# ⚠️ 2026-09-20 — 이 워크플로가 전제하는 **AWS staging 환경은 존재하지 않는다.** 3계정 분리
+#    계획이 실행되지 않았고 ADR-058 로 불필요해졌다(infra/README.md 배너). 아래 변수들은
+#    채워질 일이 없다. 남겨 둔 이유는 ECS 배포가 다시 필요해질 때의 출발점이기 때문이고,
+#    지금은 **동작하지 않는 문서**로 취급할 것. 현행 프론트 배포는 Vercel 이다.
 #   위 변수·시크릿이 아직 하나도 채워져 있지 않다. AWS Organizations + 3계정(런북 1단계)이
 #   Gate keeper 회신 대기라 채울 수가 없고, 그래서 dev 푸시마다 첫 AWS 스텝에서
 #   `Input required and not supplied: aws-region` 으로 죽었다(최소 2026-09-10 이후 전건 실패).
