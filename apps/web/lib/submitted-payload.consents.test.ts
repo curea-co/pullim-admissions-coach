@@ -11,14 +11,14 @@ import {
 describe('mergeConsentIntoPayload — record 보존 + consent 덮어쓰기', () => {
   const record = { inputType: 'text_paste', text: '생기부', maskingApplied: true };
   const stubConsent = {
-    isMinor: true,
+    guardianRequired: true,
     termsAgreed: true,
     privacyPolicyAgreed: true,
     guardianConsentObtained: true,
     consentTimestamp: '2026-01-01T00:00:00.000Z',
   };
   const realConsent = {
-    isMinor: false,
+    guardianRequired: false,
     termsAgreed: true,
     privacyPolicyAgreed: true,
     guardianConsentObtained: false,
@@ -54,12 +54,12 @@ describe('submitted-payload 저장 라운드트립', () => {
     const existing = {
       schemaVersion: '1.0.0',
       record: { inputType: 'text_paste', text: '생기부' },
-      consent: { isMinor: true, termsAgreed: true },
+      consent: { guardianRequired: true, termsAgreed: true },
     };
     expect(saveSubmittedPayload(existing)).toBe(true);
 
     const merged = mergeConsentIntoPayload(loadSubmittedPayload(), {
-      isMinor: false,
+      guardianRequired: false,
       termsAgreed: true,
       privacyPolicyAgreed: true,
       guardianConsentObtained: false,

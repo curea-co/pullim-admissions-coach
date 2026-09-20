@@ -6,7 +6,7 @@
 // 가드레일 강제 (§6.3):
 //   - record.maskingApplied: 항상 true (literal)
 //   - consent.termsAgreed / privacyPolicyAgreed: 항상 true (literal)
-//   - consent.isMinor=true → guardianConsentObtained=true 강제 (refine)
+//   - consent.guardianRequired=true → guardianConsentObtained=true 강제 (refine)
 
 import { z } from 'zod';
 import { hasBlockingPii } from './pii';
@@ -126,7 +126,15 @@ const trueLiteral = (message: string) =>
 
 export const consentSchema = z
   .object({
-    isMinor: z.boolean(),
+    /**
+     * 법정대리인 동의가 필요한가 — **만 14세 미만**(개인정보 동의 경계)이면 true.
+     *
+     * 2026-09-20 정정: 이전 이름은 `isMinor` 였고 만 19세 미만(민법상 미성년)을 뜻했다. 그 숫자는
+     * 근거가 없었다 — 정의 v0.3 §6.3 과 docs/006 §8-1 은 만 14 를 말하는데 docs/007 §1 이 만 19 로
+     * 단정하며 그 둘을 근거로 달았다. 이름이 연령 사실(`미성년`)을 가리켜서 판정 축과 어긋난 것이
+     * 오기가 굳은 원인이라, 이름도 **요구 사항**을 가리키게 바꾼다. 경위는 apps/web/lib/consent-gate.ts.
+     */
+    guardianRequired: z.boolean(),
     termsAgreed: trueLiteral('이용약관에 동의해주세요'),
     privacyPolicyAgreed: trueLiteral('개인정보 수집·이용에 동의해주세요'),
     guardianConsentObtained: z.boolean(),
@@ -134,9 +142,9 @@ export const consentSchema = z
     consentTimestamp: z.string().datetime({ message: '잘못된 시각 형식입니다' }),
   })
   .refine(
-    (d) => !d.isMinor || d.guardianConsentObtained === true,
+    (d) => !d.guardianRequired || d.guardianConsentObtained === true,
     {
-      message: '미성년자는 법정대리인 동의가 필요합니다',
+      message: '만 14세 미만은 법정대리인 동의가 필요합니다',
       path: ['guardianConsentObtained'],
     }
   );

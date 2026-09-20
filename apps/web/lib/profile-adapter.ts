@@ -83,7 +83,7 @@ export function toAnalysisInput(
     saengbu,
     consent: {
       sensitive: true as const,
-      guardian: consent.isMinor,
+      guardian: consent.guardianRequired,
     },
   }
 

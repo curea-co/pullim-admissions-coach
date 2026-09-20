@@ -16,7 +16,7 @@ import {
   saveSubmittedPayload,
   mergeConsentIntoPayload,
 } from '@/lib/submitted-payload';
-import { resolveIsMinor, isConsentGateMet } from '@/lib/consent-gate';
+import { requiresGuardianConsent, isConsentGateMet } from '@/lib/consent-gate';
 import { cn } from '@/lib/utils';
 
 // Phase B: 클라이언트 차단 로직.
@@ -48,9 +48,9 @@ const items: ConsentItem[] = [
   {
     id: 'guardian',
     required: true,
-    title: '미성년자 — 법정대리인 동의',
+    title: '만 14세 미만 — 법정대리인 동의',
     body:
-      '본인이 미성년자(만 19세 미만)인 경우, 법정대리인(부모님 등)의 동의가 필요합니다. 출시 단계에서는 카카오 알림톡으로 보호자 동의를 한 번 더 확인합니다.',
+      '본인이 만 14세 미만인 경우, 법정대리인(부모님 등)의 동의가 필요합니다. 만 14세 이상은 본인 동의로 진행하되, 보호자에게 이용 사실을 알리고 사용하시길 권합니다.',
   },
 ];
 
@@ -58,10 +58,11 @@ export default function ConsentPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // 미성년 여부 = 가입 시 생년월일로 산정된 **권위값**(user.isMinor) — 화면에서 임의 변경 불가.
-  // 미성년자가 스스로 성인으로 바꿔 법정대리인 동의를 우회하는 것을 막는다(#52). unknown 시 보수적으로 미성년.
+  // 법정대리인 동의 필요 여부 = 가입 생년월일로 산정된 **권위값**(user.ageBand, 만14 경계)에서만 온다.
+  // 화면에서 임의 변경할 수 없다 — 스스로 성인으로 바꿔 동의를 우회하는 것을 막는다(#52).
+  // 미확정(unknown)이면 보수적으로 '필요'. 기준이 만19 → 만14 로 정정된 경위는 lib/consent-gate.ts 주석.
   const { user } = useAuth();
-  const isMinor = resolveIsMinor(user?.isMinor);
+  const guardianRequired = requiresGuardianConsent(user?.ageBand);
   const [checked, setChecked] = useState<Record<ConsentItem['id'], boolean>>({
     terms: false,
     privacy: false,
@@ -76,13 +77,13 @@ export default function ConsentPage() {
   function toggleAll(v: boolean) {
     // 성인은 보호자 동의가 필수 항목이 아니므로 "전체 동의"에서 제외(guardian 유지) —
     // 성인이 전체 동의해도 guardian 미체크로 진행버튼과 어긋나던 불일치 해소(Codex #65).
-    setChecked((prev) => ({ terms: v, privacy: v, guardian: isMinor ? v : prev.guardian }));
+    setChecked((prev) => ({ terms: v, privacy: v, guardian: guardianRequired ? v : prev.guardian }));
   }
 
   function allRequiredMet(): boolean {
     // 게이트 로직은 lib/consent-gate(순수·테스트됨)로 위임 — 성인 면제/미성년 필수 회귀 고정(#65).
     return isConsentGateMet({
-      isMinor,
+      guardianRequired,
       terms: checked.terms,
       privacy: checked.privacy,
       guardian: checked.guardian,
@@ -96,16 +97,16 @@ export default function ConsentPage() {
       const missing: string[] = [];
       if (!checked.terms) missing.push('이용약관');
       if (!checked.privacy) missing.push('개인정보');
-      if (isMinor && !checked.guardian) missing.push('법정대리인');
+      if (guardianRequired && !checked.guardian) missing.push('법정대리인');
       setSubmitError(
         `진행하려면 ${missing.join(' · ')} 동의가 필요합니다.`
       );
       return;
     }
 
-    // Zod로 schema 측면 재검증 (literal(true) 강제 / 미성년→guardian 강제)
+    // Zod로 schema 측면 재검증 (literal(true) 강제 / 만14 미만→guardian 강제)
     const payload = {
-      isMinor,
+      guardianRequired,
       termsAgreed: checked.terms as true,
       privacyPolicyAgreed: checked.privacy as true,
       guardianConsentObtained: checked.guardian,
@@ -143,7 +144,7 @@ export default function ConsentPage() {
   }
 
   // 성인은 보호자 동의 제외 — "전체 동의" 표시를 진행 가능 조건(필수 항목)과 일치시킨다(Codex #65).
-  const allChecked = checked.terms && checked.privacy && (!isMinor || checked.guardian);
+  const allChecked = checked.terms && checked.privacy && (!guardianRequired || checked.guardian);
   const canProceed = allRequiredMet();
 
   return (
@@ -161,16 +162,16 @@ export default function ConsentPage() {
           한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
         </p>
 
-        {/* 미성년 여부는 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
+        {/* 연령 구간은 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-ink-900">미성년자(만 19세 미만)인가요?</p>
+            <p className="text-sm font-semibold text-ink-900">만 14세 미만인가요?</p>
             <p className="mt-0.5 text-xs text-ink-500">
-              미성년자라면 법정대리인 동의가 필수로 추가됩니다.
+              만 14세 미만이라면 법정대리인 동의가 필수로 추가됩니다.
             </p>
           </div>
           <span className="rounded-md border border-ink-100 bg-ink-50 px-3 py-1.5 text-xs font-medium text-ink-700">
-            {isMinor ? '미성년' : '성인'}
+            {guardianRequired ? '만 14세 미만' : '만 14세 이상'}
           </span>
         </div>
 
@@ -184,7 +185,7 @@ export default function ConsentPage() {
             />
             <span className="font-medium text-ink-900">전체 동의</span>
           </label>
-          <span className="text-xs text-ink-500">필수 {isMinor ? 3 : 2}개</span>
+          <span className="text-xs text-ink-500">필수 {guardianRequired ? 3 : 2}개</span>
         </div>
 
         <section className="space-y-3">
@@ -192,8 +193,8 @@ export default function ConsentPage() {
             <ConsentRow
               key={item.id}
               item={item}
-              required={item.id !== 'guardian' || isMinor}
-              dim={item.id === 'guardian' && !isMinor}
+              required={item.id !== 'guardian' || guardianRequired}
+              dim={item.id === 'guardian' && !guardianRequired}
               checked={checked[item.id]}
               onChange={(v) => toggle(item.id, v)}
             />
@@ -223,7 +224,7 @@ export default function ConsentPage() {
                 const missing: string[] = [];
                 if (!checked.terms) missing.push('이용약관');
                 if (!checked.privacy) missing.push('개인정보');
-                if (isMinor && !checked.guardian) missing.push('법정대리인');
+                if (guardianRequired && !checked.guardian) missing.push('법정대리인');
                 return missing.length > 0
                   ? `필수 동의 ${missing.length}개(${missing.join(', ')})를 체크해야 진행할 수 있습니다.`
                   : '';
@@ -311,9 +312,9 @@ function BlockerNote() {
     >
       <p className="font-semibold">미성년자 보호 정책 (출시 차단 조건)</p>
       <p className="mt-1 text-amber-900/80">
-        본 서비스는 미성년자 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두
-        가동된 이후에만 실제 사용자 데이터를 받습니다. 본 화면은 그 절차를 사용자에게
-        가시화한 베타 미리보기입니다.
+        본 서비스는 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두 가동된 이후에만
+        실제 사용자 데이터를 받습니다. 생기부는 연령과 무관하게 민감정보로 다루며,
+        보관 기간이 지나면 자동 삭제합니다.
       </p>
     </aside>
   );
