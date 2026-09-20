@@ -1,10 +1,11 @@
 'use client';
 
-import { Suspense, useState, useTransition } from 'react';
+import { Suspense, useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Route } from 'next';
 import Link from 'next/link';
-import { auth } from '@/lib/auth';
+import { auth, isPullimAuth } from '@/lib/auth';
+import { osSignupHref } from '@/lib/auth/os-login';
 import { useAuth } from '@/components/auth/auth-provider';
 import { safeNext } from '@/lib/safe-next';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,25 @@ function SignupForm() {
 
   // 오픈 리다이렉트 가드(auth 설계 §5): 내부 경로만 허용.
   const nextRoute = safeNext(searchParams.get('next'), '/submit') as unknown as Route;
+
+  // 실 auth 모드에서는 이 화면을 쓰지 않는다 — 가입 정본은 풀림 OS 다.
+  //
+  // 아래 폼은 mock 어댑터를 전제로 만들어졌고, 실 어댑터의 signup·verifyEmail·
+  // submitGuardianConsent 는 pullim-api DTO 필드명이 아직 TODO 다. mock 에서는 멀쩡히
+  // 돌다가 실 모드로 바꾸는 순간 이 세 단계만 400 으로 죽는다 — 사용자가 처음 만나는
+  // 화면이 실패하는 경로가 된다. 채우는 대신 **정본으로 보낸다**: user-menu 의 가입
+  // 버튼이 이미 osSignupHref 로 가므로, URL 직접 진입만 여기서 같은 곳으로 돌린다.
+  //
+  // OS URL 미설정(로컬·데모)이면 null → 폴백 없이 폼을 그대로 쓴다(모드 안전).
+  // 복귀 주소는 **절대 URL** 이어야 한다 — OS resolveNext 가 allowlist 된 풀림 호스트의
+  // 절대 URL 만 복귀로 인정한다(상대 경로는 무시되고 OS 홈으로 떨어진다).
+  const [redirecting, setRedirecting] = useState(isPullimAuth);
+  useEffect(() => {
+    if (!isPullimAuth) return;
+    const href = osSignupHref(new URL(nextRoute, window.location.origin).toString());
+    if (href) window.location.replace(href);
+    else setRedirecting(false); // OS URL 미설정 — 내부 폼으로 폴백
+  }, [nextRoute]);
 
   // 단계 상태
   const [step, setStep] = useState<Step>('account');
@@ -195,6 +215,15 @@ function SignupForm() {
   const labelCls = 'text-sm font-medium text-ink-900';
 
   // ── 렌더 ─────────────────────────────────────────────────────────────────
+
+  // 풀림 OS 가입으로 넘어가는 중 — mock 폼이 한 프레임이라도 비치지 않게 한다.
+  if (redirecting) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center px-4">
+        <p className="text-sm text-ink-400">풀림 가입 화면으로 이동 중…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
