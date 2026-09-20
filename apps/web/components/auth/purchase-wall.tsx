@@ -8,6 +8,8 @@
 // TODO(P0-8·게이트키퍼/OS): 아래 구매 링크의 정확한 exam 결제 진입 URL 확정
 //   (현재는 NEXT_PUBLIC_OS_URL 홈으로 폴백 — OS 스토어/결제 딥링크가 정해지면 교체).
 
+import { CouponRedeemForm } from './coupon-redeem-form';
+
 const OS_URL = process.env.NEXT_PUBLIC_OS_URL ?? '';
 
 /** OS 결제(구매) 진입 URL. 미설정/형식오류 시 null → 버튼 대신 "준비 중" 안내. */
@@ -63,7 +65,9 @@ export function PurchaseWall({
           </p>
         )}
 
-        {/* 결제 완료 후 같은 탭 복귀 시 재검증(Codex #59) — 구매 반영되면 통과. */}
+        {/* 결제 완료 후 같은 탭 복귀 시 재검증(Codex #59) — 구매 반영되면 통과.
+            **구매 CTA 바로 아래**에 둔다: 이 링크는 구매 흐름에 속한다. 아래 쿠폰 폼은 자체
+            구분선을 갖고 있어서, 순서를 바꾸면 이 링크가 쿠폰 블록에 딸린 것처럼 읽힌다. */}
         {onRecheck && (
           <button
             type="button"
@@ -73,6 +77,11 @@ export function PurchaseWall({
             구매를 완료했다면 다시 확인
           </button>
         )}
+
+        {/* 쿠폰 등록 — OS 결제 딥링크가 없는 동안 **실제로 동작하는 유일한 획득 경로**다.
+            벽에 막힌 사람이 다른 화면으로 가지 않고 그 자리에서 풀 수 있어야 해서 여기 둔다.
+            성공(admissions grant)하면 onRecheck 배관을 그대로 타 게이트가 재판정한다. */}
+        <CouponRedeemForm tone="wall" onGranted={onRecheck} />
 
         {/* 개발자 구역 — 실 구매 CTA 와 확실히 분리한다(구분선 + 낮은 채도 + 작은 글씨).
             실제 권한처럼 보이면 안 되므로 버튼 톤도 회색 계열로 낮춘다. */}
