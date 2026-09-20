@@ -24,7 +24,7 @@ describe('recordSchema — block-tier PII 게이트', () => {
 
 describe('studentProfileSchema — targetTrack enum', () => {
   const consentStub = {
-    isMinor: false,
+    guardianRequired: false,
     termsAgreed: true as const,
     privacyPolicyAgreed: true as const,
     guardianConsentObtained: false,
