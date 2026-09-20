@@ -10,6 +10,7 @@ import {
   schoolTypeLabel,
   type TargetTrack,
   type SchoolType,
+  type Consent,
   detectPii,
   redactPii,
   type PiiMatch,
@@ -197,13 +198,21 @@ export default function SubmitPage() {
       selfReportedWeakAreas: weakAreas || undefined,
       // /submit 단계에서는 *식별* 부분만 검증; consent는 다음 화면에서 추가됨.
       // 여기서는 schema 통과를 위해 stub consent를 만들고 /consent에서 다시 받는다.
+      //
+      // **`Consent` 타입을 명시한다.** 이 객체는 consentSchema 의 모양을 손으로 베껴 둔 것이라,
+      // 스키마 필드가 바뀌면 여기만 조용히 뒤처진다. 실제로 그렇게 깨졌다 — 필드가
+      // `isMinor` → `guardianRequired` 로 바뀌었는데(만14 정정) 이 stub 이 안 따라와
+      // `/submit` 의 모든 제출이 `consent.guardianRequired: Required` 로 막혔다.
+      // 그 키는 FIELD_LABELS 에도 `data-field-error` 앵커에도 없어서 화면에는
+      // "1개 항목을 확인해주세요. (입력 항목)" 만 뜨고 **어느 칸이 문제인지 표시되지 않았다.**
+      // 타입을 붙이면 다음 리네임은 런타임이 아니라 tsc 에서 걸린다.
       consent: {
-        isMinor: true,
+        guardianRequired: true,
         termsAgreed: true,
         privacyPolicyAgreed: true,
         guardianConsentObtained: true,
         consentTimestamp: new Date().toISOString(),
-      },
+      } satisfies Consent,
     };
   }
 

@@ -14,6 +14,9 @@ const FIELD_LABELS: Record<string, string> = {
   'currentStanding.schoolType': '학교 유형',
   targetUniversities: '목표 대학',
   selfReportedWeakAreas: '보완이 필요한 영역',
+  // /submit 의 stub consent 가 스키마와 어긋나면 여기로 떨어진다. 라벨이 없으면 화면에
+  // "(입력 항목)" 만 뜨고 사용자는 어느 칸을 고쳐야 할지 알 수 없다 — 실제로 그렇게 막혔다.
+  consent: '동의 정보',
 };
 
 export function fieldLabel(key: string): string {
