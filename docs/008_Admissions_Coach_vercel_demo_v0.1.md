@@ -1,5 +1,17 @@
 # Vercel Demo 환경 v0.1 — 임시 시연용
 
+> **⚠️ 전제 두 개가 사실과 다르다 (2026-09-20 확인).**
+>
+> 1. **"백엔드(api·DB) 미연결 · mock·합성 데이터만"** — 아니다. FE 는 `pullim-api` 의
+>    `/admissions/*` 에 실제로 배선돼 있다(제출 → 동의 → 진단 enqueue → 폴링 → 결과, ADR-058).
+> 2. **"Phase 0 AWS staging 이 가동되는 즉시 폐기"** — 그 staging 은 오지 않는다. AWS staging
+>    환경 자체가 존재하지 않고(`infra/README.md` 배너), 만들 계획도 폐기됐다. **Vercel 이
+>    현행 배포다.** retire 조건은 대상이 사라졌으므로 무효다.
+>
+> `staging.pullim.curea.co` 매핑 금지 조항도 대상이 없어 의미가 없다.
+> 현재 상태는 `README.md` 를 볼 것.
+
+
 확정일: 2026-05-29 (금)
 작성자: 최선혜 (Education Product Owner)
 성격: **임시 preview**. *production 아님.*
