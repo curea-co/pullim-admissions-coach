@@ -9,6 +9,7 @@ import { UserMenu } from '../components/auth/user-menu';
 // 성공·실패 분기를 전부 고정한다.
 
 let authStatus: 'loading' | 'authed' | 'guest' | 'error' = 'authed';
+let displayName = '박준호';
 const logout = vi.fn();
 const hasAdmissionsAccess = vi.fn();
 const assign = vi.fn();
@@ -17,7 +18,7 @@ let settingsHref: string | null = 'https://os.example.test/settings';
 vi.mock('@/components/auth/auth-provider', () => ({
   useAuth: () => ({
     status: authStatus,
-    user: { id: 'u1', displayName: '박준호', email: 'a@b.test', tier: 'free', package: 'home' },
+    user: { id: 'u1', displayName, email: 'a@b.test', tier: 'free', package: 'home' },
     logout,
     refresh: vi.fn(),
   }),
@@ -43,6 +44,7 @@ const items = () => screen.getAllByRole('menuitem');
 beforeEach(() => {
   vi.clearAllMocks();
   authStatus = 'authed';
+  displayName = '박준호';
   settingsHref = 'https://os.example.test/settings';
   hasAdmissionsAccess.mockResolvedValue(true);
   logout.mockResolvedValue(undefined);
@@ -54,13 +56,32 @@ beforeEach(() => {
 });
 
 describe('UserMenu — 프로필 메뉴 상태 전이', () => {
-  it('아바타 트리거: 이니셜 1글자 + 초기 aria-expanded=false, 로그아웃 버튼은 topbar 에 없다', () => {
+  it('아바타 트리거: 이니셜 1글자 + 이름 텍스트 병기 + 초기 aria-expanded=false, 로그아웃 버튼은 topbar 에 없다', () => {
     render(<UserMenu />);
+    // 2026-09-21 오너 결정 — 아바타(이니셜)는 그대로 유지하면서 트리거에 이름을 병기한다.
+    // user-menu.tsx 상단 주석 참고(형제 앱 3곳과 의도적으로 갈라진 지점).
     expect(trigger()).toHaveTextContent('박');
+    expect(trigger()).toHaveTextContent('박준호');
     expect(trigger()).toHaveAttribute('aria-expanded', 'false');
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu');
+    // 접근명은 이름 유무와 무관하게 정적 aria-label 이 낸다.
+    expect(trigger()).toHaveAttribute('aria-label', '프로필 메뉴 열기');
     // OS 규격: 로그아웃은 드롭다운 안에만 — 닫힌 상태에서 노출되면 안 된다.
     expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
+  });
+
+  it('긴 이름은 트리거에서 truncate 클래스로 잘리고(max-width), 레이아웃을 밀지 않는다', () => {
+    displayName = '아주아주아주긴이름을가진학생사용자';
+    render(<UserMenu />);
+    const nameEl = screen.getByText(displayName);
+    expect(nameEl).toHaveClass('truncate');
+    expect(nameEl.className).toMatch(/max-w-/);
+  });
+
+  it('이름이 비어 있으면 트리거·드롭다운 모두 "사용자" 로 폴백한다', () => {
+    displayName = '';
+    render(<UserMenu />);
+    expect(trigger()).toHaveTextContent('사용자');
   });
 
   it('클릭으로 열면 aria-expanded=true + 항목이 순서대로 나오고 첫 항목에 포커스', async () => {
