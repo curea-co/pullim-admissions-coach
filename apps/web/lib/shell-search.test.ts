@@ -94,7 +94,7 @@ describe('SHELL_SEARCH_INDEX', () => {
     expect(nav.map((i) => [i.label, i.href])).toEqual([
       ['홈', '/'],
       ['생기부 제출', '/submit'],
-      ['진단 결과', '/result'],
+      ['진단 내역', '/result'],
     ]);
   });
 
@@ -132,9 +132,9 @@ describe('searchShell', () => {
     expect(searchShell('')).not.toBe(SHELL_SEARCH_INDEX);
   });
 
-  it('한글 질의 "진단" → 진단 결과 · 생기부 진단 가이드', () => {
+  it('한글 질의 "진단" → 진단 내역 · 생기부 진단 가이드', () => {
     expect(searchShell('진단').map((i) => i.label)).toEqual([
-      '진단 결과',
+      '진단 내역',
       '생기부 진단 가이드',
     ]);
   });

@@ -56,7 +56,6 @@ function LoginForm() {
         {/* 카드 */}
         <div className="rounded-2xl border border-ink-100 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">로그인</h1>
-          <p className="mt-1.5 text-sm text-ink-500">계정에 로그인하세요.</p>
 
           <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
             {/* 이메일 */}

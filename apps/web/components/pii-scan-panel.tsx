@@ -38,7 +38,7 @@ export function PiiScanPanel({
   if (matches.length === 0) {
     return (
       <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3 text-sm text-emerald-800">
-        ✓ 식별정보로 의심되는 항목이 발견되지 않았습니다.
+        식별정보로 보이는 항목이 없어요.
       </div>
     );
   }
@@ -55,8 +55,8 @@ export function PiiScanPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold text-ink-900">
           {block.length > 0
-            ? `🔴 반드시 가려야 할 식별정보 ${block.length}건`
-            : `🟡 확인이 필요한 항목 ${warn.length}건`}
+            ? `반드시 가려야 할 식별정보 ${block.length}건`
+            : `확인이 필요한 항목 ${warn.length}건`}
         </p>
         <button
           type="button"
@@ -73,8 +73,13 @@ export function PiiScanPanel({
       )}
       {warn.length > 0 && (
         <p className="mt-1.5 text-xs text-amber-700">
-          {summarize(warn).join(' · ')} — 이름·교사 등으로 보입니다. 자동 가림하거나, 식별정보가
-          아니면 아래에서 확인 후 진행하세요.
+          {summarize(warn).join(' · ')} — 이름·교사로 보이는 항목이에요.{' '}
+          {/* 아래 확인란(submit/page.tsx)은 **차단 항목이 없을 때만** 그려진다. 둘 다 잡힌
+              상태에서 "아래에서 확인" 이라고 하면 없는 컨트롤을 가리키게 된다 — 그때는
+              다음에 할 일(가리기)만 말한다. */}
+          {block.length > 0
+            ? '[자동 가림]을 누르면 함께 가려져요.'
+            : '[자동 가림]을 누르거나, 식별정보가 아니면 아래 확인란에 체크하고 진행하세요.'}
         </p>
       )}
     </div>

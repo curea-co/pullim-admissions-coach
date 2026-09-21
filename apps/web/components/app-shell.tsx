@@ -17,7 +17,7 @@ import { isFeedbackEnabled } from '@/lib/feedback';
 const NAV: { label: string; href: string; icon: React.ReactNode }[] = [
   { label: '홈', href: '/', icon: <IconHome /> },
   { label: '생기부 제출', href: '/submit', icon: <IconUpload /> },
-  { label: '진단 결과', href: '/result', icon: <IconChart /> },
+  { label: '진단 내역', href: '/result', icon: <IconChart /> },
 ];
 
 function isActive(pathname: string, href: string) {

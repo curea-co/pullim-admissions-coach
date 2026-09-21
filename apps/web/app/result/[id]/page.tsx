@@ -245,10 +245,10 @@ function ResultView({ id }: { id: string }) {
           <StepIndicator current="result" />
         </div>
         {/* 제출 프로필은 이 브라우저의 로컬 값이라 없을 수 있다(다른 기기·프라이빗 모드).
-            없으면 학년·계열을 지어내지 않고 제목만 둔다 — 결과 본문은 서버 정본 그대로다. */}
-        <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
-          {profile ? `${formatStandingLabel(profile)} · 1차 진단 결과` : '1차 진단 결과'}
-        </p>
+            없으면 학년·계열을 지어내지 않고 줄째로 뺀다 — 결과 본문은 서버 정본 그대로다.
+            "1차 진단 결과" 라는 꼬리표도 뺐다: 재제출로 여러 건이 쌓이는데 세 번째 결과도
+            "1차" 라고 적혔고, 바로 위 h1 이 이미 "진단 결과" 라 같은 말이 두 줄 연속이었다. */}
+        {profile && <p className="mb-2 text-ink-700">{formatStandingLabel(profile)}</p>}
         {profile && (() => {
           const cohort = cohortFromGrade(profile.grade);
           const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영' : '');
@@ -383,10 +383,7 @@ function ResultView({ id }: { id: string }) {
 
         <div className="mt-10 mb-6">
           <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
-          <ResultActions
-            track={profile ? formatStandingLabel(profile) : '공학계열'}
-            summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
-          />
+          <ResultActions summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안" />
         </div>
         </>
         )}
@@ -445,7 +442,7 @@ function InterviewPanelReal({ questions }: { questions: ResultViewModel['intervi
   if (questions.length === 0) {
     return (
       <section className="space-y-4">
-        <p className="text-sm text-ink-500">면접 준비 팩 데이터가 없습니다.</p>
+        <p className="text-sm text-ink-500">예상 질문이 아직 없어요.</p>
       </section>
     );
   }
@@ -654,7 +651,7 @@ function ImprovementsPanelReal({
     return (
       <section className="space-y-4">
         <KeywordCloud keywords={keywords} />
-        <p className="text-sm text-ink-500">이 프로필에 해당하는 보완 처방이 없습니다.</p>
+        <p className="text-sm text-ink-500">제안할 보완 활동이 없어요.</p>
       </section>
     );
   }
@@ -662,7 +659,7 @@ function ImprovementsPanelReal({
     <section className="space-y-4">
       <KeywordCloud keywords={keywords} />
       <p className="text-sm text-ink-500">
-        게이트 통과 합법 처방 {items.length}건 — 대입 반영 영역 기반
+        앞으로 할 활동 {items.length}건
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item, idx) => (

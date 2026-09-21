@@ -99,10 +99,12 @@ function ResultList() {
       <PageHeader />
       <div className="w-full max-w-4xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-ink-900">진단 결과</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink-900">진단 내역</h1>
           <StepIndicator current="result" />
         </div>
-        <p className="mb-6 text-ink-700">지금까지 받은 진단 내역이에요. 하나를 골라 결과를 확인하세요.</p>
+        <p className="mb-6 text-ink-700">
+          지금까지 받은 진단이에요. 하나를 골라 면접 준비 팩 · 진단 가이드 · 보완안을 확인하세요.
+        </p>
 
         {state === 'loading' && (
           <div className="space-y-3" role="status" aria-live="polite">
@@ -152,9 +154,6 @@ function ResultList() {
                     <div>
                       <p className="text-base font-semibold text-ink-900">
                         {formatDate(r.createdAt)} 진단
-                      </p>
-                      <p className="mt-1 text-sm text-ink-500">
-                        면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안
                       </p>
                     </div>
                     <span

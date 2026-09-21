@@ -62,7 +62,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('RequireAdmissionsAccess — 개발용 엔타이틀먼트 우회 배선', () => {
   it('denied + 플래그 off → 구매 벽만 나오고 개발 버튼은 없다', async () => {
     renderGate();
-    await screen.findByText('유료 회원만 이용할 수 있어요');
+    await screen.findByText('입시 이용권이 필요해요');
     expect(devButton()).not.toBeInTheDocument();
     expect(child()).not.toBeInTheDocument();
   });
@@ -70,7 +70,7 @@ describe('RequireAdmissionsAccess — 개발용 엔타이틀먼트 우회 배선
   it('denied + 플래그 on(로컬) → 개발 버튼 노출, 클릭하면 children + 경고 배지', async () => {
     vi.stubEnv('NEXT_PUBLIC_DEV_ENTITLEMENT_BYPASS', 'true');
     renderGate();
-    await screen.findByText('유료 회원만 이용할 수 있어요');
+    await screen.findByText('입시 이용권이 필요해요');
     // 실 권한처럼 보이지 않도록 한계를 명시한 안내가 버튼과 함께 붙어 있어야 한다.
     expect(screen.getByText('개발 환경 전용')).toBeInTheDocument();
 
@@ -85,7 +85,7 @@ describe('RequireAdmissionsAccess — 개발용 엔타이틀먼트 우회 배선
     vi.stubEnv('NEXT_PUBLIC_DEV_ENTITLEMENT_BYPASS', 'true');
     setHost('admissions.pullim.ai');
     renderGate();
-    await screen.findByText('유료 회원만 이용할 수 있어요');
+    await screen.findByText('입시 이용권이 필요해요');
     expect(devButton()).not.toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe('RequireAdmissionsAccess — 개발용 엔타이틀먼트 우회 배선
 
     fireEvent.click(screen.getByRole('button', { name: '해제' }));
 
-    await screen.findByText('유료 회원만 이용할 수 있어요');
+    await screen.findByText('입시 이용권이 필요해요');
     expect(child()).not.toBeInTheDocument();
     expect(screen.queryByText('개발 우회 중 · 실 이용권 아님')).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(KEY)).toBeNull();
