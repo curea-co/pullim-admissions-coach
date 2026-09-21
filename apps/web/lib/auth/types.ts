@@ -7,6 +7,12 @@ export type User = {
   id: string;
   email: string;
   displayName: string;
+  /**
+   * KCB 본인인증 실명(pullim-api `GET /me` 의 `name` — users.name AES-256-GCM 복호).
+   * **본인 조회 한정 PII** 다: 로그·토큰·스토리지 어디에도 남기지 않는다(auth-provider 는 메모리에만 둔다).
+   * mock 모드에는 본인인증이 없어 부재할 수 있으므로 선택 필드 — 표시 시 displayName 으로 폴백한다.
+   */
+  name?: string;
   ageBand: AgeBand;
   isMinor: boolean;
   guardianConsent: GuardianConsent;
