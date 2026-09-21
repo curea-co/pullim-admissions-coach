@@ -70,6 +70,16 @@ const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
 /** 파라미터가 없거나 알 수 없는 값일 때의 탭. `tabs` 의 첫 항목과 같아야 한다. */
 const DEFAULT_TAB: Tab = 'interview';
 
+/**
+ * 브레드크럼의 진단 날짜. 목록 화면(app/result/page.tsx)의 `formatDate` 와 같은 표기여야
+ * 두 화면이 같은 진단을 같은 이름으로 부른다 — 한쪽만 바꾸면 방금 누른 줄을 못 알아본다.
+ */
+function formatDiagnosedOn(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '날짜 미상';
+  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 /** 알 수 없는 값은 조용히 null → 기본 탭. 잘못된 링크로 에러 화면을 띄우지 않는다. */
 function parseTabParam(search: string): Tab | null {
   try {
@@ -107,6 +117,9 @@ function ResultView({ id }: { id: string }) {
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
   const [state, setState] = useState<ResultState>('loading');
+  // 브레드크럼의 현재 항목 라벨. 목록이 "2026년 9월 20일 진단"으로 부르는 것과 같은 이름이어야
+  // 방금 어느 줄을 눌렀는지 알아볼 수 있다 — 그래서 id 가 아니라 생성일을 쓴다.
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
 
   // URL → 탭 동기화.
   // useSearchParams() 를 쓰지 않는다: 클라이언트 컴포넌트가 이걸 쓰면 Next 14 App Router 가
@@ -160,6 +173,7 @@ function ResultView({ id }: { id: string }) {
         setState('not_found');
         return;
       }
+      setCreatedAt(dto.createdAt ?? null);
       if (dto.status === 'pending' || dto.status === 'processing') {
         setState('in_progress');
         return;
@@ -208,6 +222,22 @@ function ResultView({ id }: { id: string }) {
     <>
       <PageHeader />
       <div className="w-full max-w-4xl px-6 py-10">
+        {/* 브레드크럼 — 상세는 목록의 하위 화면이므로 어디에서 왔는지와 돌아가는 길을 위에 둔다.
+            본문이 길어 하단 링크만으로는 되돌아가려고 끝까지 스크롤해야 한다(하단 링크도 함께 유지).
+            현재 항목은 링크가 아니다(aria-current="page") — 자기 자신으로 가는 링크는 오해를 준다. */}
+        <nav aria-label="현재 위치" className="mb-3">
+          <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-500">
+            <li>
+              <Link href="/result" className="rounded transition hover:text-ink-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+                진단 내역
+              </Link>
+            </li>
+            <li aria-hidden className="text-ink-300">/</li>
+            <li aria-current="page" className="font-medium text-ink-700">
+              {createdAt ? `${formatDiagnosedOn(createdAt)} 진단` : '진단 결과'}
+            </li>
+          </ol>
+        </nav>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             진단 결과
