@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
+import { osSettingsHref } from '@/lib/auth/os-login';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
 import { studentProfileSchema } from '@pullim/shared';
 import { clearAnalyzeResult } from '@/lib/result-view';
@@ -186,7 +187,7 @@ function ProcessingFlow() {
         }
         setErrorMsg(
           entitlementBlocked
-            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 마이페이지에서 등록해 주세요.'
+            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 풀림 계정 설정에서 등록해 주세요.'
             : (e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.'))
         );
         setPhase('error');
@@ -248,14 +249,22 @@ function ProcessingFlow() {
                 다시 시도
               </button>
               )}
-              {needsEntitlement && (
-                <Link
-                  href="/mypage"
-                  className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
-                >
-                  이용권·쿠폰 등록하기
-                </Link>
-              )}
+              {/* 이용권 등록 창구는 풀림 OS 설정이 정본이다(구매·쿠폰·결제수단 한자리).
+                  예전에는 앱의 /mypage 로 보냈는데, 그 화면이 OS 설정과 중복이라 걷어냈다.
+                  OS URL 미설정 환경에서는 링크를 만들 수 없으므로 안내 문구만 남긴다. */}
+              {needsEntitlement &&
+                (osSettingsHref() ? (
+                  <a
+                    href={osSettingsHref() as string}
+                    className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                  >
+                    이용권·쿠폰 등록하기
+                  </a>
+                ) : (
+                  <span className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-medium text-ink-500">
+                    이용권 등록은 풀림 계정 설정에서 할 수 있어요
+                  </span>
+                ))}
               <Link
                 href="/submit"
                 className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
