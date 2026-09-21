@@ -80,7 +80,23 @@ function parseTabParam(search: string): Tab | null {
   }
 }
 
+// 게이트를 페이지 최상위에서 렌더 — 결과 조회(effect)는 게이트 **하위 자식**으로 둔다.
+// 페이지 컴포넌트 자신에 effect 를 두면 게이트가 JSX 렌더만 막고 마운트 effect(진단 조회)는
+// 그대로 실행된다(Codex #59 · /processing 과 같은 함정). 그러면 ① 미보유 사용자의 deep-link 가
+// GET /admissions/results 를 쏴서 403 을 받고 ② 쿠폰 등록·"다시 확인"·개발 우회로 벽이 그 자리에서
+// 걷혀도 페이지가 remount 되지 않아 그때 받은 unavailable 상태가 그대로 굳는다(실 결과 대신
+// 오류 배너). 자식으로 분리하면 벽이 걷히는 순간이 곧 자식의 첫 마운트라 조회가 새로 돈다.
 export default function ResultPage() {
+  return (
+    <RequireAuth>
+      <RequireAdmissionsAccess>
+        <ResultView />
+      </RequireAdmissionsAccess>
+    </RequireAuth>
+  );
+}
+
+function ResultView() {
   // 초기값은 서버 렌더와 동일한 기본 탭 — URL 을 렌더 중에 읽으면 서버/클라이언트 초기 HTML 이
   // 달라져 hydration mismatch 가 난다. 실제 보정은 아래 effect 에서 한다.
   const [tab, setTab] = useState<Tab>(DEFAULT_TAB);
@@ -125,9 +141,9 @@ export default function ResultPage() {
     // 연결되지 않은 값이라 네트워크/권한 오류 시 타인·과거 결과가 재렌더될 수 있다.
     let cancelled = false;
     async function loadFromServer() {
-      // 이용권 판정은 상위 RequireAdmissionsAccess 가 이미 끝냈다(flags.admissions). 그래서
-      // 여기서 만나는 403 은 미보유가 아니라 실제 이상(RBAC 오설정·정책 회귀)이고, 아래
-      // unavailable 로 드러난다 — 조용한 폴백을 두지 않는다(Codex #59).
+      // 이 컴포넌트는 게이트를 통과한 뒤에야 마운트된다(위 ResultPage 참고) — 즉 여기 도달했다는
+      // 건 flags.admissions 판정이 이미 끝났다는 뜻이다. 그래서 여기서 만나는 403 은 미보유가
+      // 아니라 실제 이상(RBAC 오설정·정책 회귀)이고, 아래 unavailable 로 드러낸다(Codex #59).
       let dto: DiagnosisDto | null = null;
       let fetchFailed = false;
       try {
@@ -139,7 +155,10 @@ export default function ResultPage() {
         if (id) {
           try {
             dto = await getDiagnosis(id);
-            fetchFailed = false;
+            // **dto 가 실제로 왔을 때만** 실패를 취소한다. 204·빈 본문이면 api.request 가
+            // undefined 를 주는데, 그걸 성공으로 치면 아래에서 '이력 없음'(제출 유도)으로
+            // 읽혀 이미 제출한 사용자를 중복 제출로 떠민다 — 장애는 장애로 말해야 한다.
+            if (dto) fetchFailed = false;
           } catch {
             // 단건 폴백도 실패 — 아래 unavailable.
           }
@@ -196,8 +215,6 @@ export default function ResultPage() {
   };
 
   return (
-    <RequireAuth>
-    <RequireAdmissionsAccess>
     <>
       <PageHeader />
       <div className="w-full max-w-4xl px-6 py-10">
@@ -364,8 +381,6 @@ export default function ResultPage() {
         </div>
       </div>
     </>
-    </RequireAdmissionsAccess>
-    </RequireAuth>
   );
 }
 
