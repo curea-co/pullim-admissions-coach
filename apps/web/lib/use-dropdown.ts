@@ -94,7 +94,7 @@ export interface UseDropdownResult {
  *     <button {...triggerProps} type="button" aria-haspopup="menu" aria-label="프로필 메뉴 열기" />
  *     {open && (
  *       <div {...menuProps} role="menu" aria-label="프로필">
- *         <a role="menuitem" tabIndex={-1} href="/mypage" onClick={close}>마이페이지</a>
+ *         <a role="menuitem" tabIndex={-1} href="/result" onClick={close}>내 진단</a>
  *       </div>
  *     )}
  *   </div>

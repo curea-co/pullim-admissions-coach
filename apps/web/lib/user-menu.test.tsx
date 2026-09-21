@@ -67,15 +67,15 @@ describe('UserMenu — 프로필 메뉴 상태 전이', () => {
     render(<UserMenu />);
     openMenu();
     expect(trigger()).toHaveAttribute('aria-expanded', 'true');
-    expect(items().map((i) => i.textContent)).toEqual(['마이페이지', '설정', '로그아웃']);
+    expect(items().map((i) => i.textContent)).toEqual(['내 진단', '내 정보', '로그아웃']);
     await waitFor(() => expect(items()[0]).toHaveFocus());
   });
 
-  it('OS URL 미설정이면 "설정" 항목을 통째로 숨긴다', async () => {
+  it('OS URL 미설정이면 "내 정보"(OS 위임) 항목을 통째로 숨긴다', async () => {
     settingsHref = null;
     render(<UserMenu />);
     openMenu();
-    expect(items().map((i) => i.textContent)).toEqual(['마이페이지', '로그아웃']);
+    expect(items().map((i) => i.textContent)).toEqual(['내 진단', '로그아웃']);
     // 열면서 시작된 이용권 조회가 테스트 종료 후 resolve 되며 act() 경고를 내지 않도록 정착시킨다.
     await waitFor(() => expect(screen.getByText('입시 이용권 보유')).toBeInTheDocument());
   });

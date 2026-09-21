@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import ResultPage from './page';
 
-// /result 의 `?tab=` 딥링크 회귀 고정.
+// /result/[id] 의 `?tab=` 딥링크 회귀 고정.
 //
 // 왜 이 파일이 있나 — 결과 화면의 탭 선택은 URL 로 지목할 수 있어야 한다(⌘K 팔레트가
 // `/result?tab=diagnosis` 로 보낸다). 그 동기화 로직은 눈에 잘 안 띄는 두 개의 장치에
@@ -34,10 +34,7 @@ vi.mock('@/components/auth/require-admissions-access', () => ({
 // 탭은 **실제 진단 결과가 있을 때만** 렌더된다(예시/데모 경로는 2026-09-21 제거). 그래서
 // 여기서는 done 진단 1건을 세워 두고, 결과 본문 자체는 빈 배열로 둔다 — 탭 동기화만 본다.
 vi.mock('@/lib/admissions-api', () => ({
-  fetchLatestDiagnosis: vi.fn().mockResolvedValue({ id: 'd1', status: 'done' }),
-  loadLastResultId: vi.fn().mockReturnValue(null),
-  saveLastResultId: vi.fn(),
-  getDiagnosis: vi.fn(),
+  getDiagnosis: vi.fn().mockResolvedValue({ id: 'd1', status: 'done' }),
   toAnalyzeResult: vi.fn().mockReturnValue({ diagnosis: {}, rubric: {} }),
 }));
 
@@ -66,7 +63,7 @@ const setUrl = (url: string) => window.history.replaceState(null, '', url);
  * 없어도 데모 패널이 즉시 떠서 동기 단언이 통했는데, 데모를 걷어낸 뒤로는 기다려야 한다.
  */
 async function renderReady() {
-  const utils = render(<ResultPage />);
+  const utils = render(<ResultPage params={{ id: 'd1' }} />);
   await screen.findByRole('tablist');
   return utils;
 }
@@ -160,7 +157,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
 
     // 팔레트의 router.push 가 하는 일 그대로: 주소 변경 + 같은 트리 재렌더(언마운트 아님).
     window.history.pushState(null, '', '/result?tab=diagnosis');
-    rerender(<ResultPage />);
+    rerender(<ResultPage params={{ id: 'd1' }} />);
 
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
     // remount 가 아니었음을 증명한다 — 마운트 1회 effect([] 의존성)가 다시 돌지 않았다.
@@ -179,7 +176,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
 
     window.history.pushState(null, '', '/result');
-    rerender(<ResultPage />);
+    rerender(<ResultPage params={{ id: 'd1' }} />);
 
     await waitFor(() => expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩'));
     expect(loadSubmittedProfile).toHaveBeenCalledTimes(1); // remount 가 아니었다
@@ -191,7 +188,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
 
     window.history.pushState(null, '', '/result?tab=nope');
-    rerender(<ResultPage />);
+    rerender(<ResultPage params={{ id: 'd1' }} />);
 
     await waitFor(() => expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩'));
     expect(loadSubmittedProfile).toHaveBeenCalledTimes(1); // remount 가 아니었다
@@ -218,7 +215,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
       expect(window.location.search).toBe('?tab=diagnosis');
 
       // 이후 어떤 이유로든 다시 렌더돼도 선택은 사용자가 누른 탭 그대로다.
-      rerender(<ResultPage />);
+      rerender(<ResultPage params={{ id: 'd1' }} />);
       expect(selectedTab()).toBe('부족 활동 보완안');
     } finally {
       replaceState.mockRestore();
@@ -244,7 +241,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
       expect(selectedTab()).toBe('생기부 진단 가이드');
       expect(window.location.search).toBe(''); // 주소는 갱신에 실패해 파라미터가 없다
 
-      rerender(<ResultPage />);
+      rerender(<ResultPage params={{ id: 'd1' }} />);
       expect(selectedTab()).toBe('생기부 진단 가이드');
     } finally {
       replaceState.mockRestore();

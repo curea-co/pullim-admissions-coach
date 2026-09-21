@@ -1,0 +1,815 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { PageHeader } from '@/components/page-header';
+import { StepIndicator } from '@/components/step-indicator';
+import { GuardrailLabel } from '@/components/guardrail-label';
+import { cn } from '@/lib/utils';
+import { RequireAuth } from '@/components/auth/require-auth';
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
+import { EmptyState } from '@/components/empty-state';
+import { SkeletonCard } from '@/components/loading-skeleton';
+// 진단 결과 **상세** — /result/[id]. 목록(/result)에서 한 건을 고르면 여기로 온다.
+//
+// 로그인 + admissions 이용권 두 겹의 게이트 뒤에 있다(정책 v2.0 §7-3 · 012 A8′). 무료 회원에게는
+// RequireAdmissionsAccess 의 구매 벽이 뜬다 — 예시(데모) 결과를 대신 보여주지 않는다.
+// 이 화면은 **실제 진단만** 렌더하고, 실제가 없으면 그 이유(진행중·실패·없음·조회불가)를 그대로
+// 말한다(§6 정직). 게이트를 통과한 뒤 만나는 403 은 미보유가 아니라 실제 이상으로 취급한다(Codex #59).
+import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
+import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
+import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
+import { getDiagnosis, toAnalyzeResult, type DiagnosisDto } from '@/lib/admissions-api';
+import type { ApiError } from '@/lib/api';
+import { SelfAnswer } from '@/components/result/self-answer';
+import { ResultActions } from '@/components/result/result-actions';
+import type { Roadmap, RoadmapPhase } from '@pullim/engine';
+import type { FitAssessment } from '@/lib/fit';
+
+const COHORT_LABEL: Record<CohortResult['system'], string> = {
+  '2027_old': '2027 대입 · 구체제',
+  '2028_new': '2028 대입 · 신체제',
+  '2029_new': '2029 대입 · 신체제',
+};
+
+const RECORD_AREA_LABEL: Record<string, string> = {
+  SETUK: '교과 세특',
+  CREATIVE_REGULAR: '정규 창의적 체험활동',
+  BEHAVIOR: '행동 특성 및 종합의견',
+};
+
+const FIT_LEVEL_STYLE: Record<'강함' | '적정' | '보완필요', string> = {
+  강함: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  적정: 'border-amber-200 bg-amber-50 text-amber-700',
+  보완필요: 'border-red-200 bg-red-50 text-red-700',
+};
+
+type Tab = 'interview' | 'diagnosis' | 'improvements';
+
+/**
+ * 결과 화면의 유일한 상태 축. 'ready' 일 때만 viewModel 이 채워져 있다.
+ * - loading     서버 조회 중
+ * - ready       실제 진단 결과 있음
+ * - not_found   그 id 의 진단이 없음(404 — 남의 진단·삭제된 진단·오타 난 링크)
+ * - in_progress 제출됨 · 분석 진행 중
+ * - failed      분석 실패 또는 done 인데 본문 손상
+ * - unavailable 조회 자체가 실패(5xx·네트워크·게이트 통과 후 403)
+ */
+type ResultState = 'loading' | 'ready' | 'not_found' | 'in_progress' | 'failed' | 'unavailable';
+
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'interview', label: '학생부 종합 전형 면접 준비 팩' },
+  { id: 'diagnosis', label: '생기부 진단 가이드' },
+  { id: 'improvements', label: '부족 활동 보완안' },
+];
+
+// ?tab= 딥링크 — ⌘K 팔레트/외부 링크가 특정 탭을 지목할 수 있게 한다.
+// `lib/shell-search.ts` 의 href(`/result?tab=diagnosis` …)와 값이 같아야 한다.
+const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
+
+/** 파라미터가 없거나 알 수 없는 값일 때의 탭. `tabs` 의 첫 항목과 같아야 한다. */
+const DEFAULT_TAB: Tab = 'interview';
+
+/** 알 수 없는 값은 조용히 null → 기본 탭. 잘못된 링크로 에러 화면을 띄우지 않는다. */
+function parseTabParam(search: string): Tab | null {
+  try {
+    const raw = new URLSearchParams(search).get('tab');
+    return raw && TAB_IDS.has(raw) ? (raw as Tab) : null;
+  } catch {
+    return null;
+  }
+}
+
+// 게이트를 페이지 최상위에서 렌더 — 결과 조회(effect)는 게이트 **하위 자식**으로 둔다.
+// 페이지 컴포넌트 자신에 effect 를 두면 게이트가 JSX 렌더만 막고 마운트 effect(진단 조회)는
+// 그대로 실행된다(Codex #59 · /processing 과 같은 함정). 그러면 ① 미보유 사용자의 deep-link 가
+// GET /admissions/results 를 쏴서 403 을 받고 ② 쿠폰 등록·"다시 확인"·개발 우회로 벽이 그 자리에서
+// 걷혀도 페이지가 remount 되지 않아 그때 받은 unavailable 상태가 그대로 굳는다(실 결과 대신
+// 오류 배너). 자식으로 분리하면 벽이 걷히는 순간이 곧 자식의 첫 마운트라 조회가 새로 돈다.
+export default function ResultDetailPage({ params }: { params: { id: string } }) {
+  return (
+    <RequireAuth>
+      <RequireAdmissionsAccess>
+        <ResultView id={params.id} />
+      </RequireAdmissionsAccess>
+    </RequireAuth>
+  );
+}
+
+function ResultView({ id }: { id: string }) {
+  // 초기값은 서버 렌더와 동일한 기본 탭 — URL 을 렌더 중에 읽으면 서버/클라이언트 초기 HTML 이
+  // 달라져 hydration mismatch 가 난다. 실제 보정은 아래 effect 에서 한다.
+  const [tab, setTab] = useState<Tab>(DEFAULT_TAB);
+  // 이미 반영한 window.location.search. effect 가 URL 의 **값**이 아니라 **변화**에만 반응하게
+  // 하는 표식이다 — 값에 반응하면 주소 갱신이 실패했을 때(아래 selectTab 참고) 방금 누른 탭을
+  // 옛 URL 로 되감아 버린다.
+  const syncedSearchRef = useRef<string | null>(null);
+  const [profile, setProfile] = useState<SubmittedProfile | null>(null);
+  const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
+  const [state, setState] = useState<ResultState>('loading');
+
+  // URL → 탭 동기화.
+  // useSearchParams() 를 쓰지 않는다: 클라이언트 컴포넌트가 이걸 쓰면 Next 14 App Router 가
+  // 정적 렌더 시 Suspense 경계를 요구해 빌드가 깨진다. 대신 window.location.search 를 읽는다.
+  // 의존성 배열이 없는 이유 — 이미 /result 에 있는 상태에서 팔레트가 router.push('/result?tab=…')
+  // 하면 컴포넌트가 remount 되지 않아 마운트 1회 effect(`[]`)로는 탭이 바뀌지 않는다. 매 렌더마다
+  // URL 을 확인하되, 직전에 반영한 search 문자열과 같으면 아무것도 하지 않는다.
+  // 이 두 가지(의존성 배열 없음 · search 문자열 비교)는 app/result/tab-deeplink.test.tsx 가
+  // 변이 검사로 고정한다 — 손대기 전에 그 테스트를 먼저 읽을 것.
+  //
+  // exhaustive-deps 를 끄는 이유: 이 규칙은 "[] 를 넣어라"고 권하는데, 그게 바로 위에서 설명한
+  // 회귀다(remount 없는 URL 변경에 탭이 안 따라옴). 경고를 남겨두면 다음 사람이 규칙 조언을
+  // 그대로 따라 고쳐서 기능을 깨뜨린다 — 무한 갱신은 규칙이 걱정하는 방식이 아니라 위 ref 로 막는다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const search = window.location.search;
+    if (search === syncedSearchRef.current) return;
+    syncedSearchRef.current = search;
+    // 파라미터가 사라지거나 알 수 없는 값이 되면 **기본 탭으로 되돌린다**(Codex PR #74 P1).
+    // 팔레트의 "진단 결과" href 가 파라미터 없는 `/result` 라, ?tab=diagnosis 를 보던 중에
+    // 그걸 고르면 remount 없이 URL 만 `/result` 가 된다 — 이때 이전 탭이 남아 있으면
+    // 주소와 화면이 어긋난다. 진입 시점만이 아니라 **전이**도 URL 을 따라야 한다.
+    setTab(parseTabParam(search) ?? DEFAULT_TAB);
+  });
+
+  useEffect(() => {
+    setProfile(loadSubmittedProfile());
+
+    // 정본 = admissions 백엔드(diagnosis_results) — URL 의 id 로 단건 조회(ADR-058).
+    // 진행중·실패·없음은 각각 제 이름의 상태로 노출한다(§6 정직 — 결과 없음을 얼버무리지 않는다).
+    let cancelled = false;
+    async function loadFromServer() {
+      // 이 컴포넌트는 게이트를 통과한 뒤에야 마운트된다(위 ResultDetailPage 참고) — 즉 여기 도달했다는
+      // 건 flags.admissions 판정이 끝났다는 뜻이다. 그래서 여기서 만나는 403 은 미보유가 아니라
+      // 실제 이상(RBAC 오설정·정책 회귀)이고, unavailable 로 드러낸다(Codex #59).
+      let dto: DiagnosisDto | null = null;
+      try {
+        dto = await getDiagnosis(id);
+      } catch (err) {
+        if (cancelled) return;
+        // 404 는 장애가 아니라 "그런 진단이 없다" 다 — 남의 진단 id·삭제된 진단·오타 난 링크.
+        // 이걸 unavailable("일시적 오류, 잠시 후 새로고침")로 뭉뚱그리면 영원히 낫지 않을 화면을
+        // 계속 새로고침하게 만든다.
+        setState((err as ApiError)?.status === 404 ? 'not_found' : 'unavailable');
+        return;
+      }
+      if (cancelled) return;
+
+      if (!dto) {
+        // 본문 없는 200(204·빈 응답) — 있다고 말할 근거가 없다.
+        setState('not_found');
+        return;
+      }
+      if (dto.status === 'pending' || dto.status === 'processing') {
+        setState('in_progress');
+        return;
+      }
+      if (dto.status === 'done') {
+        const result = toAnalyzeResult(dto);
+        if (result) {
+          setViewModel(toResultViewModel(result));
+          setState('ready');
+          return;
+        }
+        // done 인데 본문 손상(부분 영속) — 결과가 있다고 말할 근거가 없으므로 실패로 노출(재제출 유도).
+        setState('failed');
+        return;
+      }
+      // 'failed' 및 계약에 없는 status — 같은 이유로 실패로 닫는다.
+      setState('failed');
+    }
+    loadFromServer();
+    return () => {
+      cancelled = true;
+    };
+    // id 를 구독한다 — 목록↔상세를 오가며 다른 진단으로 이동해도 remount 없이 재조회된다.
+  }, [id]);
+
+  // 탭 전환 시 URL 만 갱신. router.replace 대신 history.replaceState 를 쓰는 이유 —
+  // 탭 전환은 새 페이지가 아니라 같은 화면의 상태라 RSC 왕복·스크롤 리셋이 낭비다.
+  // Next 14.1+ 는 window.history.pushState/replaceState 를 패치해 App Router 주소 상태까지
+  // 같이 맞춰준다(공식 권장 형태). replaceState 라 뒤로가기 이력도 탭 수만큼 쌓이지 않는다.
+  const selectTab = (id: Tab) => {
+    setTab(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', id);
+      window.history.replaceState(null, '', url.toString());
+      // 우리가 만든 URL 변경은 위 effect 가 다시 처리하지 않도록 표식을 앞당겨 찍는다.
+      syncedSearchRef.current = window.location.search;
+    } catch {
+      // 주소 갱신 실패(예: Safari 의 history API 호출 빈도 제한)는 치명적이지 않다.
+      // 표식을 갱신하지 않았으므로 effect 는 "URL 이 안 바뀌었다"고 보고 아무것도 하지 않는다 —
+      // 방금 누른 탭이 옛 주소의 값으로 되감기지 않는다(사용자 클릭이 주소보다 우선).
+    }
+  };
+
+  return (
+    <>
+      <PageHeader />
+      <div className="w-full max-w-4xl px-6 py-10">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-ink-900">
+            진단 결과
+          </h1>
+          <StepIndicator current="result" />
+        </div>
+        {/* 제출 프로필은 이 브라우저의 로컬 값이라 없을 수 있다(다른 기기·프라이빗 모드).
+            없으면 학년·계열을 지어내지 않고 제목만 둔다 — 결과 본문은 서버 정본 그대로다. */}
+        <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
+          {profile ? `${formatStandingLabel(profile)} · 1차 진단 결과` : '1차 진단 결과'}
+        </p>
+        {profile && (() => {
+          const cohort = cohortFromGrade(profile.grade);
+          const label = COHORT_LABEL[cohort.system] + (cohort.emphasizeSetuk ? ' · 정성평가(세특·창체) 반영' : '');
+          return (
+            <p className="mb-2">
+              <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                {label}
+              </span>
+            </p>
+          );
+        })()}
+        {profile && profile.targetUniversities.length > 0 && (
+          <p className="mb-6 text-sm text-ink-500">
+            목표:{' '}
+            {profile.targetUniversities
+              .map((u, i) => `${i + 1}순위 ${u.name}${u.department ? ` ${u.department}` : ''}`)
+              .join(' · ')}
+          </p>
+        )}
+
+        {state === 'loading' && (
+          <div className="space-y-3" role="status" aria-live="polite">
+            <span className="sr-only">진단 결과를 불러오는 중입니다</span>
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        )}
+        {state === 'not_found' && (
+          <EmptyState
+            title="이 진단을 찾을 수 없어요"
+            description="삭제됐거나 주소가 잘못된 링크일 수 있어요. 내 진단 내역에서 다시 선택해 주세요."
+            action={
+              <Link
+                href="/result"
+                className="inline-flex rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                진단 내역 보기
+              </Link>
+            }
+          />
+        )}
+        {state === 'in_progress' && (
+          <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+            <p className="text-sm font-semibold text-brand-800">분석이 아직 진행 중입니다</p>
+            <p className="mt-1 text-sm text-ink-700">
+              AI 진단이 완료되면 이 화면에서 결과를 볼 수 있어요(보통 1–3분).
+            </p>
+            <Link
+              href="/processing"
+              className="mt-3 inline-flex rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              진행 상태 보기
+            </Link>
+          </div>
+        )}
+        {state === 'unavailable' && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+            <p className="text-sm font-semibold text-amber-800">결과를 불러오지 못했어요</p>
+            <p className="mt-1 text-sm text-ink-700">
+              일시적인 오류로 진단 결과를 확인할 수 없습니다. 잠시 후 새로고침해주세요 — 결과는 사라지지 않습니다.
+            </p>
+          </div>
+        )}
+        {state === 'failed' && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/60 p-5">
+            <p className="text-sm font-semibold text-red-800">분석에 실패했어요</p>
+            <p className="mt-1 text-sm text-ink-700">
+              일시적인 오류일 수 있어요. 생기부를 다시 제출하면 새로 분석합니다.
+            </p>
+            <Link
+              href="/submit"
+              className="mt-3 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              다시 제출하기
+            </Link>
+          </div>
+        )}
+        {state === 'ready' && viewModel && (
+        <>
+        <GuardrailLabel
+          variant={
+            tab === 'interview'
+              ? 'interview'
+              : tab === 'diagnosis'
+              ? 'diagnosis'
+              : 'general'
+          }
+          className="mb-6"
+        />
+
+        {/* Tabs */}
+        <div
+          role="tablist"
+          className="sticky top-[60px] z-30 mb-6 flex flex-wrap gap-1 rounded-xl bg-ink-100/90 p-1 backdrop-blur-sm"
+        >
+          {tabs.map((t) => {
+            const active = t.id === tab;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => selectTab(t.id)}
+                className={cn(
+                  'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition',
+                  active
+                    ? 'bg-white text-ink-900 shadow-sm'
+                    : 'text-ink-500 hover:text-ink-700'
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === 'interview' && <InterviewPanelReal questions={viewModel.interview} />}
+        {tab === 'diagnosis' && <DiagnosisPanelReal criteria={viewModel.diagnosis} />}
+        {tab === 'improvements' && (
+          <ImprovementsPanelReal items={viewModel.improvements} keywords={viewModel.keywords} />
+        )}
+
+        {/*
+          로드맵·적합도는 보완 탭에만 붙인다. 둘 다 "앞으로 무엇을 할지"를 다루므로
+          면접·진단 탭에서는 읽는 맥락에서 벗어난다(프로토타입 015 의 구성).
+          실 데이터가 있을 때만 — 합격%·점수는 어디에도 없다.
+        */}
+        {tab === 'improvements' && viewModel.roadmap && (
+          <RoadmapSection roadmap={viewModel.roadmap} />
+        )}
+        {tab === 'improvements' && viewModel.fit && <FitSection fit={viewModel.fit} />}
+
+        <div className="mt-10 mb-6">
+          <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
+          <ResultActions
+            track={profile ? formatStandingLabel(profile) : '공학계열'}
+            summary="면접 준비 팩 · 생기부 진단 가이드 · 부족 활동 보완안"
+          />
+        </div>
+        </>
+        )}
+
+        <div className="mt-10 border-t border-ink-100 pt-6">
+          <Link href="/result" className="text-sm text-ink-500 hover:text-ink-900">
+            ← 진단 내역
+          </Link>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── 실데이터 패널들 ─────────────────────────────────────────────────────────
+
+/**
+ * 면접 질문 유형 뱃지. 유형(record_based·passage_based·mmi)과 방식(압박)은 다른 축이라,
+ * 압박 질문이면 그쪽을 먼저 보여준다 — 답변 준비 방향이 유형보다 크게 갈리기 때문이다.
+ */
+const INTERVIEW_TAG_STYLE = {
+  record_based: 'bg-emerald-50 text-emerald-700',
+  passage_based: 'bg-sky-50 text-sky-700',
+  mmi: 'bg-violet-50 text-violet-700',
+  pressure: 'bg-amber-50 text-amber-700',
+} as const;
+
+// 유형 라벨은 shared 의 INTERVIEW_FORMAT_LABEL 이 정본이다 — 같은 enum 에 두 벌의 문구를
+// 두면 화면마다 다른 말을 하게 된다. 압박만 별도 축이라 여기서 더한다.
+const INTERVIEW_TAG_LABEL = {
+  ...INTERVIEW_FORMAT_LABEL,
+  pressure: '압박',
+} as const;
+
+function InterviewTag({
+  format,
+  pressure,
+}: {
+  format: ResultViewModel['interview'][number]['format'];
+  pressure: boolean;
+}) {
+  const key = pressure ? 'pressure' : format;
+  return (
+    <span
+      className={cn(
+        'rounded-md px-2 py-0.5 text-xs font-medium',
+        INTERVIEW_TAG_STYLE[key]
+      )}
+    >
+      {INTERVIEW_TAG_LABEL[key]}
+    </span>
+  );
+}
+
+function InterviewPanelReal({ questions }: { questions: ResultViewModel['interview'] }) {
+  if (questions.length === 0) {
+    return (
+      <section className="space-y-4">
+        <p className="text-sm text-ink-500">면접 준비 팩 데이터가 없습니다.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-4">
+      <p className="text-sm text-ink-500">
+        면접 예상 질문 {questions.length}건 — 답변 방향과 근거 기반
+      </p>
+      {questions.map((q, idx) => (
+        <article
+          key={idx}
+          className="rounded-2xl border border-ink-100 bg-white p-5"
+        >
+          <header className="flex flex-wrap items-baseline gap-2">
+            <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+              Q{idx + 1}
+            </span>
+            <InterviewTag format={q.format} pressure={q.pressure} />
+            <h3 className="text-base font-semibold leading-snug text-ink-900">
+              {q.question}
+            </h3>
+          </header>
+          <dl className="mt-4 space-y-3 text-sm leading-relaxed">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                답변 방향
+              </dt>
+              <dd className="mt-1 text-ink-900">{q.answerDirection}</dd>
+            </div>
+            {q.evidence.length > 0 && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  근거 생기부 항목
+                </dt>
+                <dd className="mt-1 space-y-2">
+                  {q.evidence.map((e, ei) => (
+                    <div key={ei}>
+                      <span className="inline-flex rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                        {e.section}
+                      </span>
+                      <p className="mt-1 text-ink-700">{e.quote}</p>
+                    </div>
+                  ))}
+                </dd>
+              </div>
+            )}
+            {q.followups.length > 0 && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  꼬리질문 대비
+                </dt>
+                <dd className="mt-1">
+                  <ul className="space-y-1">
+                    {q.followups.map((f, fi) => (
+                      <li key={fi} className="flex gap-2 text-ink-700">
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            )}
+            <SelfAnswer qid={`interview-${idx}`} />
+          </dl>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function DiagnosisPanelReal({ criteria }: { criteria: ResultViewModel['diagnosis'] }) {
+  const flagStyle = {
+    strength: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    weakness: 'border-amber-200 bg-amber-50 text-amber-700',
+  } as const;
+
+  return (
+    <section className="space-y-4">
+      {criteria.map((c) => (
+        <article
+          key={c.competency}
+          className="rounded-2xl border border-ink-100 bg-white p-5"
+        >
+          <h3 className="text-base font-semibold text-ink-900">
+            {c.competencyLabelText}
+          </h3>
+          <p className="mt-1 text-xs text-ink-500">{c.mapping}</p>
+
+          {c.summary && (
+            <p className="mt-3 text-sm leading-relaxed text-ink-700">{c.summary}</p>
+          )}
+
+          <div className="mt-4 space-y-3">
+            {c.strengths.length > 0 && (
+              <div className={cn('rounded-xl border p-3', flagStyle.strength)}>
+                <p className="text-xs font-semibold mb-2">◎ 강점</p>
+                <ul className="space-y-2">
+                  {c.strengths.map((s, si) => (
+                    <li key={si}>
+                      <p className="text-sm font-semibold leading-snug">{s.title}</p>
+                      {s.detail && (
+                        <p className="mt-0.5 text-sm leading-relaxed">{s.detail}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {c.gaps.length > 0 && (
+              <div className={cn('rounded-xl border p-3', flagStyle.weakness)}>
+                <p className="text-xs font-semibold mb-2">△ 보완</p>
+                <ul className="space-y-2">
+                  {c.gaps.map((g, gi) => (
+                    <li key={gi}>
+                      <p className="text-sm font-semibold leading-snug">{g.title}</p>
+                      {g.detail && (
+                        <p className="mt-0.5 text-sm leading-relaxed">{g.detail}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {c.nextSteps.length > 0 && (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+                앞으로 할 일
+              </p>
+              <ul className="space-y-1">
+                {c.nextSteps.map((s, si) => (
+                  <li key={si} className="flex gap-2 text-sm leading-relaxed text-ink-700">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {c.evidence.length > 0 && (
+            <div className="mt-4 border-t border-ink-100 pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+                생기부 근거
+              </p>
+              <ul className="flex flex-wrap gap-1.5">
+                {c.evidence.map((e, ei) => (
+                  <li
+                    key={ei}
+                    className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
+                    title={e.quote}
+                  >
+                    {e.section}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
+
+/** 생기부 주제 태그 — 반복 횟수가 많을수록 진하게. 없으면 아무것도 렌더하지 않는다. */
+function KeywordCloud({ keywords }: { keywords: ResultViewModel['keywords'] }) {
+  if (keywords.length === 0) return null;
+  const max = Math.max(...keywords.map((k) => k.count));
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+        생기부에서 반복되는 주제
+      </p>
+      <ul className="flex flex-wrap gap-1.5">
+        {keywords.map((k, i) => (
+          <li
+            key={i}
+            className={cn(
+              'rounded-md px-2 py-0.5 text-xs font-medium',
+              k.count >= max * 0.7
+                ? 'bg-brand-100 text-brand-800'
+                : k.count >= max * 0.4
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'bg-ink-100 text-ink-600'
+            )}
+          >
+            {k.label}
+            <span className="ml-1 tabular-nums opacity-60">{k.count}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ImprovementsPanelReal({
+  items,
+  keywords,
+}: {
+  items: ResultViewModel['improvements'];
+  keywords: ResultViewModel['keywords'];
+}) {
+  if (items.length === 0) {
+    return (
+      <section className="space-y-4">
+        <KeywordCloud keywords={keywords} />
+        <p className="text-sm text-ink-500">이 프로필에 해당하는 보완 처방이 없습니다.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-4">
+      <KeywordCloud keywords={keywords} />
+      <p className="text-sm text-ink-500">
+        게이트 통과 합법 처방 {items.length}건 — 대입 반영 영역 기반
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {items.map((item, idx) => (
+          <article
+            key={idx}
+            className="rounded-2xl border border-ink-100 bg-white p-5"
+          >
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                {RECORD_AREA_LABEL[item.recordArea] ?? item.recordArea}
+              </span>
+              <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+                {competencyLabel[item.competency]}
+              </span>
+              {item.estimatedMinutes !== undefined && (
+                <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+                  약 {item.estimatedMinutes}분
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-semibold text-ink-900">{item.text}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-700">{item.rationale}</p>
+            {item.linkedQuestions.length > 0 && (
+              <p className="mt-2 text-xs text-ink-500">
+                대비하는 면접 질문 · {item.linkedQuestions.join(' · ')}
+              </p>
+            )}
+            <div className="mt-3 rounded-md bg-brand-50 px-2 py-1 text-xs text-brand-700">
+              <span className="font-medium">{item.evidence.section}</span>
+              {item.evidence.quote && (
+                <span className="ml-1 text-brand-500">— {item.evidence.quote}</span>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── 로드맵 섹션 ──────────────────────────────────────────────────────────────
+
+function RoadmapSection({ roadmap }: { roadmap: Roadmap }) {
+  return (
+    <section className="mt-10">
+      <h2 className="mb-2 text-lg font-bold text-ink-900">입시 로드맵</h2>
+      <p className="mb-4 text-sm text-ink-500">{roadmap.note}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {roadmap.phases.map((phase: RoadmapPhase) => (
+          <div
+            key={phase.key}
+            className={cn(
+              'rounded-2xl border p-4',
+              phase.active
+                ? 'border-brand-300 bg-brand-50'
+                : 'border-ink-100 bg-white'
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={cn(
+                'rounded-md px-2 py-0.5 text-xs font-semibold',
+                phase.active
+                  ? 'bg-brand-100 text-brand-700'
+                  : 'bg-ink-100 text-ink-600'
+              )}>
+                {phase.label}
+              </span>
+              <span className="text-xs text-ink-400">{phase.window}</span>
+            </div>
+            <ul className="space-y-1">
+              {phase.focus.map((f, fi) => (
+                <li key={fi} className="flex gap-2 text-xs leading-relaxed text-ink-700">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-brand-400" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── 적합도 섹션 ──────────────────────────────────────────────────────────────
+
+function FitSection({ fit }: { fit: FitAssessment }) {
+  return (
+    <section className="mt-10">
+      <h2 className="mb-2 text-lg font-bold text-ink-900">전형 적합도</h2>
+      <p className="mb-1 text-sm text-ink-500">{fit.consistencyNote}</p>
+      <p className="mb-4 text-xs text-ink-400">{fit.caveat}</p>
+
+      {/* 역량별 정성 수준 (합격%·점수 없음) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
+        {fit.competencyFit.map((cf) => (
+          <div
+            key={cf.key}
+            className={cn(
+              'rounded-2xl border p-4',
+              FIT_LEVEL_STYLE[cf.level]
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold">{competencyLabel[cf.key.toLowerCase() as keyof typeof competencyLabel] ?? cf.key}</span>
+              <span className="rounded-full border border-current px-2 py-0.5 text-xs font-semibold">
+                {cf.level}
+              </span>
+            </div>
+            <p className="text-xs leading-relaxed opacity-90">{cf.reason}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 권장 과목 */}
+      {fit.recommendedSubjects.length > 0 && (
+        <div className="mb-6">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
+            권장 과목
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {fit.recommendedSubjects.map((s) => (
+              <span
+                key={s}
+                className="rounded-full bg-ink-100 px-3 py-0.5 text-xs font-medium text-ink-700"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 목표 대학별 노트 */}
+      {fit.universityFit && fit.universityFit.length > 0 && (
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">
+            목표 대학별 평가기준
+          </p>
+          <div className="space-y-3">
+            {fit.universityFit.map((uf, idx) => (
+              <div
+                key={idx}
+                className="rounded-2xl border border-ink-100 bg-white p-4"
+              >
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-sm font-semibold text-ink-900">
+                    {uf.matched ? uf.name : uf.input}
+                  </span>
+                  {!uf.matched && (
+                    <span className="text-xs text-ink-400">미수록</span>
+                  )}
+                </div>
+                {uf.matched && uf.evaluationFraming && (
+                  <p className="text-sm text-ink-700 mb-1">{uf.evaluationFraming}</p>
+                )}
+                {uf.matched && uf.evaluationItems && (
+                  <ul className="flex flex-wrap gap-1 mb-2">
+                    {uf.evaluationItems.map((item) => (
+                      <li
+                        key={item}
+                        className="rounded-md bg-ink-100 px-2 py-0.5 text-xs text-ink-600"
+                      >
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-ink-400">{uf.note}</p>
+                {uf.matched && uf.source && (
+                  <p className="mt-1 text-xs text-ink-300">출처: {uf.source}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

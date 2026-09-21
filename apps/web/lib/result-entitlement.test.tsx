@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// /result 의 **게이트-조회 순서** 회귀 고정 (자체 리뷰, PR #98).
+// /result/[id] 의 **게이트-조회 순서** 회귀 고정 (자체 리뷰, PR #98).
 //
 // 왜 이 파일이 있나 — 게이트(RequireAdmissionsAccess)는 JSX 렌더만 막고 마운트 effect 는 막지
 // 못한다. 그래서 조회 effect 를 페이지 컴포넌트 **자신**에 두면 두 가지가 동시에 깨진다:
@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // 해결은 /processing 과 같다: 조회를 게이트 **하위 자식**(ResultView)으로 내린다.
 // 아래 두 테스트는 그 구조를 고정한다 — effect 를 페이지로 되올리면 둘 다 깨진다.
 
-const fetchLatestDiagnosis = vi.hoisted(() => vi.fn());
+const getDiagnosis = vi.hoisted(() => vi.fn());
 // 게이트의 실제 동작을 모사한다: 통과 전에는 children 을 **렌더하지 않는다**(벽을 대신 그린다).
 const gate = vi.hoisted(() => ({ allowed: false }));
 
@@ -27,10 +27,7 @@ vi.mock('@/components/auth/require-admissions-access', () => ({
 }));
 
 vi.mock('@/lib/admissions-api', () => ({
-  fetchLatestDiagnosis,
-  loadLastResultId: vi.fn().mockReturnValue(null),
-  saveLastResultId: vi.fn(),
-  getDiagnosis: vi.fn(),
+  getDiagnosis,
   toAnalyzeResult: vi.fn().mockReturnValue({ diagnosis: {}, rubric: {} }),
 }));
 vi.mock('@/lib/result-view', () => ({
@@ -45,33 +42,33 @@ vi.mock('@/lib/submitted-profile', () => ({
   loadSubmittedProfile: vi.fn().mockReturnValue(null),
 }));
 
-import ResultPage from '../app/result/page';
+import ResultPage from '../app/result/[id]/page';
 
 beforeEach(() => {
   vi.clearAllMocks();
   gate.allowed = false;
-  fetchLatestDiagnosis.mockResolvedValue({ id: 'd1', status: 'done' });
+  getDiagnosis.mockResolvedValue({ id: 'd1', status: 'done' });
 });
 
 describe('/result — 이용권 게이트와 결과 조회의 순서', () => {
   it('벽에 막혀 있는 동안에는 진단 조회 API 를 쏘지 않는다', async () => {
-    render(<ResultPage />);
+    render(<ResultPage params={{ id: 'd1' }} />);
 
     expect(screen.getByText(/유료 회원만 이용할 수 있어요/)).toBeInTheDocument();
     // effect 가 페이지에 있으면 여기서 이미 호출돼 있다(= 미보유 deep-link 의 403).
-    await waitFor(() => expect(fetchLatestDiagnosis).not.toHaveBeenCalled());
+    await waitFor(() => expect(getDiagnosis).not.toHaveBeenCalled());
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 
   it('벽이 그 자리에서 걷히면(쿠폰 등록·재확인) 그때 조회가 돌아 실제 결과가 뜬다', async () => {
-    const { rerender } = render(<ResultPage />);
-    expect(fetchLatestDiagnosis).not.toHaveBeenCalled();
+    const { rerender } = render(<ResultPage params={{ id: 'd1' }} />);
+    expect(getDiagnosis).not.toHaveBeenCalled();
 
     // 쿠폰 등록·"다시 확인"·개발 우회가 하는 일: 언마운트 없이 게이트만 통과로 바뀐다.
     gate.allowed = true;
-    rerender(<ResultPage />);
+    rerender(<ResultPage params={{ id: 'd1' }} />);
 
-    await waitFor(() => expect(fetchLatestDiagnosis).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getDiagnosis).toHaveBeenCalledTimes(1));
     // 조회가 다시 돌지 않으면 여기서 탭 대신 오류 배너가 남는다.
     expect(await screen.findByRole('tablist')).toBeInTheDocument();
     expect(screen.queryByText(/결과를 불러오지 못했어요/)).toBeNull();
