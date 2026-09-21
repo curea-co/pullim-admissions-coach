@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const redeemCoupon = vi.fn();
 const clearAdmissionsAccessCache = vi.fn();
+const markCouponGranted = vi.fn();
 
 vi.mock('@/lib/coupon-api', async () => {
   // 형식 검사는 진짜를 쓴다 — 제출 버튼 활성 조건이 서버 패턴과 어긋나는지도 같이 잡힌다.
@@ -20,6 +21,8 @@ vi.mock('@/lib/coupon-api', async () => {
 vi.mock('@/lib/admissions-api', () => ({
   clearAdmissionsAccessCache: () => clearAdmissionsAccessCache(),
 }));
+
+vi.mock('@/lib/coupon-granted-notice', () => ({ markCouponGranted: () => markCouponGranted() }));
 
 import { CouponRedeemForm } from '../components/auth/coupon-redeem-form';
 
@@ -52,6 +55,31 @@ describe('CouponRedeemForm — 제출 가드', () => {
 });
 
 describe('CouponRedeemForm — 결과 분기', () => {
+  it('성공하면 확인 신호를 폼 바깥에 남긴다 — 이 컴포넌트는 곧 언마운트된다', async () => {
+    render(<CouponRedeemForm onGranted={vi.fn()} />);
+    type('ABCD-EF23-GHJ4');
+    fireEvent.click(submit());
+    await waitFor(() => expect(markCouponGranted).toHaveBeenCalledTimes(1));
+  });
+
+  it('실패하면 신호를 남기지 않는다', async () => {
+    redeemCoupon.mockResolvedValue({ ok: false, failure: 'not_redeemable', message: 'x' });
+    render(<CouponRedeemForm />);
+    type('ABCD-EF23-GHJ4');
+    fireEvent.click(submit());
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(markCouponGranted).not.toHaveBeenCalled();
+  });
+
+  it('다른 서비스 쿠폰도 신호를 남기지 않는다', async () => {
+    redeemCoupon.mockResolvedValue({ ok: true, admissionsGranted: false, grants: [] });
+    render(<CouponRedeemForm />);
+    type('ABCD-EF23-GHJ4');
+    fireEvent.click(submit());
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(markCouponGranted).not.toHaveBeenCalled();
+  });
+
   it('admissions 가 붙으면 성공 문구 + 캐시 무효화 + onGranted 호출', async () => {
     const onGranted = vi.fn();
     render(<CouponRedeemForm onGranted={onGranted} />);

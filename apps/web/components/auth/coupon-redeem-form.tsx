@@ -12,6 +12,7 @@
 import { useId, useState } from 'react';
 import { redeemCoupon, isValidCouponCode } from '@/lib/coupon-api';
 import { clearAdmissionsAccessCache } from '@/lib/admissions-api';
+import { markCouponGranted } from '@/lib/coupon-granted-notice';
 import { cn } from '@/lib/utils';
 
 type Result =
@@ -56,6 +57,10 @@ export function CouponRedeemForm({
       }
       setResult({ kind: 'granted' });
       setCode('');
+      // 성공 확인을 **폼 바깥에** 남긴다. 바로 아래 onGranted() 가 게이트를 재판정시켜
+      // 이 컴포넌트(구매 벽이면 벽 전체)를 언마운트하므로, 여기서 띄운 메시지는 화면에
+      // 남을 시간이 없다. 등록 후 실제로 렌더되는 화면이 이 신호를 소비해 한 번 보여준다.
+      markCouponGranted();
       // 게이트가 세션 캐시를 들고 있어 비우지 않으면 새 grant 를 못 본다(lib/admissions-api.ts).
       clearAdmissionsAccessCache();
       onGranted?.();
