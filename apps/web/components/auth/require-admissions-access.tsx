@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { PurchaseWall } from './purchase-wall';
 import { DevBypassBadge } from './dev-bypass-badge';
+import { CouponGrantedNotice } from './coupon-granted-notice';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import {
   devBypassAvailable,
@@ -137,6 +138,8 @@ export function RequireAdmissionsAccess({ children }: { children: React.ReactNod
   // (②가 켜지면 위 effect 가 ① 경로에 닿기 전에 반환하므로 bypassed 와 동시에 참이 되지 않는다.)
   return (
     <>
+      {/* 벽에서 쿠폰을 등록하면 벽이 사라지며 이 자리로 온다 — 성공 확인을 여기서 한 번 띄운다. */}
+      <CouponGrantedNotice className="mx-6 mt-6" />
       {gateBypass ? (
         <DevBypassBadge message="개발 게이트 우회 중 · 인증·이용권 검사 꺼짐" />
       ) : (

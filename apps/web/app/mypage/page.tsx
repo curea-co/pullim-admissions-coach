@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { auth, isPullimAuth } from '@/lib/auth';
 import { osSettingsHref } from '@/lib/auth/os-login';
 import { CouponRedeemForm } from '@/components/auth/coupon-redeem-form';
+import { CouponGrantedNotice } from '@/components/auth/coupon-granted-notice';
 import { hasAdmissionsAccess, clearAdmissionsAccessCache } from '@/lib/admissions-api';
 import { decideAccessOnError } from '@/lib/admissions-access-state';
 import type { ApiError } from '@/lib/api';
@@ -146,6 +147,9 @@ function MyPageContent() {
     <div className="w-full max-w-2xl px-6 pb-16 pt-10">
       {/* 페이지 제목 */}
       <h1 className="text-3xl font-bold tracking-tight text-ink-900">마이페이지</h1>
+
+      {/* 마이페이지에서 등록하면 폼이 숨겨지며 확인 문구도 같이 사라진다 — 여기서 받는다. */}
+      <CouponGrantedNotice className="mt-4" />
 
       {/* ── 프로필 카드 ─────────────────────────────────────────────────────── */}
       <section className="mt-8">
