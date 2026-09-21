@@ -26,3 +26,10 @@
 - `pnpm build:web`: 프로덕션 빌드 성공.
 - `git diff --check`: 통과.
 - 현재 상태: 로컬 수정·검증 완료. 사용자 승인으로 최신 dev를 반영한 뒤 재검증·PR·개발 배포를 진행한다.
+
+## PR·개발 배포
+
+- 사용자 승인으로 최신 dev #103(2d6b268)을 rebase 반영했다. CSRF 파일 충돌 없음.
+- 삭제된 mypage의 기존 .next/types 캐시로 타입 검사 1회 실패; 생성 캐시를 분리한 뒤 재검증 통과. 소스 수정 불필요.
+- 최신 기준 lint·typecheck·build 통과. 전체 테스트 shared 156 + engine 58 + web 742 = 956개 통과(API 회귀 27개 포함).
+- [PR #104](https://github.com/curea-co/pullim-admissions-coach/pull/104), base=dev. Vercel preview 검증 후 dev 머지·기존 dev 도메인 배포 확인을 진행한다.
