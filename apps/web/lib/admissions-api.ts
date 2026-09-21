@@ -101,13 +101,6 @@ export interface DiagnosisDto {
   createdAt: string;
 }
 
-export interface ParentSummaryDto {
-  studentUserId: string;
-  hasResult: boolean;
-  status: DiagnosisStatus | null;
-  lastDiagnosedAt: string | null;
-}
-
 // ── 제출 → 동의 → 진단 enqueue ───────────────────────────────────────────────
 /**
  * studentProfile payload(제출+동의 병합본)를 백엔드 흐름으로 접수한다.
@@ -210,10 +203,6 @@ export function getDiagnosis(id: string): Promise<DiagnosisDto> {
 
 export function listDiagnoses(): Promise<DiagnosisDto[]> {
   return api.get<DiagnosisDto[]>('/admissions/results');
-}
-
-export function getParentSummary(studentUserId: string): Promise<ParentSummaryDto> {
-  return api.get<ParentSummaryDto>(`/admissions/parent/summary/${studentUserId}`);
 }
 
 /** done 상태 DTO → FE AnalyzeResult(improvements→rubric 복원). cohort 는 rubric.cohort 로 재수화. */

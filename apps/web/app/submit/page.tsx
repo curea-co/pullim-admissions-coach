@@ -24,7 +24,6 @@ import { fieldLabel, validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { saveSubmittedPayload } from '@/lib/submitted-payload';
-import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
@@ -44,6 +43,13 @@ const tracks: { value: TargetTrack; label: string }[] = (
 const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
 ).map(([value, label]) => ({ value, label }));
+
+// 폼 초기값. 예전에는 박준호 데모 mock 에서 끌어왔는데, mock 을 걷어내면서 여기 상수로 옮겼다
+// (값은 그대로 — 주 이용자가 고3 2학기 일반고 이공계열이라 입력 횟수가 가장 적은 기본값이다).
+const DEFAULT_TRACK: TargetTrack = 'science_engineering';
+const DEFAULT_GRADE = 3;
+const DEFAULT_SEMESTER: 1 | 2 = 2;
+const DEFAULT_SCHOOL_TYPE: SchoolType = 'general';
 
 export default function SubmitPage() {
   const router = useRouter();
@@ -74,19 +80,13 @@ export default function SubmitPage() {
   const [warnAck, setWarnAck] = useState(false);
   const [scanned, setScanned] = useState(false);
 
-  const [targetTrack, setTargetTrack] = useState<TargetTrack>(
-    parkJunho.profile.targetTrack
-  );
+  const [targetTrack, setTargetTrack] = useState<TargetTrack>(DEFAULT_TRACK);
   const [universities, setUniversities] = useState<
     { name: string; department?: string }[]
   >([{ name: '' }, { name: '' }, { name: '' }]);
-  const [grade, setGrade] = useState<number>(parkJunho.identity.grade);
-  const [semester, setSemester] = useState<1 | 2>(
-    parkJunho.identity.semester as 1 | 2
-  );
-  const [schoolType, setSchoolType] = useState<SchoolType>(
-    parkJunho.identity.schoolType
-  );
+  const [grade, setGrade] = useState<number>(DEFAULT_GRADE);
+  const [semester, setSemester] = useState<1 | 2>(DEFAULT_SEMESTER);
+  const [schoolType, setSchoolType] = useState<SchoolType>(DEFAULT_SCHOOL_TYPE);
   const [weakAreas, setWeakAreas] = useState<string>('');
 
   const [errors, setErrors] = useState<FieldErrors>({});

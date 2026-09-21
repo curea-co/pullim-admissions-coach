@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { saveAnalyzeResult, loadAnalyzeResult, loadAnalyzeDemo, clearAnalyzeResult, toResultViewModel } from './result-view';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { clearAnalyzeResult, toResultViewModel } from './result-view';
 import type { AnalyzeResult } from './analyze';
 import type { CohortResult } from '@pullim/shared';
 
@@ -78,98 +78,17 @@ const withInterviewResult: AnalyzeResult = {
   },
 };
 
-// ── sessionStorage 라운드트립 ──────────────────────────────────────────────
+// ── 레거시 세션 저장소 정리 ────────────────────────────────────────────────
 
-describe('saveAnalyzeResult / loadAnalyzeResult', () => {
+describe('clearAnalyzeResult', () => {
   beforeEach(() => sessionStorage.clear());
 
-  it('저장 전에는 null 반환', () => {
-    expect(loadAnalyzeResult()).toBeNull();
-  });
-
-  it('저장 후 동일 객체 복원', () => {
-    saveAnalyzeResult(minimalResult);
-    const loaded = loadAnalyzeResult();
-    expect(loaded).not.toBeNull();
-    expect(loaded!.cohort.system).toBe('2028_new');
-    expect(loaded!.diagnosis.criteria).toHaveLength(3);
-    expect(loaded!.rubric.items).toHaveLength(1);
-  });
-
-  it('덮어쓰기 후 최신 값 반환', () => {
-    saveAnalyzeResult(minimalResult);
-    const updated: AnalyzeResult = {
-      ...minimalResult,
-      cohort: { system: '2027_old', track: 'beachhead', region: 'unknown', emphasizeSetuk: false },
-    };
-    saveAnalyzeResult(updated);
-    expect(loadAnalyzeResult()!.cohort.system).toBe('2027_old');
-  });
-
-  it('clearAnalyzeResult: 결과 + 데모 플래그 모두 제거(이전 결과 오표시 방지)', () => {
-    saveAnalyzeResult(minimalResult, true);
-    expect(loadAnalyzeResult()).not.toBeNull();
-    expect(loadAnalyzeDemo()).toBe(true);
+  it('예전 배포가 남긴 결과·데모 플래그를 모두 비운다', () => {
+    sessionStorage.setItem('pullim:analyze-result', JSON.stringify(minimalResult));
+    sessionStorage.setItem('pullim:analyze-demo', '1');
     clearAnalyzeResult();
-    expect(loadAnalyzeResult()).toBeNull();
-    expect(loadAnalyzeDemo()).toBe(false);
-  });
-});
-
-// ── 데모 플래그(§6 정직 고지) ───────────────────────────────────────────────
-
-describe('loadAnalyzeDemo', () => {
-  beforeEach(() => sessionStorage.clear());
-
-  it('미저장이면 false', () => {
-    expect(loadAnalyzeDemo()).toBe(false);
-  });
-
-  it('demo=true 저장 시 true (mock 결과도 viewModel은 로드되므로 플래그로 고지)', () => {
-    saveAnalyzeResult(minimalResult, true);
-    expect(loadAnalyzeResult()).not.toBeNull();
-    expect(loadAnalyzeDemo()).toBe(true);
-  });
-
-  it('기본값(실결과)은 false', () => {
-    saveAnalyzeResult(minimalResult);
-    expect(loadAnalyzeDemo()).toBe(false);
-  });
-
-  it('데모 저장 후 실결과로 덮어쓰면 플래그도 해제(잔존 금지)', () => {
-    saveAnalyzeResult(minimalResult, true);
-    expect(loadAnalyzeDemo()).toBe(true);
-    saveAnalyzeResult(minimalResult, false);
-    expect(loadAnalyzeDemo()).toBe(false);
-  });
-});
-
-// ── 저장 fail-closed(결과 유실 방지) ────────────────────────────────────────
-
-describe('saveAnalyzeResult 반환값', () => {
-  beforeEach(() => sessionStorage.clear());
-  afterEach(() => vi.restoreAllMocks());
-
-  it('성공 시 true', () => {
-    expect(saveAnalyzeResult(minimalResult)).toBe(true);
-  });
-
-  it('setItem이 조용히 실패하면 false(호출자 fail-closed 유도)', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-    expect(saveAnalyzeResult(minimalResult)).toBe(false);
-  });
-
-  it('데모 플래그 키만 실패해도 false(부분 성공 차단 → 데모 고지 누락 방지)', () => {
-    const orig = Storage.prototype.setItem;
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      k: string,
-      v: string
-    ) {
-      if (k === 'pullim:analyze-demo') return; // 데모 키 쓰기만 실패 모사
-      orig.call(this, k, v);
-    });
-    expect(saveAnalyzeResult(minimalResult, true)).toBe(false);
+    expect(sessionStorage.getItem('pullim:analyze-result')).toBeNull();
+    expect(sessionStorage.getItem('pullim:analyze-demo')).toBeNull();
   });
 });
 

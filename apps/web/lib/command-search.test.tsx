@@ -125,10 +125,10 @@ describe('CommandSearch — 열림/닫힘과 포커스', () => {
 });
 
 describe('CommandSearch — 결과 목록', () => {
-  it('빈 질의면 레일 4 + 결과 탭 3 을 전부 보여준다', async () => {
+  it('빈 질의면 레일 3 + 결과 탭 3 을 전부 보여준다', async () => {
     render(<CommandSearch />);
     await openPalette();
-    expect(options()).toHaveLength(7);
+    expect(options()).toHaveLength(6);
     expect(options()[0]).toHaveTextContent('홈');
     expect(options()[0]).toHaveAttribute('aria-selected', 'true');
   });
@@ -160,7 +160,7 @@ describe('CommandSearch — 결과 목록', () => {
     expect(options()[0]).toHaveAttribute('aria-selected', 'true');
     // 처음에서 위 → 마지막으로 순환.
     fireEvent.keyDown(input(), { key: 'ArrowUp' });
-    expect(options()[6]).toHaveAttribute('aria-selected', 'true');
+    expect(options()[options().length - 1]).toHaveAttribute('aria-selected', 'true');
   });
 
   it('마우스 hover 가 선택을 동기화한다', async () => {

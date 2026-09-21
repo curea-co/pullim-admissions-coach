@@ -5,20 +5,22 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
-import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
-// 주의: /result 는 RequireAuth(로그인)만 두고 **admissions 구매 게이트는 두지 않는다** —
-// 로그인 회원이 무료여도 예시 결과(§6 데모, parkJunho)를 볼 수 있어야 하기 때문(랜딩 "전체 예시").
-// 실 결과: **미보유(free)는 권위 신호(flags.admissions) 선판정으로 예시(데모) 경로**("진입만+예시
-// 열람" 정책 — 403 해석 아님: 실제 장애를 데모로 가리지 않기 위해), 보유자의 fetch 실패(403 포함·
-// 5xx/네트워크)는 §6 정직 원칙대로 명시 상태(진행중/실패/unavailable) 노출. 유료 게이트는 제출·
-// 동의·진단 흐름에만. (비로그인 공개 여부는 RequireAuth 유지=별도 제품 결정, 이 PR 미변경 — Codex #59.)
+import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
+import { EmptyState } from '@/components/empty-state';
+import { SkeletonCard } from '@/components/loading-skeleton';
+// /result 는 **로그인 + admissions 이용권** 두 겹의 게이트 뒤에 있다(정책 v2.0 §7-3 · 012 A8′).
+// 무료 회원에게는 RequireAdmissionsAccess 의 구매 벽이 뜬다 — 예시(데모) 결과를 대신 보여주지
+// 않는다: 2026-09-21 결정으로 박준호 mock 과 예시 경로를 화면에서 전부 걷어냈다.
+// 이 화면은 이제 **실제 진단만** 렌더하고, 실제가 없으면 그 이유(이력 없음·진행중·실패·조회불가)를
+// 그대로 말한다(§6 정직 — 없는 결과를 예시로 가리지 않는다).
+// 이용권 판정의 권위 신호는 여전히 flags.admissions 이고, 게이트를 통과한 뒤 만나는 403 은
+// 미보유가 아니라 실제 이상으로 취급한다(Codex #59).
 import { competencyLabel, formatStandingLabel, INTERVIEW_FORMAT_LABEL, cohortFromGrade, type CohortResult } from '@pullim/shared';
 import { loadSubmittedProfile, type SubmittedProfile } from '@/lib/submitted-profile';
 import { toResultViewModel, type ResultViewModel } from '@/lib/result-view';
-import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, hasAdmissionsAccess, type DiagnosisDto } from '@/lib/admissions-api';
-import { isPullimAuth } from '@/lib/auth';
+import { getDiagnosis, toAnalyzeResult, loadLastResultId, fetchLatestDiagnosis, saveLastResultId, type DiagnosisDto } from '@/lib/admissions-api';
 import { SelfAnswer } from '@/components/result/self-answer';
 import { ResultActions } from '@/components/result/result-actions';
 import type { Roadmap, RoadmapPhase } from '@pullim/engine';
@@ -44,6 +46,17 @@ const FIT_LEVEL_STYLE: Record<'강함' | '적정' | '보완필요', string> = {
 
 type Tab = 'interview' | 'diagnosis' | 'improvements';
 
+/**
+ * 결과 화면의 유일한 상태 축. 'ready' 일 때만 viewModel 이 채워져 있다.
+ * - loading     서버 조회 중
+ * - ready       실제 진단 결과 있음
+ * - none        이용권은 있는데 제출한 진단이 아직 없음(예전에 데모로 가려지던 자리)
+ * - in_progress 제출됨 · 분석 진행 중
+ * - failed      분석 실패 또는 done 인데 본문 손상
+ * - unavailable 조회 자체가 실패(5xx·네트워크·게이트 통과 후 403)
+ */
+type ResultState = 'loading' | 'ready' | 'none' | 'in_progress' | 'failed' | 'unavailable';
+
 const tabs: { id: Tab; label: string }[] = [
   { id: 'interview', label: '학생부 종합 전형 면접 준비 팩' },
   { id: 'diagnosis', label: '생기부 진단 가이드' },
@@ -67,7 +80,23 @@ function parseTabParam(search: string): Tab | null {
   }
 }
 
+// 게이트를 페이지 최상위에서 렌더 — 결과 조회(effect)는 게이트 **하위 자식**으로 둔다.
+// 페이지 컴포넌트 자신에 effect 를 두면 게이트가 JSX 렌더만 막고 마운트 effect(진단 조회)는
+// 그대로 실행된다(Codex #59 · /processing 과 같은 함정). 그러면 ① 미보유 사용자의 deep-link 가
+// GET /admissions/results 를 쏴서 403 을 받고 ② 쿠폰 등록·"다시 확인"·개발 우회로 벽이 그 자리에서
+// 걷혀도 페이지가 remount 되지 않아 그때 받은 unavailable 상태가 그대로 굳는다(실 결과 대신
+// 오류 배너). 자식으로 분리하면 벽이 걷히는 순간이 곧 자식의 첫 마운트라 조회가 새로 돈다.
 export default function ResultPage() {
+  return (
+    <RequireAuth>
+      <RequireAdmissionsAccess>
+        <ResultView />
+      </RequireAdmissionsAccess>
+    </RequireAuth>
+  );
+}
+
+function ResultView() {
   // 초기값은 서버 렌더와 동일한 기본 탭 — URL 을 렌더 중에 읽으면 서버/클라이언트 초기 HTML 이
   // 달라져 hydration mismatch 가 난다. 실제 보정은 아래 effect 에서 한다.
   const [tab, setTab] = useState<Tab>(DEFAULT_TAB);
@@ -77,9 +106,7 @@ export default function ResultPage() {
   const syncedSearchRef = useRef<string | null>(null);
   const [profile, setProfile] = useState<SubmittedProfile | null>(null);
   const [viewModel, setViewModel] = useState<ResultViewModel | null>(null);
-  const [resultIsDemo, setResultIsDemo] = useState(false);
-  // 서버 진단이 아직 완료 전/실패인 상태 — 데모로 가리지 않고 명시 분기(§6 정직).
-  const [serverState, setServerState] = useState<'in_progress' | 'failed' | 'unavailable' | null>(null);
+  const [state, setState] = useState<ResultState>('loading');
 
   // URL → 탭 동기화.
   // useSearchParams() 를 쓰지 않는다: 클라이언트 컴포넌트가 이걸 쓰면 Next 14 App Router 가
@@ -109,25 +136,14 @@ export default function ResultPage() {
     setProfile(loadSubmittedProfile());
 
     // 정본 = admissions 백엔드(diagnosis_results) — 마지막 진단 id 로 서버 재조회(ADR-058).
-    // 로컬 id 유실(프라이빗 모드) 시 서버 이력 최신 1건으로 복구. pending/processing·failed 는
-    // 데모로 가리지 않고 명시 분기(§6 정직 — 진행 안내/오류 노출). 레거시 세션 결과는 하위호환 폴백.
+    // 로컬 id 유실(프라이빗 모드) 시 서버 이력 최신 1건으로 복구. 이력 없음·진행중·실패는 각각
+    // 제 이름의 상태로 노출한다(§6 정직). 레거시 세션 결과 폴백은 은퇴 — 현재 사용자·진단과
+    // 연결되지 않은 값이라 네트워크/권한 오류 시 타인·과거 결과가 재렌더될 수 있다.
     let cancelled = false;
     async function loadFromServer() {
-      // 최신 진단을 정본으로(멀티탭·새 제출로 로컬 포인터가 낡았을 수 있음) — 이력 조회가
-      // 실패할 때만 로컬 id 단건 조회로 폴백한다.
-      // admissions 미보유(free)는 **권위 신호(flags.admissions, 캐시)로 선판정** — 서버 fetch 없이
-      // 예시(§6 데모) 경로("진입만+예시 열람" 정책). 403 응답을 미보유로 해석하지 않는다:
-      // 그러면 RBAC 오설정·정책 회귀 같은 실제 장애까지 데모로 가려진다(Codex #59). 선판정 후의
-      // 403/실패는 진짜 이상 → 아래 unavailable 로 정직 노출. 판정 실패는 fetch 흐름으로 폴백.
-      if (isPullimAuth) {
-        try {
-          const has = await hasAdmissionsAccess();
-          if (cancelled) return;
-          if (!has) return; // serverState=null 유지 → 예시(데모) 렌더(본문 데모 고지 포함).
-        } catch {
-          // 판정 불가(네트워크 등) — 아래 fetch 시도(실패 시 unavailable).
-        }
-      }
+      // 이 컴포넌트는 게이트를 통과한 뒤에야 마운트된다(위 ResultPage 참고) — 즉 여기 도달했다는
+      // 건 flags.admissions 판정이 이미 끝났다는 뜻이다. 그래서 여기서 만나는 403 은 미보유가
+      // 아니라 실제 이상(RBAC 오설정·정책 회귀)이고, 아래 unavailable 로 드러낸다(Codex #59).
       let dto: DiagnosisDto | null = null;
       let fetchFailed = false;
       try {
@@ -139,40 +155,39 @@ export default function ResultPage() {
         if (id) {
           try {
             dto = await getDiagnosis(id);
-            fetchFailed = false;
+            // **dto 가 실제로 왔을 때만** 실패를 취소한다. 204·빈 본문이면 api.request 가
+            // undefined 를 주는데, 그걸 성공으로 치면 아래에서 '이력 없음'(제출 유도)으로
+            // 읽혀 이미 제출한 사용자를 중복 제출로 떠민다 — 장애는 장애로 말해야 한다.
+            if (dto) fetchFailed = false;
           } catch {
             // 단건 폴백도 실패 — 아래 unavailable.
           }
         }
       }
       if (cancelled) return;
-      if (!dto && fetchFailed) {
-        setServerState('unavailable');
+
+      if (!dto) {
+        // 조회는 성공했는데 이력이 0건 = 아직 제출 전. 장애와 안내가 달라야 해서 구분한다.
+        setState(fetchFailed ? 'unavailable' : 'none');
         return;
       }
-
-      if (dto) {
-        if (dto.status === 'done') {
-          const result = toAnalyzeResult(dto);
-          if (result) {
-            setViewModel(toResultViewModel(result));
-            setResultIsDemo(false);
-            setServerState(null);
-            return;
-          }
-          // done 인데 본문 손상(부분 영속) — 오래된 레거시/데모로 가리지 않고 실패로 노출(재제출 유도).
-          setServerState('failed');
-          return;
-        } else if (dto.status === 'pending' || dto.status === 'processing') {
-          setServerState('in_progress');
-          return;
-        } else if (dto.status === 'failed') {
-          setServerState('failed');
+      if (dto.status === 'pending' || dto.status === 'processing') {
+        setState('in_progress');
+        return;
+      }
+      if (dto.status === 'done') {
+        const result = toAnalyzeResult(dto);
+        if (result) {
+          setViewModel(toResultViewModel(result));
+          setState('ready');
           return;
         }
+        // done 인데 본문 손상(부분 영속) — 결과가 있다고 말할 근거가 없으므로 실패로 노출(재제출 유도).
+        setState('failed');
+        return;
       }
-      // 레거시 세션 결과 폴백은 은퇴 — 현재 사용자·진단과 연결되지 않은 값이라 네트워크/권한
-      // 오류 시 타인·과거 결과가 재렌더될 수 있다(서버가 유일 정본, 없으면 데모 고지).
+      // 'failed' 및 계약에 없는 status — 같은 이유로 실패로 닫는다.
+      setState('failed');
     }
     loadFromServer();
     return () => {
@@ -199,12 +214,7 @@ export default function ResultPage() {
     }
   };
 
-  // 데모 고지: 실 결과가 전혀 없거나(미제출), 키 없이 생성된 mock 결과일 때.
-  // 후자는 viewModel이 있어도 본문이 예시이므로 반드시 고지해야 함(§6 정직).
-  const isDemo = !viewModel || resultIsDemo;
-
   return (
-    <RequireAuth>
     <>
       <PageHeader />
       <div className="w-full max-w-4xl px-6 py-10">
@@ -214,10 +224,10 @@ export default function ResultPage() {
           </h1>
           <StepIndicator current="result" />
         </div>
+        {/* 제출 프로필은 이 브라우저의 로컬 값이라 없을 수 있다(다른 기기·프라이빗 모드).
+            없으면 학년·계열을 지어내지 않고 제목만 둔다 — 결과 본문은 서버 정본 그대로다. */}
         <p className={cn('text-ink-700', profile ? 'mb-2' : 'mb-6')}>
-          {profile
-            ? `${formatStandingLabel(profile)} · 1차 진단 결과`
-            : '예시 학생 (데모) · 고3 2학기 · 이공 · 1차 진단 결과'}
+          {profile ? `${formatStandingLabel(profile)} · 1차 진단 결과` : '1차 진단 결과'}
         </p>
         {profile && (() => {
           const cohort = cohortFromGrade(profile.grade);
@@ -239,7 +249,28 @@ export default function ResultPage() {
           </p>
         )}
 
-        {serverState === 'in_progress' && (
+        {state === 'loading' && (
+          <div className="space-y-3" role="status" aria-live="polite">
+            <span className="sr-only">진단 결과를 불러오는 중입니다</span>
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        )}
+        {state === 'none' && (
+          <EmptyState
+            title="아직 제출한 진단이 없어요"
+            description="생기부를 제출하면 면접 준비 팩 · 진단 가이드 · 보완안을 여기에서 볼 수 있어요."
+            action={
+              <Link
+                href="/submit"
+                className="inline-flex rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                생기부 제출하기
+              </Link>
+            }
+          />
+        )}
+        {state === 'in_progress' && (
           <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
             <p className="text-sm font-semibold text-brand-800">분석이 아직 진행 중입니다</p>
             <p className="mt-1 text-sm text-ink-700">
@@ -253,7 +284,7 @@ export default function ResultPage() {
             </Link>
           </div>
         )}
-        {serverState === 'unavailable' && (
+        {state === 'unavailable' && (
           <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
             <p className="text-sm font-semibold text-amber-800">결과를 불러오지 못했어요</p>
             <p className="mt-1 text-sm text-ink-700">
@@ -261,7 +292,7 @@ export default function ResultPage() {
             </p>
           </div>
         )}
-        {serverState === 'failed' && (
+        {state === 'failed' && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/60 p-5">
             <p className="text-sm font-semibold text-red-800">분석에 실패했어요</p>
             <p className="mt-1 text-sm text-ink-700">
@@ -275,7 +306,7 @@ export default function ResultPage() {
             </Link>
           </div>
         )}
-        {serverState !== null ? null : (
+        {state === 'ready' && viewModel && (
         <>
         <GuardrailLabel
           variant={
@@ -287,17 +318,6 @@ export default function ResultPage() {
           }
           className="mb-6"
         />
-
-        {isDemo && (
-          <aside
-            role="note"
-            className="mb-6 rounded-2xl border border-ink-100 bg-ink-100/50 px-4 py-3 text-sm leading-relaxed text-ink-600"
-          >
-            아래 면접·진단·보완{' '}
-            <strong className="text-ink-900">본문은 예시 결과(데모)</strong>입니다. 실제 개인화
-            결과는 출시 버전에서 제공됩니다.
-          </aside>
-        )}
 
         {/* Tabs */}
         <div
@@ -325,20 +345,10 @@ export default function ResultPage() {
           })}
         </div>
 
-        {tab === 'interview' && (
-          viewModel
-            ? <InterviewPanelReal questions={viewModel.interview} />
-            : <InterviewPanel />
-        )}
-        {tab === 'diagnosis' && (
-          viewModel
-            ? <DiagnosisPanelReal criteria={viewModel.diagnosis} />
-            : <DiagnosisPanel />
-        )}
+        {tab === 'interview' && <InterviewPanelReal questions={viewModel.interview} />}
+        {tab === 'diagnosis' && <DiagnosisPanelReal criteria={viewModel.diagnosis} />}
         {tab === 'improvements' && (
-          viewModel
-            ? <ImprovementsPanelReal items={viewModel.improvements} keywords={viewModel.keywords} />
-            : <ImprovementsPanel />
+          <ImprovementsPanelReal items={viewModel.improvements} keywords={viewModel.keywords} />
         )}
 
         {/*
@@ -346,12 +356,10 @@ export default function ResultPage() {
           면접·진단 탭에서는 읽는 맥락에서 벗어난다(프로토타입 015 의 구성).
           실 데이터가 있을 때만 — 합격%·점수는 어디에도 없다.
         */}
-        {tab === 'improvements' && viewModel?.roadmap && (
+        {tab === 'improvements' && viewModel.roadmap && (
           <RoadmapSection roadmap={viewModel.roadmap} />
         )}
-        {tab === 'improvements' && viewModel?.fit && (
-          <FitSection fit={viewModel.fit} />
-        )}
+        {tab === 'improvements' && viewModel.fit && <FitSection fit={viewModel.fit} />}
 
         <div className="mt-10 mb-6">
           <p className="mb-3 text-sm font-semibold text-ink-700">결과 저장·공유</p>
@@ -363,23 +371,16 @@ export default function ResultPage() {
         </>
         )}
 
-        <div className="mt-10 flex items-center justify-between border-t border-ink-100 pt-6">
+        <div className="mt-10 border-t border-ink-100 pt-6">
           <Link
             href="/consent"
             className="text-sm text-ink-500 hover:text-ink-900"
           >
             ← 동의로
           </Link>
-          <Link
-            href="/parent"
-            className="rounded-xl border border-brand-300 px-5 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-          >
-            학부모 리포트 보기 →
-          </Link>
         </div>
       </div>
     </>
-    </RequireAuth>
   );
 }
 
@@ -397,7 +398,7 @@ const INTERVIEW_TAG_STYLE = {
 } as const;
 
 // 유형 라벨은 shared 의 INTERVIEW_FORMAT_LABEL 이 정본이다 — 같은 enum 에 두 벌의 문구를
-// 두면 데모 패널(아래 parkJunho)과 실 결과가 서로 다른 말을 한다. 압박만 별도 축이라 더한다.
+// 두면 화면마다 다른 말을 하게 된다. 압박만 별도 축이라 여기서 더한다.
 const INTERVIEW_TAG_LABEL = {
   ...INTERVIEW_FORMAT_LABEL,
   pressure: '압박',
@@ -822,186 +823,6 @@ function FitSection({ fit }: { fit: FitAssessment }) {
           </div>
         </div>
       )}
-    </section>
-  );
-}
-
-// ── 목 폴백 패널들 (기존 코드 그대로) ─────────────────────────────────────────
-
-function InterviewPanel() {
-  return (
-    <section className="space-y-4">
-      <p className="text-sm text-ink-500">
-        데모 미리보기 3건 · 실서비스는 예상 질문 10종
-      </p>
-      {parkJunho.interviewPack.questions.map((q, idx) => (
-        <article
-          key={idx}
-          className="rounded-2xl border border-ink-100 bg-white p-5"
-        >
-          <header className="flex flex-wrap items-baseline gap-2">
-            <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-              Q{idx + 1}
-            </span>
-            <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
-              {INTERVIEW_FORMAT_LABEL[q.format]}
-            </span>
-            <h3 className="text-base font-semibold leading-snug text-ink-900">
-              {q.question}
-            </h3>
-          </header>
-          <dl className="mt-4 space-y-3 text-sm leading-relaxed">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                답변 방향
-              </dt>
-              <dd className="mt-1 text-ink-900">{q.direction}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                근거 생기부 항목
-              </dt>
-              <dd className="mt-1">
-                {q.evidence.length > 0 ? (
-                  <ul className="space-y-1">
-                    {q.evidence.map((e) => (
-                      <li key={e} className="flex gap-2 text-ink-700">
-                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
-                        <span>{e}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-ink-500">
-                    {(q.format as string) === 'mmi' ? '(가상 상황 면접 — 생기부 근거 없음)' : '(제시문 면접 — 생기부 근거 없음)'}
-                  </p>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-                꼬리질문 대비
-              </dt>
-              <dd className="mt-1 text-ink-700">{q.followUp}</dd>
-            </div>
-            <SelfAnswer qid={`interview-${idx}`} />
-          </dl>
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function DiagnosisPanel() {
-  const flagStyle = {
-    strength: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    gap: 'border-amber-200 bg-amber-50 text-amber-700',
-  } as const;
-  const flagLabel = { strength: '◎ 강점', gap: '△ 보완' } as const;
-
-  return (
-    <section className="space-y-4">
-      {parkJunho.diagnosisGuide.criteria.map((c) => (
-        <article
-          key={c.competency}
-          className="rounded-2xl border border-ink-100 bg-white p-5"
-        >
-          <h3 className="text-base font-semibold text-ink-900">
-            {competencyLabel[c.competency]}
-          </h3>
-          <p className="mt-2 text-sm leading-relaxed text-ink-700">{c.summary}</p>
-
-          <ul className="mt-4 space-y-3">
-            {c.highlights.map((h, idx) => (
-              <li key={idx} className="rounded-xl border border-ink-100 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-0.5 text-xs font-semibold',
-                      flagStyle[h.flag]
-                    )}
-                  >
-                    {flagLabel[h.flag]}
-                  </span>
-                  <span className="text-sm font-semibold text-ink-900">
-                    {h.item}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-700">
-                  {h.note}
-                </p>
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {h.evidence.map((e) => (
-                    <li
-                      key={e}
-                      className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
-                    >
-                      {e}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-4 border-t border-ink-100 pt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-              앞으로 할 활동 / 정리 방향
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-ink-900">
-              {c.nextSteps}
-            </p>
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function ImprovementsPanel() {
-  return (
-    <section className="space-y-6">
-      <article className="rounded-2xl border border-ink-100 bg-white p-5">
-        <h3 className="text-base font-semibold text-ink-900">
-          생기부 키워드 & 강점을 드러낼 방향
-        </h3>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {parkJunho.improvements.keywords.map((k) => (
-            <span
-              key={k}
-              className="rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700"
-            >
-              {k}
-            </span>
-          ))}
-        </div>
-        <p className="mt-4 text-sm leading-relaxed text-ink-700">
-          {parkJunho.improvements.fitDelta}
-        </p>
-      </article>
-      <article>
-        <h3 className="mb-3 text-base font-semibold text-ink-900">
-          보완 활동 제안 3건 — 학생 본인이 앞으로 할 활동
-        </h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {parkJunho.improvements.suggestions.map((s, idx) => (
-            <div
-              key={s.title}
-              className="rounded-2xl border border-ink-100 bg-white p-5"
-            >
-              <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                제안 {idx + 1}
-              </span>
-              <h4 className="mt-2 text-base font-semibold text-ink-900">
-                {s.title}
-              </h4>
-              <p className="mt-2 text-sm leading-relaxed text-ink-700">
-                {s.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </article>
     </section>
   );
 }
