@@ -85,17 +85,16 @@ describe('scoreItem', () => {
 });
 
 describe('SHELL_SEARCH_INDEX', () => {
-  it('레일 4항목 + 결과 탭 3개, 총 7건', () => {
-    expect(SHELL_SEARCH_INDEX).toHaveLength(7);
+  it('레일 3항목 + 결과 탭 3개, 총 6건', () => {
+    expect(SHELL_SEARCH_INDEX).toHaveLength(6);
   });
 
-  it('레일 4항목이 app-shell NAV 와 같은 라벨·경로다', () => {
+  it('레일 3항목이 app-shell NAV 와 같은 라벨·경로다', () => {
     const nav = SHELL_SEARCH_INDEX.filter((i) => i.group === '메뉴');
     expect(nav.map((i) => [i.label, i.href])).toEqual([
       ['홈', '/'],
       ['생기부 제출', '/submit'],
       ['진단 결과', '/result'],
-      ['학부모 리포트', '/parent'],
     ]);
   });
 
@@ -144,10 +143,8 @@ describe('searchShell', () => {
     expect(searchShell('면접').map((i) => i.href)).toContain('/result?tab=interview');
   });
 
-  it('키워드로도 찾힌다: "리포트" → 진단 결과 · 학부모 리포트', () => {
-    const hrefs = searchShell('리포트').map((i) => i.href);
-    expect(hrefs).toContain('/parent');
-    expect(hrefs).toContain('/result');
+  it('키워드로도 찾힌다: "리포트" → 진단 결과', () => {
+    expect(searchShell('리포트').map((i) => i.href)).toContain('/result');
   });
 
   it('영문 slug 로도 찾힌다: "diagnosis" → 생기부 진단 가이드', () => {
@@ -159,7 +156,7 @@ describe('searchShell', () => {
   });
 
   it('라벨이 정확히 맞는 항목이 키워드로만 맞는 항목보다 앞에 온다', () => {
-    // "학부모 리포트"는 라벨 매칭, "진단 결과"는 keywords 의 "리포트" 매칭.
-    expect(searchShell('학부모 리포트')[0]?.href).toBe('/parent');
+    // "생기부 진단 가이드"는 라벨 매칭, "진단 결과"는 label+keywords 부분 매칭.
+    expect(searchShell('생기부 진단 가이드')[0]?.href).toBe('/result?tab=diagnosis');
   });
 });

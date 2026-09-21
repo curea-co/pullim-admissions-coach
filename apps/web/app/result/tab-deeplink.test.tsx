@@ -26,18 +26,28 @@ vi.mock('@/components/auth/require-auth', () => ({
   RequireAuth: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// 실 auth 경로(hasAdmissionsAccess 선판정)를 타지 않게 해 서버 상태 분기를 배제한다 —
-// 이 파일이 고정하려는 건 URL↔탭 동기화뿐이다.
-vi.mock('@/lib/auth', () => ({ isPullimAuth: false }));
+// 로그인·이용권 게이트는 통과시킨다 — 이 파일이 고정하려는 건 URL↔탭 동기화뿐이다.
+vi.mock('@/components/auth/require-admissions-access', () => ({
+  RequireAdmissionsAccess: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
+// 탭은 **실제 진단 결과가 있을 때만** 렌더된다(예시/데모 경로는 2026-09-21 제거). 그래서
+// 여기서는 done 진단 1건을 세워 두고, 결과 본문 자체는 빈 배열로 둔다 — 탭 동기화만 본다.
 vi.mock('@/lib/admissions-api', () => ({
-  // 서버 진단 없음(serverState=null) → 데모 패널과 탭이 그대로 렌더된다.
-  fetchLatestDiagnosis: vi.fn().mockResolvedValue(null),
+  fetchLatestDiagnosis: vi.fn().mockResolvedValue({ id: 'd1', status: 'done' }),
   loadLastResultId: vi.fn().mockReturnValue(null),
   saveLastResultId: vi.fn(),
   getDiagnosis: vi.fn(),
-  toAnalyzeResult: vi.fn().mockReturnValue(null),
-  hasAdmissionsAccess: vi.fn().mockResolvedValue(true),
+  toAnalyzeResult: vi.fn().mockReturnValue({ diagnosis: {}, rubric: {} }),
+}));
+
+vi.mock('@/lib/result-view', () => ({
+  toResultViewModel: vi.fn().mockReturnValue({
+    interview: [],
+    diagnosis: [],
+    keywords: [],
+    improvements: [],
+  }),
 }));
 
 vi.mock('@/lib/submitted-profile', () => ({
@@ -50,6 +60,17 @@ const { loadSubmittedProfile } = await import('@/lib/submitted-profile');
 const TAB_LABELS = ['학생부 종합 전형 면접 준비 팩', '생기부 진단 가이드', '부족 활동 보완안'];
 
 const setUrl = (url: string) => window.history.replaceState(null, '', url);
+
+/**
+ * 결과 화면은 서버 조회가 끝나야 탭을 그린다(그 전에는 로딩 스켈레톤). 예전에는 조회 결과가
+ * 없어도 데모 패널이 즉시 떠서 동기 단언이 통했는데, 데모를 걷어낸 뒤로는 기다려야 한다.
+ */
+async function renderReady() {
+  const utils = render(<ResultPage />);
+  await screen.findByRole('tablist');
+  return utils;
+}
+
 const tabs = () => screen.getAllByRole('tab');
 const selectedTab = () =>
   tabs().find((t) => t.getAttribute('aria-selected') === 'true')?.textContent;
@@ -67,25 +88,25 @@ afterEach(() => {
 describe('?tab= 딥링크 — 진입', () => {
   it('?tab=diagnosis 로 들어오면 생기부 진단 가이드 탭이 선택된 상태로 렌더된다', async () => {
     setUrl('/result?tab=diagnosis');
-    render(<ResultPage />);
+    await renderReady();
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
   });
 
   it('?tab=improvements → 부족 활동 보완안', async () => {
     setUrl('/result?tab=improvements');
-    render(<ResultPage />);
+    await renderReady();
     await waitFor(() => expect(selectedTab()).toBe('부족 활동 보완안'));
   });
 
   it('파라미터가 없으면 기본 탭(면접 준비 팩)', async () => {
-    render(<ResultPage />);
+    await renderReady();
     expect(tabs().map((t) => t.textContent)).toEqual(TAB_LABELS);
     expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩');
   });
 
   it('알 수 없는 값은 조용히 기본 탭으로 떨어진다 — 에러 화면 없음', async () => {
     setUrl('/result?tab=nope');
-    render(<ResultPage />);
+    await renderReady();
     expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩');
     // 잘못된 링크가 화면을 깨뜨리지 않는다: 탭도 본문도 정상 렌더.
     expect(tabs()).toHaveLength(3);
@@ -94,14 +115,14 @@ describe('?tab= 딥링크 — 진입', () => {
 
   it('빈 값(?tab=)도 기본 탭', async () => {
     setUrl('/result?tab=');
-    render(<ResultPage />);
+    await renderReady();
     expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩');
   });
 });
 
 describe('?tab= 딥링크 — 탭 클릭', () => {
   it('탭을 누르면 선택이 바뀌고 URL 에 ?tab= 이 반영된다', async () => {
-    render(<ResultPage />);
+    await renderReady();
     clickTab('생기부 진단 가이드');
     expect(selectedTab()).toBe('생기부 진단 가이드');
     expect(window.location.search).toBe('?tab=diagnosis');
@@ -112,7 +133,7 @@ describe('?tab= 딥링크 — 탭 클릭', () => {
   });
 
   it('주소만 바꾼다 — 히스토리 길이가 늘지 않는다(replaceState)', async () => {
-    render(<ResultPage />);
+    await renderReady();
     const before = window.history.length;
     clickTab('생기부 진단 가이드');
     clickTab('부족 활동 보완안');
@@ -121,7 +142,7 @@ describe('?tab= 딥링크 — 탭 클릭', () => {
 
   it('다른 쿼리 파라미터는 보존한다', async () => {
     setUrl('/result?from=palette');
-    render(<ResultPage />);
+    await renderReady();
     clickTab('생기부 진단 가이드');
     expect(window.location.search).toContain('from=palette');
     expect(window.location.search).toContain('tab=diagnosis');
@@ -134,7 +155,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
   // 같은 컴포넌트를 remount 하지 않고 **다시 렌더만** 한다. RTL 의 rerender() 가 그 상황이다.
   // effect 에 `[]` 를 넣으면 이 테스트가 깨진다 — 그게 이 테스트의 존재 이유다.
   it('remount 없이 URL 만 바뀌어도 탭이 따라온다 (팔레트로 탭 이동)', async () => {
-    const { rerender } = render(<ResultPage />);
+    const { rerender } = await renderReady();
     expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩');
 
     // 팔레트의 router.push 가 하는 일 그대로: 주소 변경 + 같은 트리 재렌더(언마운트 아님).
@@ -154,7 +175,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
   // 어긋난다. effect 가 `fromUrl ?? DEFAULT_TAB` 이 아니라 `if (fromUrl)` 이면 여기서 깨진다.
   it('?tab=diagnosis → /result(파라미터 없음): remount 없이 기본 탭으로 되돌아온다', async () => {
     setUrl('/result?tab=diagnosis');
-    const { rerender } = render(<ResultPage />);
+    const { rerender } = await renderReady();
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
 
     window.history.pushState(null, '', '/result');
@@ -166,7 +187,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
 
   it('?tab=diagnosis → ?tab=nope: remount 없이 기본 탭으로 되돌아온다', async () => {
     setUrl('/result?tab=diagnosis');
-    const { rerender } = render(<ResultPage />);
+    const { rerender } = await renderReady();
     await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
 
     window.history.pushState(null, '', '/result?tab=nope');
@@ -188,7 +209,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
         throw new Error('SecurityError: too many history calls');
       });
     try {
-      const { rerender } = render(<ResultPage />);
+      const { rerender } = await renderReady();
       await waitFor(() => expect(selectedTab()).toBe('생기부 진단 가이드'));
 
       clickTab('부족 활동 보완안');
@@ -216,7 +237,7 @@ describe('?tab= 딥링크 — 회귀 가드', () => {
         throw new Error('SecurityError: too many history calls');
       });
     try {
-      const { rerender } = render(<ResultPage />);
+      const { rerender } = await renderReady();
       expect(selectedTab()).toBe('학생부 종합 전형 면접 준비 팩');
 
       clickTab('생기부 진단 가이드');

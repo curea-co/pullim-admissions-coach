@@ -114,14 +114,6 @@ export const SHELL_SEARCH_INDEX: ShellSearchItem[] = [
     description: '면접 · 진단 · 보완 3종',
     keywords: ['result', '결과', '리포트', '분석', '진단'],
   },
-  {
-    id: 'nav-parent',
-    label: '학부모 리포트',
-    href: '/parent',
-    group: '메뉴',
-    description: '자녀 진행 요약',
-    keywords: ['parent', '부모', '보호자', '리포트', '요약'],
-  },
   // ── 결과 화면 탭 (app/result/page.tsx tabs 와 1:1) ──────────────────────
   // href 의 ?tab= 은 결과 페이지의 딥링크 파라미터다. 값(interview/diagnosis/improvements)이
   // 탭 id 와 어긋나면 조용히 기본 탭으로 떨어진다 — 테스트가 이 문자열을 고정한다.

@@ -18,7 +18,6 @@ const NAV: { label: string; href: string; icon: React.ReactNode }[] = [
   { label: '홈', href: '/', icon: <IconHome /> },
   { label: '생기부 제출', href: '/submit', icon: <IconUpload /> },
   { label: '진단 결과', href: '/result', icon: <IconChart /> },
-  { label: '학부모 리포트', href: '/parent', icon: <IconUsers /> },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -94,13 +93,6 @@ function IconChart() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M3 20h18" />
-    </svg>
-  );
-}
-function IconUsers() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 6a3 3 0 0 1 0 6" /><path d="M18 20a6 6 0 0 0-3-5" />
     </svg>
   );
 }

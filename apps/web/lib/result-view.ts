@@ -15,63 +15,13 @@ import type { FitAssessment } from './fit';
 
 // ── sessionStorage 키 ──────────────────────────────────────────────────────
 
+// 레거시 세션 결과 저장소의 잔재. 결과 정본은 서버(diagnosis_results)이고 /result 는 거기서만
+// 읽는다(ADR-058) — 여기 쓰는 코드는 더 이상 없다. 남긴 건 **지우는 쪽**뿐이다: 예전 배포가
+// 열어 둔 탭에 값이 남아 있을 수 있어, 새 분석을 시작할 때 한 번 비운다.
 const STORAGE_KEY = 'pullim:analyze-result';
-// 키 없이 생성된 mock 결과(데모) 여부. 결과 화면에서 정직 고지에 사용(§6).
 const DEMO_KEY = 'pullim:analyze-demo';
 
-/**
- * 분석 결과를 저장하고 **쓰기 성공 여부**를 반환한다.
- * false면 호출자는 제출 데이터를 지우거나 /result로 이동하지 말아야 한다(fail-closed):
- * 실 분석이 성공했는데 결과 저장이 조용히 실패하면, /result가 결과 없음으로 보고
- * 데모를 표시하고 제출 데이터까지 지워져 재시도도 막힌다.
- */
-export function saveAnalyzeResult(r: AnalyzeResult, demo = false): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const serialized = JSON.stringify(r);
-    const demoFlag = demo ? '1' : '0';
-    window.sessionStorage.setItem(STORAGE_KEY, serialized);
-    // 항상 동기화: 직전 데모 플래그가 실결과에 남지 않도록 매 저장 시 덮어쓴다.
-    window.sessionStorage.setItem(DEMO_KEY, demoFlag);
-    // 쓰기 검증(프라이빗 모드/쿼터 초과 등에서 setItem이 조용히 실패할 수 있음).
-    // 두 키 모두 검증: DEMO_KEY만 실패해도 /result가 mock을 실결과처럼 렌더(데모 고지
-    // 누락)할 수 있으므로 부분 성공을 false로 본다.
-    return (
-      window.sessionStorage.getItem(STORAGE_KEY) === serialized &&
-      window.sessionStorage.getItem(DEMO_KEY) === demoFlag
-    );
-  } catch {
-    // sessionStorage 비가용(프라이빗 모드 등) — 저장 실패로 보고.
-    return false;
-  }
-}
-
-export function loadAnalyzeResult(): AnalyzeResult | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AnalyzeResult;
-  } catch {
-    return null;
-  }
-}
-
-/** 저장된 결과가 키 없는 데모(mock)로 생성됐는지. 미저장이면 false. */
-export function loadAnalyzeDemo(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.sessionStorage.getItem(DEMO_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 저장된 분석 결과를 제거. 새 분석을 시작하기 전 반드시 호출해,
- * 분석이 진행 중이거나 실패한 상태에서 /result가 이전 학생의 결과를
- * 개인화 결과처럼 표시하는 것을 막는다.
- */
+/** 레거시 세션 저장소를 비운다. 새 분석 시작 전에 호출(이전 결과 잔존 방지). */
 export function clearAnalyzeResult(): void {
   if (typeof window === 'undefined') return;
   try {

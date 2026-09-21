@@ -143,40 +143,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 학생 / 학부모 분기 */}
-      <section className="w-full max-w-6xl px-6 pb-12">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <StartCta className="group rounded-2xl border border-ink-100 bg-white p-6 transition hover:border-brand-200 hover:shadow-md">
-            <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
-              학생이에요
-            </span>
-            <h3 className="mt-2 text-lg font-semibold text-ink-900">생기부로 면접을 준비할래요</h3>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              내 생기부를 넣고 진단·예상 질문·보완 방향을 받아 스스로 답하는 연습을 시작해요.
-            </p>
-            <span className="mt-4 inline-block text-sm font-semibold text-brand-700 group-hover:underline">
-              시작하기 →
-            </span>
-          </StartCta>
-          <Link
-            href="/parent"
-            className="group rounded-2xl border border-ink-100 bg-white p-6 transition hover:border-brand-200 hover:shadow-md"
-          >
-            <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">
-              학부모예요
-            </span>
-            <h3 className="mt-2 text-lg font-semibold text-ink-900">무엇을 도와주는지 알고 싶어요</h3>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              우리 아이에게 무엇을(그리고 무엇을 하지 않는지) 보여드립니다. 개인정보 보호 기준도
-              함께 확인하세요.
-            </p>
-            <span className="mt-4 inline-block text-sm font-semibold text-brand-700 group-hover:underline">
-              학부모용 보기 →
-            </span>
-          </Link>
-        </div>
-      </section>
-
       {/* 진행 3스텝 */}
       <section className="w-full max-w-6xl px-6 pb-12">
         <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
@@ -195,14 +161,9 @@ export default function LandingPage() {
 
       {/* 결과 예시 미리보기 */}
       <section id="sample" className="w-full max-w-6xl scroll-mt-20 px-6 pb-12">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-            한 번에 받는 3종 결과
-          </h2>
-          <Link href="/result" className="text-sm font-semibold text-brand-700 hover:underline">
-            전체 예시 결과 보기 →
-          </Link>
-        </div>
+        <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
+          한 번에 받는 3종 결과
+        </h2>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {outputs.map((card) => (
             <article
