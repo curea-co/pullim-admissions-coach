@@ -153,7 +153,7 @@ export function CommandSearch() {
         title={`검색 (${shortcut})`}
         // 치수: 모바일 44px(터치 타깃) → sm 이상 38px. 옆의 프로필 아바타(44 → 36)와
         // 같은 브레이크포인트에서 줄어들어야 한 줄로 나란히 보인다.
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] border border-[var(--border-default)] bg-[var(--surface-raised)] text-[var(--text-tertiary)] outline-none transition-colors duration-150 hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 sm:h-[38px] sm:w-[38px]"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] bg-[var(--surface-raised)] text-[var(--text-tertiary)] outline-none transition-colors duration-150 hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 sm:h-[38px] sm:w-[38px]"
       >
         <SearchIcon size={18} />
       </button>
