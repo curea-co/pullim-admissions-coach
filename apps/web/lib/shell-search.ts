@@ -108,11 +108,11 @@ export const SHELL_SEARCH_INDEX: ShellSearchItem[] = [
   },
   {
     id: 'nav-result',
-    label: '진단 결과',
+    label: '진단 내역',
     href: '/result',
     group: '메뉴',
-    description: '면접 · 진단 · 보완 3종',
-    keywords: ['result', '결과', '리포트', '분석', '진단'],
+    description: '지금까지 받은 진단 목록',
+    keywords: ['result', '결과', '리포트', '분석', '진단', '내역', '목록'],
   },
   // ── 결과 화면 탭 (app/result/page.tsx tabs 와 1:1) ──────────────────────
   // href 의 ?tab= 은 결과 페이지의 딥링크 파라미터다. 값(interview/diagnosis/improvements)이

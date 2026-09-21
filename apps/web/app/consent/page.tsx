@@ -171,8 +171,8 @@ export default function ConsentPage() {
           <StepIndicator current="consent" />
         </div>
         <p className="mb-6 text-ink-700">
-          학생부 종합 전형 진단 서비스를 진행하려면 아래 {guardianRequired ? 3 : 2}가지 동의가
-          모두 필요합니다. 한 가지라도 동의하지 않으면 다음 단계로 진행할 수 없습니다.
+          입시코치 진단을 시작하려면 아래 {guardianRequired ? 3 : 2}가지에 모두 동의해야 합니다.
+          하나라도 빠지면 다음 단계로 갈 수 없습니다.
         </p>
 
         {sessionLost && (
@@ -188,9 +188,10 @@ export default function ConsentPage() {
         {/* 연령 구간은 가입 생년월일 기반 권위값(읽기 전용) — 화면 자기신고로 보호자 동의를 우회할 수 없다. */}
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-ink-100 bg-white px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-ink-900">만 14세 미만인가요?</p>
+            <p className="text-sm font-semibold text-ink-900">연령 구간</p>
             <p className="mt-0.5 text-xs text-ink-500">
-              만 14세 미만이라면 법정대리인 동의가 필수로 추가됩니다.
+              가입할 때 입력한 생년월일로 정해집니다. 만 14세 미만이면 법정대리인 동의가 필수로
+              추가됩니다.
             </p>
           </div>
           <span className="rounded-md border border-ink-100 bg-ink-50 px-3 py-1.5 text-xs font-medium text-ink-700">
@@ -333,7 +334,7 @@ function BlockerNote() {
       role="note"
       className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-relaxed text-amber-900"
     >
-      <p className="font-semibold">미성년자 보호 정책 (출시 차단 조건)</p>
+      <p className="font-semibold">미성년자 보호 정책</p>
       <p className="mt-1 text-amber-900/80">
         본 서비스는 법정대리인 동의 절차와 생기부 보관·삭제 정책이 모두 가동된 이후에만
         실제 사용자 데이터를 받습니다. 생기부는 연령과 무관하게 민감정보로 다루며,

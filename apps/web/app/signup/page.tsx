@@ -232,7 +232,6 @@ function SignupForm() {
           {/* 헤더 */}
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">회원가입</h1>
           <p className="mt-1.5 text-sm text-ink-500">
-            {step === 'account' && '이메일로 계정을 만드세요.'}
             {step === 'verify' && '이메일로 보낸 인증 코드를 입력해 주세요.'}
             {step === 'guardian' && '미성년자의 경우 보호자 동의가 필요합니다.'}
             {step === 'done' && '가입이 완료되었습니다. 이동 중…'}
@@ -319,9 +318,13 @@ function SignupForm() {
           {/* ── verify 단계 ── */}
           {step === 'verify' && (
             <form className="space-y-4" noValidate onSubmit={handleVerify}>
-              <p className="rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-2.5 text-sm text-brand-700">
-                데모: 아무 코드나 입력
-              </p>
+              {/* mock 모드 전용 안내 — 실 auth(pullim) 경로에서는 실제 코드가 필요하므로 숨긴다.
+                  예전에는 무조건 렌더돼 OS URL 미설정 폴백을 탄 실사용자에게도 보였다. */}
+              {!isPullimAuth && (
+                <p className="rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-2.5 text-sm text-brand-700">
+                  데모: 아무 코드나 입력
+                </p>
+              )}
 
               <div className="space-y-1.5">
                 <label htmlFor="code" className={labelCls}>인증 코드</label>
@@ -416,7 +419,7 @@ function SignupForm() {
           {step === 'done' && (
             <div className="flex flex-col items-center py-4">
               <span className="text-3xl" aria-hidden>✓</span>
-              <p className="mt-2 text-sm text-ink-500">이동 중…</p>
+              <p className="mt-2 text-sm text-ink-500">가입이 완료되었어요</p>
             </div>
           )}
 

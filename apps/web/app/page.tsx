@@ -7,7 +7,6 @@ import { RequireAuth } from '@/components/auth/require-auth';
 // ── 데이터 ─────────────────────────────────────────────────────────────
 
 // 베타 오픈일 — 노출면(히어로 배지·FAQ)에서 문자열 중복 시 드리프트 방지 위해 단일 상수(Codex #60).
-const BETA_OPEN_DATE = '2026-07-27';
 
 const steps = [
   {
@@ -77,7 +76,7 @@ const promises = [
 const faqs = [
   {
     q: '비용이 드나요?',
-    a: `입시코치 진단은 유료 서비스로, 입시 이용권 구매가 필요합니다. 구체적 요금 정책은 ${BETA_OPEN_DATE} 베타 오픈 시 안내합니다.`,
+    a: '입시코치 진단은 유료 서비스로, 입시 이용권이 필요합니다. 요금은 풀림 계정 설정에서 확인할 수 있어요.',
   },
   {
     q: '제 개인정보는 어디에 저장되나요?',
@@ -107,21 +106,17 @@ export default function LandingPage() {
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-sm font-medium text-brand-700">
               <span className="size-1.5 rounded-full bg-brand-500" />
-              베타 서비스 · {BETA_OPEN_DATE} 오픈
+              베타 서비스
             </span>
             <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.2] tracking-tight text-ink-900 sm:text-[2.6rem] sm:leading-[1.18]">
               생기부를 넣으면
               <br />
               <span className="text-brand-600">면접 준비·진단·보완</span>을 한 번에
             </h1>
-            <p className="mt-4 max-w-prose text-base leading-relaxed text-ink-500">
-              학생부 종합 전형(생기부로 평가하는 대입 수시)을 준비하는 곳입니다. 고1~고3 학생과
-              학부모를 위해 만들어졌습니다.
-            </p>
             <p className="mt-4 max-w-prose text-lg leading-relaxed text-ink-700">
-              평가 기준으로 내 생기부를 진단하고, 면접에서{' '}
-              <strong className="font-semibold text-ink-900">스스로 답할 수 있도록</strong>{' '}
-              준비합니다.
+              학생부 종합 전형(생기부로 평가하는 대입 수시)을 준비하는 고1~고3 학생과 학부모를 위한
+              서비스입니다. 평가 기준으로 생기부를 진단하고, 면접에서{' '}
+              <strong className="font-semibold text-ink-900">스스로 답할 수 있도록</strong> 준비합니다.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -162,7 +157,7 @@ export default function LandingPage() {
       {/* 결과 예시 미리보기 */}
       <section id="sample" className="w-full max-w-6xl scroll-mt-20 px-6 pb-12">
         <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-          한 번에 받는 3종 결과
+          결과 3종, 이렇게 나옵니다
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {outputs.map((card) => (
@@ -282,10 +277,10 @@ export default function LandingPage() {
 
       <footer className="border-t border-ink-100">
         <div className="w-full max-w-6xl px-6 py-8 text-sm text-ink-500">
-          <p>© Curea · Pullim Admissions Coach</p>
-          <p className="mt-1">
-            본 페이지는 베타 미리보기이며, 실제 사용자 데이터는 수집하지 않습니다.
-          </p>
+          {/* 환경별 사실(수집·저장 여부)은 여기서 단언하지 않는다 — DemoBanner 가
+              NEXT_PUBLIC_PULLIM_API 를 보고 말한다. 예전 이 자리의 "데이터를 수집하지 않습니다" 는
+              백엔드가 붙은 dev·운영에서 거짓이었고, 같은 화면 상단 배너와 정반대였다(2026-09-21). */}
+          <p>© Curea · 풀림 입시코치</p>
         </div>
       </footer>
     </div>
