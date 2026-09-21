@@ -7,8 +7,8 @@
  * - 모든 요청 `credentials: 'include'`(httpOnly 쿠키 세션).
  * - CSRF: `GET /auth/csrf`로 토큰 부트스트랩 → 변경 요청에 `X-CSRF-Token` echo.
  * - 401: `POST /auth/refresh` **single-flight**(동시 만료 시 1회만) 후 원요청 1회 재시도.
- *   refresh 자체의 401/403에는 재시도하지 않는다(무한 루프 방지).
- * - 403(CSRF): `/auth/csrf` 재부트스트랩 후 1회 재시도.
+ *   refresh 자체는 다시 refresh를 호출하지 않는다.
+ * - 변경 요청의 CSRF_TOKEN_MISMATCH만 재부트스트랩 후 1회 복구(refresh POST 포함).
  * - 에러는 `ApiError`로 정규화(status + 필드 에러).
  *
  * 이 파일은 DTO에 독립적인 전송 계층이다. 엔드포인트별 요청/응답 매핑은
@@ -68,38 +68,48 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
   // 인스턴스 로컬 상태(모듈 전역 아님 — 테스트 격리/멀티 인스턴스 안전).
   let csrfToken: string | null = null;
-  let refreshInFlight: Promise<boolean> | null = null;
+  let csrfInFlight: Promise<void> | null = null;
+  let refreshInFlight: Promise<Response> | null = null;
 
   const url = (path: string) => `${baseUrl}${path}`;
 
-  async function bootstrapCsrf(): Promise<void> {
-    // TODO(B): pullim-api `/auth/csrf` 실제 응답 형태 확인.
-    // 본 스캐폴드는 응답 본문 `{ csrfToken }`을 가정(쿠키가 api-호스트 전용이면 웹 JS가
-    // 못 읽으므로 본문 토큰이 안전). 공유 부모 도메인 쿠키면 쿠키에서 읽도록 교체.
-    const res = await fetchImpl(url(csrfPath), { credentials: 'include' });
-    if (!res.ok) throw makeApiError('CSRF 부트스트랩 실패', res.status);
-    const data = (await res.json().catch(() => ({}))) as { csrfToken?: string };
-    csrfToken = data.csrfToken ?? null;
+  /** 동시 요청의 bootstrap을 공유하며 실패 뒤에는 다시 시도할 수 있게 한다. */
+  function bootstrapCsrf(): Promise<void> {
+    if (csrfInFlight) return csrfInFlight;
+    csrfInFlight = (async () => {
+      const res = await fetchImpl(url(csrfPath), {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!res.ok) throw makeApiError('CSRF 부트스트랩 실패', res.status);
+      const data: unknown = await res.json().catch(() => null);
+      if (
+        !data || typeof data !== 'object' || !('csrfToken' in data) ||
+        typeof data.csrfToken !== 'string' || !data.csrfToken.trim()
+      ) {
+        throw makeApiError('CSRF 응답에 유효한 토큰이 없습니다.', res.status);
+      }
+      csrfToken = data.csrfToken;
+    })().finally(() => {
+      csrfInFlight = null;
+    });
+    return csrfInFlight;
   }
 
-  /** single-flight refresh. 동시 만료 요청은 진행 중 Promise 하나를 공유. 성공 여부 반환. */
-  function refreshOnce(): Promise<boolean> {
-    if (refreshInFlight) return refreshInFlight;
-    refreshInFlight = (async () => {
-      try {
-        const res = await fetchImpl(url(refreshPath), {
-          method: 'POST',
-          credentials: 'include',
-          headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+  /** 동시 만료 요청은 CSRF 복구까지 포함한 refresh 작업 하나를 공유한다. */
+  function refreshOnce(): Promise<Response> {
+    if (!refreshInFlight) {
+      refreshInFlight = withCsrfRecovery('POST', refreshPath, undefined, { used: false })
+        .then((res) => {
+          if (res.ok) csrfToken = null;
+          return res;
+        })
+        .finally(() => {
+          refreshInFlight = null;
         });
-        return res.ok; // refresh의 401/403 → false(재귀 금지)
-      } catch {
-        return false;
-      } finally {
-        refreshInFlight = null;
-      }
-    })();
-    return refreshInFlight;
+    }
+    // 실패 본문을 여러 호출자가 각각 읽을 수 있어야 한다.
+    return refreshInFlight.then((res) => res.clone());
   }
 
   async function raw(method: Method, path: string, body: unknown): Promise<Response> {
@@ -115,6 +125,27 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+  }
+
+  /** 원요청의 refresh 전후에 동일한 CSRF 복구 예산을 사용한다. */
+  async function withCsrfRecovery(
+    method: Method,
+    path: string,
+    body: unknown,
+    budget: { used: boolean }
+  ): Promise<Response> {
+    const res = await raw(method, path, body);
+    if (res.status !== 403 || !MUTATING.includes(method) || budget.used) return res;
+    const error: unknown = await res.clone().json().catch(() => null);
+    if (
+      !error || typeof error !== 'object' || !('code' in error) ||
+      error.code !== 'CSRF_TOKEN_MISMATCH'
+    ) return res;
+
+    budget.used = true;
+    csrfToken = null;
+    await bootstrapCsrf();
+    return raw(method, path, body);
   }
 
   async function normalizeError(res: Response): Promise<never> {
@@ -146,23 +177,19 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       );
     }
     const isRefresh = path === refreshPath;
-    let res = await raw(method, path, body);
+    const csrfBudget = { used: false };
+    let res = await withCsrfRecovery(method, path, body, csrfBudget);
 
-    // 403(CSRF) → 재부트스트랩 후 1회 재시도.
-    if (res.status === 403 && !isRefresh) {
-      await bootstrapCsrf();
-      res = await raw(method, path, body);
-    }
-
-    // 401 → single-flight refresh → 1회 재시도. refresh 자체는 재시도 안 함(재귀 금지).
+    // refresh만 401인 경우에 세션 만료로 판정한다. CSRF/Origin/서버 오류는 그대로 전달한다.
     if (res.status === 401 && !isRefresh) {
-      const ok = await refreshOnce();
-      if (!ok) {
+      const refreshed = await refreshOnce();
+      if (refreshed.status === 401) {
         throw makeApiError('인증이 만료되었습니다. 다시 로그인해 주세요.', 401, {
           authExpired: true,
         });
       }
-      res = await raw(method, path, body);
+      if (!refreshed.ok) await normalizeError(refreshed);
+      res = await withCsrfRecovery(method, path, body, csrfBudget);
     }
 
     if (!res.ok) await normalizeError(res);
