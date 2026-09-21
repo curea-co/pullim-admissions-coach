@@ -6,7 +6,6 @@
 // 정의하지 않는다. 프로필 표시는 pullim-web(OS) OsTopbar 를 원본으로 pullim-Q · pullim-planner ·
 // pullim-writing-coach 세 앱이 동일하게 수렴한 패턴을 따른다:
 //   - 트리거 = 원형 그라디언트 아바타(이니셜 1글자, 데스크탑 36px · 모바일 44px 터치 타깃)
-//     (★ 이 항목은 2026-09-21 이 앱에서만 깨졌다 — 아래 "2026-09-21 오너 결정" 단락 참고)
 //   - 로그아웃은 **topbar 에 노출하지 않고** 드롭다운 안에만 둔다(직전 구현은 topbar 나열이라 규격 위반)
 //   - 메뉴 순서 고정: 이름+플랜 배지 → "로그인됨" → 설정(OS 위임) → 로그아웃
 //   - 메뉴 항목에 아이콘을 달지 않는다(OS 원본이 텍스트만 — 같은 메뉴가 서로 달라 보이는 것 방지)
@@ -14,17 +13,6 @@
 //
 // 색·간격은 셸(DashboardShell/OsRail)과 같은 PUDS 시맨틱 토큰을 쓴다. 아바타 그라디언트만
 // OS 원본 값(#1F89F5 → #004BB9)을 그대로 옮긴다 — 서비스 간 아바타가 같아 보여야 하므로.
-//
-// 2026-09-21 오너 결정: 닫힌 트리거에 이니셜 아바타만 두던 위 OS 규격을 **이 앱은 의도적으로
-// 깬다** — 트리거에 사용자 이름 텍스트를 병기한다(아바타는 그대로 유지, 옆에 이름만 추가).
-// 유저가 프로필 표시를 다시 확인 요청해 확정됐다. pullim-Q · pullim-planner ·
-// pullim-writing-coach 세 형제 앱은 아직 이니셜 전용이라 이 지점에서 갈라진다 — 다음에 이
-// 파일을 손대는 사람이 "형제 앱과 다르네" 하고 이니셜 전용으로 되돌리지 않도록 이 갈래를
-// 여기 남겨 둔다. 이름이 숨는 초협폭(<380px) 처리는 `components/shell/service-switcher.tsx`
-// 의 서비스명 규칙과 동형
-// (min-[380px]:inline) — 우측 액션(검색·알림·프로필)이 수평으로 밀려나는 걸 막기 위함이며
-// pullim-writing-coach #125 가 그 전례다. 트리거의 접근명은 이름 유무와 무관하게 정적
-// aria-label("프로필 메뉴 열기")이 단다 — 이름이 숨어도 스크린리더 낭독은 그대로다.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -41,25 +29,9 @@ const LOGIN_CTA_CLASS =
 const MENU_ITEM_CLASS =
   'flex w-full items-center px-3 py-2 text-left text-sm text-[var(--text-primary)] outline-none transition hover:bg-[var(--color-action-secondary)] focus-visible:bg-[var(--color-action-secondary)] disabled:cursor-not-allowed disabled:opacity-60';
 
-// 트리거(닫힌 상태) 전체 — 아바타 + 이름을 함께 감싸는 pill. 포커스 링·outline 은 여기(바깥
-// 버튼)에 둔다 — 안쪽 아바타는 더 이상 그 자체로 버튼이 아니라 장식용 span 이기 때문.
-// 오른쪽 패딩(pr-3)은 **이름과 같은 브레이크포인트**를 탄다 — 이름이 숨는 <380px 에서 그대로
-// 두면 아바타 오른쪽에 빈 12px 가 남아 아이콘이 왼쪽으로 치우쳐 보인다(이름 없을 땐 정원형).
-// hover 토큰은 notifications-menu.tsx TRIGGER_CLASS 와 동일(surface-sunken) — 같은 topbar
-// 액션끼리 hover 감각이 갈라지지 않게.
-const TRIGGER_CLASS =
-  'inline-flex h-11 shrink-0 items-center gap-2 rounded-full p-0.5 outline-none transition-colors duration-150 hover:bg-[var(--surface-sunken)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 min-[380px]:pr-3 sm:h-9 sm:pr-2.5';
-
 /** 아바타 — 데스크탑 36px, 모바일 44px(터치 타깃). 그라디언트는 OS 원본 값 고정. */
 const AVATAR_CLASS =
-  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1F89F5] to-[#004BB9] text-sm font-bold text-white shadow-[var(--shadow-sm)] sm:h-9 sm:w-9';
-
-// 이름 텍스트 — 초협폭(<380px)에서는 숨긴다. service-switcher.tsx 의 서비스명(min-[380px]:inline)
-// 과 같은 규칙 — 우측 액션(검색·알림·프로필)이 수평으로 밀려나는 걸 막기 위함
-// (pullim-writing-coach #125 전례). 트리거의 접근명은 aria-label 이 항상 들고 있어 이름이
-// 사라져도 낭독은 유지된다. max-w + truncate — 긴 이름이 topbar 레이아웃을 밀지 않게.
-const NAME_CLASS =
-  'hidden max-w-[7rem] truncate whitespace-nowrap text-sm font-semibold text-[var(--text-primary)] min-[380px]:inline sm:max-w-[9rem]';
+  'inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#1F89F5] to-[#004BB9] text-sm font-bold text-white shadow-[var(--shadow-sm)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 sm:h-9 sm:w-9';
 
 export function UserMenu({ className }: { className?: string }) {
   const { user, status } = useAuth();
@@ -179,12 +151,9 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
         type="button"
         aria-haspopup="menu"
         aria-label="프로필 메뉴 열기"
-        className={TRIGGER_CLASS}
+        className={AVATAR_CLASS}
       >
-        <span className={AVATAR_CLASS}>
-          {initial ?? <IconUser className="h-4 w-4" />}
-        </span>
-        <span className={NAME_CLASS}>{displayName || '사용자'}</span>
+        {initial ?? <IconUser className="h-4 w-4" />}
       </button>
 
       {open && (
