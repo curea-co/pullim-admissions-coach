@@ -13,11 +13,15 @@ const logout = vi.fn();
 const hasAdmissionsAccess = vi.fn();
 const assign = vi.fn();
 let settingsHref: string | null = 'https://os.example.test/settings';
+// /me 신원 두 필드. name = KCB 실명(본인인증 완료 시), displayName = 표시 이름(닉네임·핸들).
+// 케이스마다 조합을 달리 세운다 — 이 둘의 **우선순위**가 이 파일이 고정하려는 것이다.
+let userName: string | undefined = '박승훈';
+let displayName = '박준호';
 
 vi.mock('@/components/auth/auth-provider', () => ({
   useAuth: () => ({
     status: authStatus,
-    user: { id: 'u1', displayName: '박준호', email: 'a@b.test', tier: 'free', package: 'home' },
+    user: { id: 'u1', name: userName, displayName, email: 'a@b.test', tier: 'free', package: 'home' },
     logout,
     refresh: vi.fn(),
   }),
@@ -43,6 +47,8 @@ const items = () => screen.getAllByRole('menuitem');
 beforeEach(() => {
   vi.clearAllMocks();
   authStatus = 'authed';
+  userName = '박승훈';
+  displayName = '박준호';
   settingsHref = 'https://os.example.test/settings';
   hasAdmissionsAccess.mockResolvedValue(true);
   logout.mockResolvedValue(undefined);
@@ -63,19 +69,45 @@ describe('UserMenu — 프로필 메뉴 상태 전이', () => {
     expect(screen.queryByText('로그아웃')).not.toBeInTheDocument();
   });
 
+  // ── 이니셜의 출처 ────────────────────────────────────────────────────────
+  // dev 회귀(2026-09-21): displayName 에 핸들('psh'·'qa-teacher')이 들어오는 계정이 있어
+  // 배지에 'p'·'q' 가 찍혔다. 본인인증을 마쳤으면 서버가 users.name 을 복호해 `name` 으로
+  // 내려주므로 **실명이 우선**이다(형제 앱 pullim-web·writing-coach 와 같은 우선순위).
+  it('표시이름이 핸들이어도 이니셜은 KCB 실명에서 뽑는다 (psh → 박)', () => {
+    userName = '박승훈';
+    displayName = 'psh';
+    render(<UserMenu />);
+    expect(trigger()).toHaveTextContent('박');
+    expect(trigger()).not.toHaveTextContent('p');
+  });
+
+  it('실명이 없으면(미인증·mock) 표시이름으로 폴백한다', () => {
+    userName = undefined;
+    displayName = 'psh';
+    render(<UserMenu />);
+    expect(trigger()).toHaveTextContent('p');
+  });
+
+  it('이모지 이름도 한 글자로 자른다 — 서러게이트 페어가 반쪽 나지 않는다', () => {
+    userName = '🙂민서';
+    displayName = 'handle';
+    render(<UserMenu />);
+    expect(trigger()).toHaveTextContent('🙂');
+  });
+
   it('클릭으로 열면 aria-expanded=true + 항목이 순서대로 나오고 첫 항목에 포커스', async () => {
     render(<UserMenu />);
     openMenu();
     expect(trigger()).toHaveAttribute('aria-expanded', 'true');
-    expect(items().map((i) => i.textContent)).toEqual(['마이페이지', '설정', '로그아웃']);
+    expect(items().map((i) => i.textContent)).toEqual(['내 진단', '내 정보', '로그아웃']);
     await waitFor(() => expect(items()[0]).toHaveFocus());
   });
 
-  it('OS URL 미설정이면 "설정" 항목을 통째로 숨긴다', async () => {
+  it('OS URL 미설정이면 "내 정보"(OS 위임) 항목을 통째로 숨긴다', async () => {
     settingsHref = null;
     render(<UserMenu />);
     openMenu();
-    expect(items().map((i) => i.textContent)).toEqual(['마이페이지', '로그아웃']);
+    expect(items().map((i) => i.textContent)).toEqual(['내 진단', '로그아웃']);
     // 열면서 시작된 이용권 조회가 테스트 종료 후 resolve 되며 act() 경고를 내지 않도록 정착시킨다.
     await waitFor(() => expect(screen.getByText('입시 이용권 보유')).toBeInTheDocument());
   });

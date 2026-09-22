@@ -43,16 +43,18 @@ beforeEach(() => {
 });
 
 describe('/consent — 인트로 개수가 실제 필수와 일치한다', () => {
-  it('만14 이상: "2가지 동의"', () => {
+  // 문구는 2026-09-21 카피 정리에서 "N가지 동의가 모두 필요합니다" → "N가지에 모두 동의해야
+  // 합니다" 로 바뀌었다. 고정하려는 건 문장이 아니라 **숫자가 실제 필수 항목 수와 맞는가** 다.
+  it('만14 이상: "2가지"', () => {
     render(<ConsentPage />);
-    expect(screen.getByText(/2가지 동의/)).toBeInTheDocument();
-    expect(screen.queryByText(/3가지 동의/)).toBeNull();
+    expect(screen.getByText(/2가지에 모두 동의/)).toBeInTheDocument();
+    expect(screen.queryByText(/3가지에 모두 동의/)).toBeNull();
   });
 
-  it('만14 미만: "3가지 동의"', () => {
+  it('만14 미만: "3가지"', () => {
     auth.user = { id: 'u1', ageBand: 'under14' };
     render(<ConsentPage />);
-    expect(screen.getByText(/3가지 동의/)).toBeInTheDocument();
+    expect(screen.getByText(/3가지에 모두 동의/)).toBeInTheDocument();
   });
 });
 
@@ -103,7 +105,7 @@ describe('/consent — 세션 만료를 말해 준다', () => {
     auth.status = 'guest';
     auth.user = null;
     render(<ConsentPage />);
-    expect(screen.getByText(/3가지 동의/)).toBeInTheDocument();
+    expect(screen.getByText(/3가지에 모두 동의/)).toBeInTheDocument();
   });
 });
 

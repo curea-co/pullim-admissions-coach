@@ -31,7 +31,8 @@ import type {
 interface MeResponse {
   sub: string;
   email: string;
-  displayName: string;
+  displayName: string; // 표시 이름(닉네임·핸들) — 실명이 아닐 수 있다
+  name: string; // KCB 실명(users.name AES 복호, 본인조회 한정 PII) — 없으면 서버가 displayName 폴백
   ageBand: AgeBand; // under14|over14|unknown (만14 경계 — birth_date 복호 만나이)
   isMinor: boolean; // 만19 미만 — /me 권위값(birth_date 파생, fail-closed true). ageBand(만14)와 별개.
   package: string; // entitlements.package
@@ -45,6 +46,9 @@ function mapMe(me: MeResponse): User {
     id: me.sub,
     email: me.email,
     displayName: me.displayName,
+    // 실명(KCB)까지 받아 둔다 — 표시 이름이 핸들(psh·qa-teacher 등)인 계정이 있어서, 배지·메뉴는
+    // 실명을 우선한다. 형제 앱(pullim-web OS · writing-coach)이 이미 같은 규칙을 쓴다.
+    name: me.name,
     ageBand: me.ageBand,
     // 만19 isMinor 는 /me 권위값을 그대로 쓴다(이전 ageBand 근사 폐기 — 만14-18 미성년 오분류 회귀 해소).
     // 구버전 api(필드 부재) 대비 fail-closed: 미상 시 보수적 true(미성년 보호 우선).

@@ -22,8 +22,8 @@ describe('§6 가드 카피 — SSOT 핀 테스트', () => {
   it('interview variant 카피가 변경되지 않았다', () => {
     expect(GUARDRAIL_COPY.interview).toMatchInlineSnapshot(`
       {
-        "body": "답변 방향·근거·꼬리질문만 제공합니다. 학생이 자신의 언어로 답할 수 있도록 설계되었습니다.",
-        "title": "면접 *준비* 팩 — 대본이 아닙니다",
+        "body": "답변 방향·근거·꼬리질문만 제공합니다. 학생이 자기 언어로 답하도록 돕습니다.",
+        "title": "면접 “준비” 팩 — 대본이 아닙니다",
       }
     `);
   });
@@ -32,7 +32,7 @@ describe('§6 가드 카피 — SSOT 핀 테스트', () => {
     expect(GUARDRAIL_COPY.diagnosis).toMatchInlineSnapshot(`
       {
         "body": "교사 기재 영역(세특·행특 등) 문구는 제공하지 않습니다. 학생 본인이 앞으로 할 활동만 제안합니다.",
-        "title": "생기부 *진단* 가이드 — 개입이 아닙니다",
+        "title": "생기부 “진단” 가이드 — 개입이 아닙니다",
       }
     `);
   });

@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
  * 36px 원형이지만 60px 바 안에서 세로 중앙 정렬이라 2px 차이는 눈에 띄지 않는다.
  */
 const TRIGGER_CLASS =
-  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] border border-[var(--border-default)] bg-[var(--surface-raised)] text-[var(--text-tertiary)] outline-none transition-colors duration-150 hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 sm:h-[38px] sm:w-[38px]';
+  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] bg-[var(--surface-raised)] text-[var(--text-tertiary)] outline-none transition-colors duration-150 hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2 sm:h-[38px] sm:w-[38px]';
 
 /**
  * 패널 위치·치수.

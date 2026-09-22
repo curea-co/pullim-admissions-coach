@@ -24,7 +24,6 @@ import { fieldLabel, validate, type FieldErrors } from '@/lib/validation';
 import { extractPdfText, validatePdfFile, type PdfExtractHandle } from '@/lib/pdf';
 import { saveSubmittedProfile } from '@/lib/submitted-profile';
 import { saveSubmittedPayload } from '@/lib/submitted-payload';
-import { parkJunho } from '@/lib/mock/park-junho';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
@@ -44,6 +43,18 @@ const tracks: { value: TargetTrack; label: string }[] = (
 const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
 ).map(([value, label]) => ({ value, label }));
+
+// 폼 초기값. 예전에는 박준호 데모 mock 에서 끌어왔는데, mock 을 걷어내면서 여기 상수로 옮겼다
+// (값은 그대로 — 주 이용자가 고3 2학기 일반고 이공계열이라 입력 횟수가 가장 적은 기본값이다).
+// 차단 PII 가 남아 있을 때의 문구 — 제출 에러와 버튼 title 이 **같은 조건**을 말하므로 한 곳에 둔다.
+// 예전에는 두 문장이 따로 있었고 띄어쓰기마저 달랐다("남아있어요" / "남아 있어요").
+const BLOCK_PII_MESSAGE =
+  '반드시 가려야 할 식별정보가 남아 있어요. [자동 가림]을 눌러주세요.';
+
+const DEFAULT_TRACK: TargetTrack = 'science_engineering';
+const DEFAULT_GRADE = 3;
+const DEFAULT_SEMESTER: 1 | 2 = 2;
+const DEFAULT_SCHOOL_TYPE: SchoolType = 'general';
 
 export default function SubmitPage() {
   const router = useRouter();
@@ -74,19 +85,13 @@ export default function SubmitPage() {
   const [warnAck, setWarnAck] = useState(false);
   const [scanned, setScanned] = useState(false);
 
-  const [targetTrack, setTargetTrack] = useState<TargetTrack>(
-    parkJunho.profile.targetTrack
-  );
+  const [targetTrack, setTargetTrack] = useState<TargetTrack>(DEFAULT_TRACK);
   const [universities, setUniversities] = useState<
     { name: string; department?: string }[]
   >([{ name: '' }, { name: '' }, { name: '' }]);
-  const [grade, setGrade] = useState<number>(parkJunho.identity.grade);
-  const [semester, setSemester] = useState<1 | 2>(
-    parkJunho.identity.semester as 1 | 2
-  );
-  const [schoolType, setSchoolType] = useState<SchoolType>(
-    parkJunho.identity.schoolType
-  );
+  const [grade, setGrade] = useState<number>(DEFAULT_GRADE);
+  const [semester, setSemester] = useState<1 | 2>(DEFAULT_SEMESTER);
+  const [schoolType, setSchoolType] = useState<SchoolType>(DEFAULT_SCHOOL_TYPE);
   const [weakAreas, setWeakAreas] = useState<string>('');
 
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -225,7 +230,7 @@ export default function SubmitPage() {
     const block = matches.filter((m) => m.tier === 'block');
     const warn = matches.filter((m) => m.tier === 'warn');
     if (block.length > 0) {
-      setSubmitError('전화·학교명 등 반드시 가려야 할 식별정보가 남아있어요. [자동 가림]을 눌러주세요.');
+      setSubmitError(BLOCK_PII_MESSAGE);
       const node = document.querySelector('[data-field-error="record.text"]') as HTMLElement | null;
       node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
@@ -295,8 +300,7 @@ export default function SubmitPage() {
           <StepIndicator current="submit" />
         </div>
         <p className="mb-6 text-ink-700">
-          학생부 종합 전형 평가 기준 5항목으로 진단하기 위해 5가지 정보를 받습니다.
-          개인 식별정보는 입력 단계에서 가려주세요.
+          진단에 필요한 5가지를 받습니다. 개인 식별정보는 입력 단계에서 가려주세요.
         </p>
 
         <GuardrailLabel variant="general" className="mb-6" />
@@ -331,8 +335,8 @@ export default function SubmitPage() {
                   rows={6}
                   value={recordText}
                   onChange={(e) => setRecordText(e.target.value)}
-                  placeholder="여기에 마스킹된 생기부 본문을 붙여넣어주세요"
-                  aria-label="생기부 본문 (마스킹 후 붙여넣기)"
+                  placeholder="여기에 식별정보를 가린 생기부 본문을 붙여넣어주세요"
+                  aria-label="생기부 본문 (식별정보를 가린 뒤 붙여넣기)"
                   className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
                   aria-invalid={!!errors['record.text']}
                   data-field-error="record.text"
@@ -512,7 +516,7 @@ export default function SubmitPage() {
               disabled={isPending || blockMatches.length > 0}
               title={
                 blockMatches.length > 0
-                  ? '반드시 가려야 할 식별정보가 남아 있어요. [자동 가림]을 눌러주세요.'
+                  ? BLOCK_PII_MESSAGE
                   : undefined
               }
               className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
@@ -736,13 +740,13 @@ function PdfUploader({
           </div>
           <div>
             <label className="text-xs font-medium text-ink-500">
-              추출된 본문 (마스킹 확인 후 필요 시 직접 수정)
+              추출된 본문 (가림 확인 후 필요 시 직접 수정)
             </label>
             <textarea
               rows={8}
               value={extractedText}
               onChange={(e) => onExtractedTextChange(e.target.value)}
-              aria-label="PDF에서 추출된 본문 (마스킹 확인 후 필요 시 직접 수정)"
+              aria-label="PDF에서 추출된 본문 (가림 확인 후 필요 시 직접 수정)"
               className="mt-1 w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
           </div>

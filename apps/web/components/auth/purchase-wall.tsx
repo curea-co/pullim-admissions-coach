@@ -46,10 +46,10 @@ export function PurchaseWall({
         <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-brand-50 text-2xl" aria-hidden>
           🔒
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-ink-900">유료 회원만 이용할 수 있어요</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink-900">입시 이용권이 필요해요</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-500">
-          입시코치 진단은 <span className="font-medium text-ink-700">입시 이용권</span>을 구매한
-          회원만 사용할 수 있습니다. 구매 후 이 화면에서 다시 확인해 주세요.
+          이용권을 구매하거나, 쿠폰이 있다면 아래에서 등록해 주세요. 반영되면 바로 진단을 시작할 수
+          있어요.
         </p>
 
         {href ? (
@@ -61,7 +61,7 @@ export function PurchaseWall({
           </a>
         ) : (
           <p className="mt-6 rounded-xl border border-ink-100 bg-ink-50 px-4 py-2.5 text-sm text-ink-500">
-            구매 페이지 준비 중입니다.
+            구매 페이지는 준비 중이에요. 쿠폰이 있다면 아래에서 등록할 수 있어요.
           </p>
         )}
 

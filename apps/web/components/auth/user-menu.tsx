@@ -139,8 +139,16 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
     }
   }
 
-  const displayName = user.displayName?.trim() ?? '';
-  const initial = displayName ? displayName[0] : null;
+  // 표시 이름 = **KCB 실명(`/me` name) 우선** → 표시이름 폴백.
+  // displayName 은 닉네임·핸들이 들어오는 자리라 실명이 아닐 수 있다(실제로 dev 계정이 'psh' ·
+  // 'qa-teacher' 였고, 그래서 배지 이니셜이 'p' · 'q' 로 찍혔다). 본인인증을 마친 사용자는
+  // 서버가 users.name 을 복호해 `name` 으로 내려주므로 그걸 먼저 쓴다 — 형제 앱
+  // (pullim-web OS · pullim-writing-coach)이 이미 같은 우선순위를 쓴다.
+  // 이 값은 본인 조회 한정 PII 다: 로그에 남기거나 스토리지에 쓰지 말 것.
+  const displayName = (user.name?.trim() || user.displayName?.trim()) ?? '';
+  // Array.from — 한글은 물론 이모지(서러게이트 페어)도 한 글자로 자른다. `[0]` 이면 이모지가
+  // 반쪽만 잘려 깨진 문자가 배지에 박힌다.
+  const initial = displayName ? Array.from(displayName)[0] : null;
   const settingsHref = osSettingsHref();
   const planLabel = plan === 'has' ? '입시 이용권 보유' : plan === 'none' ? '이용권 미보유' : null;
 
@@ -183,17 +191,21 @@ function ProfileMenu({ user, className }: { user: User; className?: string }) {
           <Link
             role="menuitem"
             tabIndex={-1}
-            href="/mypage"
+            href="/result"
             onClick={close}
             className={MENU_ITEM_CLASS}
           >
-            마이페이지
+            내 진단
           </Link>
 
-          {/* 설정은 앱이 소유하지 않고 OS 가 정본 — 미설정 환경에서는 항목째 숨긴다. */}
+          {/* 계정(내 정보·요금제·쿠폰·탈퇴)은 앱이 소유하지 않는다 — 풀림 OS 가 정본이고,
+              형제 앱(pullim-Q·planner·writing-coach)도 전부 OS 로 보낸다. 이 앱만 자체
+              마이페이지를 들고 있었고 내용이 OS 설정과 중복이라 2026-09-21 에 걷어냈다.
+              앱에 남는 건 도메인 데이터(진단 내역)뿐이고 그건 위 "내 진단"이 가져갔다.
+              OS URL 미설정 환경에서는 갈 곳이 없으므로 항목째 숨긴다. */}
           {settingsHref && (
             <a role="menuitem" tabIndex={-1} href={settingsHref} className={MENU_ITEM_CLASS}>
-              설정
+              내 정보
             </a>
           )}
 

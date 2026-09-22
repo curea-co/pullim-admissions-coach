@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/error-state';
 import { cn } from '@/lib/utils';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { RequireAdmissionsAccess } from '@/components/auth/require-admissions-access';
+import { osSettingsHref } from '@/lib/auth/os-login';
 import { loadSubmittedPayload, clearSubmittedPayload } from '@/lib/submitted-payload';
 import { studentProfileSchema } from '@pullim/shared';
 import { clearAnalyzeResult } from '@/lib/result-view';
@@ -34,7 +35,7 @@ type AnalysisPhase = 'submitting' | 'analyzing' | 'done' | 'error';
 
 const STEP_SEQUENCE: { key: AnalysisPhase; label: string; detail: string }[] = [
   { key: 'submitting', label: '제출 접수', detail: '생기부를 안전하게 저장하고 동의를 기록합니다' },
-  { key: 'analyzing', label: '분석 중', detail: 'AI가 §6 가드레일 준수로 분석 중 (보통 1–3분)' },
+  { key: 'analyzing', label: '분석 중', detail: '예상 질문·진단·보완안을 만드는 중 (보통 1–3분)' },
   { key: 'done', label: '결과 도착', detail: '결과 화면을 불러옵니다' },
 ];
 
@@ -186,7 +187,7 @@ function ProcessingFlow() {
         }
         setErrorMsg(
           entitlementBlocked
-            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 마이페이지에서 등록해 주세요.'
+            ? '입시 이용권이 없어 진단을 시작할 수 없어요. 쿠폰이 있다면 풀림 계정 설정에서 등록해 주세요.'
             : (e?.message ?? (err instanceof Error ? err.message : '네트워크 오류가 발생했습니다.'))
         );
         setPhase('error');
@@ -225,7 +226,7 @@ function ProcessingFlow() {
             사용자는 제출이 된 건지 안 된 건지 판단할 수 없다(QA 2026-09-20). */}
         {phase !== 'error' && (
           <p className="mb-6 text-ink-700">
-            제출이 접수되었습니다. AI가 §6 가드레일 안에서 결과를 만들고 있습니다.
+            제출이 접수되었습니다.
           </p>
         )}
 
@@ -248,19 +249,29 @@ function ProcessingFlow() {
                 다시 시도
               </button>
               )}
-              {needsEntitlement && (
-                <Link
-                  href="/mypage"
-                  className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
-                >
-                  이용권·쿠폰 등록하기
-                </Link>
-              )}
+              {/* 이용권 등록 창구는 풀림 OS 설정이 정본이다(구매·쿠폰·결제수단 한자리).
+                  예전에는 앱의 /mypage 로 보냈는데, 그 화면이 OS 설정과 중복이라 걷어냈다.
+                  OS URL 미설정 환경에서는 링크를 만들 수 없으므로 안내 문구만 남긴다. */}
+              {needsEntitlement &&
+                (osSettingsHref() ? (
+                  <a
+                    href={osSettingsHref() as string}
+                    className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                  >
+                    이용권·쿠폰 등록하기
+                  </a>
+                ) : (
+                  <span className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-medium text-ink-500">
+                    이용권 등록은 풀림 계정 설정에서 할 수 있어요
+                  </span>
+                ))}
               <Link
                 href="/submit"
                 className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
               >
-                처음으로
+                {/* 목적지를 말하는 라벨 — submit 화면의 "← 처음으로" 는 `/` 로 가는데 같은
+                    라벨이 여기서는 `/submit` 으로 갔다. */}
+                생기부 다시 제출하기
               </Link>
             </div>
           </div>
@@ -283,7 +294,7 @@ function ProcessingFlow() {
             </section>
 
             <p className="mt-6 text-xs text-ink-400">
-              분석 중(보통 1–3분) — 완료되면 자동으로 결과 화면으로 이동합니다. 이 화면을 닫아도 분석은 계속됩니다.
+              완료되면 자동으로 결과 화면으로 이동합니다. 이 화면을 닫아도 분석은 계속됩니다.
             </p>
           </>
         )}
@@ -293,7 +304,7 @@ function ProcessingFlow() {
             href="/consent"
             className="text-sm text-ink-500 hover:text-ink-900"
           >
-            ← 동의로
+            ← 동의 단계로
           </Link>
         </div>
       </div>

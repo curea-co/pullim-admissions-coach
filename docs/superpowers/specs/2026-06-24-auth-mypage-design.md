@@ -44,16 +44,9 @@
   - 베이스 URL = `process.env.NEXT_PUBLIC_PULLIM_API` (예 dev `http://localhost:3000`).
   - 모든 요청 `credentials: 'include'`.
   - **CSRF**: 변경 요청(POST/PATCH/DELETE)에 `X-CSRF-Token` 헤더로 토큰을 echo한다.
-    토큰 획득 방식은 **쿠키 도메인 전략에 종속**된다(§10 선행조건과 함께 확정):
-    - 인증/CSRF 쿠키가 **api 호스트 전용**이면 웹 앱 도메인의 JS는 그 쿠키를 읽을 수
-      없으므로 echo가 불가능하다. 이 경우 **`GET /auth/csrf`가 응답 *본문*으로 토큰을
-      반환**하고(또는 웹이 읽을 수 있는 비-httpOnly 쿠키) 클라이언트가 메모리에 두고 echo한다.
-    - 또는 **공유 부모 도메인 쿠키**(`Domain=.pullim…`)로 두어 웹·api 서브도메인이 같은
-      CSRF 쿠키를 읽게 한다.
-    어느 쪽이든 "웹 JS가 echo할 토큰을 얻을 수 있어야" 한다 — api-호스트-전용 httpOnly
-    쿠키만으로는 CSRF 부트스트랩이 동작하지 않는다. 플랜 단계에서 pullim-api의 실제
-    `/auth/csrf` 응답 형태와 쿠키 도메인을 확인해 확정한다.
-  - **401 처리**: `POST /auth/refresh` **1회만** 시도 후 원요청 재시도. 실패 시 인증 만료(로그아웃 + `/login?next=`). **재귀/폭주 가드(필수)**: ① `/auth/refresh` 호출 자체의 401/403에는 refresh를 재시도하지 않는다(무한 루프 방지). ② **single-flight** — 동시에 만료된 여러 요청은 진행 중인 refresh Promise 하나를 공유(요청마다 refresh 폭주 금지). ③ 재시도는 원요청당 1회로 제한.
+    `GET /auth/csrf`의 `{ csrfToken }` 응답으로 확보하며 `credentials: 'include'`·`cache: 'no-store'`를 사용한다. 동시 부트스트랩은 single-flight로 공유하고 토큰이 없거나 잘못된 응답이면 변경 요청을 보내지 않는다.
+  - **401 처리**: `POST /auth/refresh` 전에 CSRF를 확보한다(GET에서 시작한 401도 동일). 동시 만료 요청은 하나의 refresh Promise를 공유하며 성공 후 CSRF 캐시를 비우고 원요청을 한 번 재시도한다. refresh의 401만 `authExpired`로 표시하고 403·서버 오류는 원래 상태·코드로 전달한다. refresh가 다시 refresh를 호출하지 않는다.
+  - **CSRF 복구**: 변경 요청의 403 중 `code=CSRF_TOKEN_MISMATCH`만 캐시 무효화·재부트스트랩 후 한 번 재시도한다. 최초 요청과 refresh 이후 요청은 같은 복구 경로·예산을 공유한다. refresh POST도 자체 CSRF 복구 1회를 허용한다. 일반 권한·Origin 거부 및 GET 403은 재시도하지 않는다.
   - 표준 에러 형태로 정규화(필드 에러/일반 에러 구분).
 - **`components/auth-provider.tsx`('use client')**: 앱 마운트 시 `GET /me`로 세션 하이드레이트.
   - 노출: `user`(MeResponse | null), `status`('loading'|'authed'|'guest'), `login()`, `signup()`, `logout()`, `refreshMe()`.
@@ -94,14 +87,14 @@
 4. access 만료 → `/auth/refresh`로 슬라이드. refresh 만료 → 로그아웃 상태.
 
 ## 8. 에러 처리
-- 401 → refresh→재시도→실패 시 `/login`.
-- CSRF 403 → `/auth/csrf` 재부트스트랩 후 1회 재시도.
+- 401 → CSRF를 갖춘 refresh → 원요청 재시도. refresh 401만 인증 만료로 분류하고 다른 실패는 보존한다.
+- CSRF 복구 및 refresh 실패 분류는 §4의 전송 계약을 따른다.
 - 가입: 이메일 중복·약한 비번·인증코드 만료/불일치 → 인라인 필드 에러.
 - 미성년: 보호자 동의 미완료 → 진단 진입 차단 + 안내.
 - 네트워크/서버 다운 → 친절 메시지 + 재시도. (pullim-api 미가동 시 명확한 안내.)
 
 ## 9. 테스트
-- **vitest**: `lib/api.ts` — CSRF echo, 401→refresh→재시도, **refresh 재귀/single-flight 가드**(refresh 자체 401에 무한루프 없음·동시 만료 시 refresh 1회), **403→`/auth/csrf` 재부트스트랩→1회 재시도**, 에러 정규화(fetch mock).
+- **vitest**: `lib/api.ts` — CSRF echo, 401→refresh→재시도, **refresh 재귀/single-flight 가드**(refresh 자체 401에 무한루프 없음·동시 만료 시 refresh 1회), **변경 요청의 CSRF_TOKEN_MISMATCH만 재부트스트랩→1회 재시도(refresh 전후 동일 예산)**, 에러 정규화(fetch mock).
 - **vitest**: `next` 오픈 리다이렉트 가드 — 내부 경로(`/...`)만 허용, `//`·`http(s):`·외부 URL은 기본값(`/mypage`)으로 폴백.
 - **수동 e2e**: 가입→인증메일→로그인→마이페이지→로그아웃→탈퇴 · 미성년 가입→보호자 동의 · 보호 라우트 리다이렉트 · 세션 만료 재로그인.
 - typecheck + `next build`.

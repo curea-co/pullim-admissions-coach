@@ -255,7 +255,7 @@ export function FeedbackWidget() {
                   건의하기
                 </h2>
                 <p id={descId} className="pr-9 text-[13px] leading-[1.6] text-[var(--text-tertiary)]">
-                  서비스 개선을 위한 의견을 보내주세요. 건의하신 내용은 운영팀에서 검토해요.
+                  건의하신 내용은 운영팀에서 확인해요.
                 </p>
                 {/* 전송 중에도 닫기는 살려 둔다 — 사용자를 모달에 가두지 않는다. */}
                 <button

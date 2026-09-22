@@ -95,7 +95,7 @@ export const recordSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['text'],
-        message: '전화·주민번호·이메일·학교명 등 식별정보가 남아있어요. 자동 가림을 적용해주세요.',
+        message: '전화·주민번호·이메일·학교명 등 식별정보가 남아 있어요. 자동 가림을 적용해 주세요.',
       });
     }
   });

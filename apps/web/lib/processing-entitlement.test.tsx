@@ -8,7 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // 눌러도 같은 403 이라 영원히 실패한다. 게다가 위쪽에 "제출이 접수되었습니다" 가 그대로 남아
 // 있어서, 사용자는 제출이 된 건지 안 된 건지도 알 수 없었다.
 //
-// 지금은 이용권 게이트를 따로 알아보고 마이페이지(쿠폰 등록)로 보낸다.
+// 지금은 이용권 게이트를 따로 알아보고 **풀림 OS 설정**(구매·쿠폰 등록의 정본)으로 보낸다.
+// (앱의 /mypage 로 보내던 것을 2026-09-21 에 바꿨다 — 그 화면이 OS 설정과 중복이라 걷어냈다.)
 
 const submitAndDiagnose = vi.fn();
 
@@ -35,6 +36,12 @@ vi.mock('@/components/auth/require-auth', () => ({
 vi.mock('@/components/auth/require-admissions-access', () => ({
   RequireAdmissionsAccess: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+// OS URL 은 환경변수 파생이라 테스트에서 고정한다 — 미설정이면 링크 대신 안내 문구가 나온다.
+vi.mock('@/lib/auth/os-login', () => ({
+  osSettingsHref: () => 'https://os.example.test/settings',
+  osLoginHref: () => null,
+  osSignupHref: () => null,
+}));
 
 // 페이로드 파싱은 이 테스트의 관심사가 아니다 — 항상 통과시키고 API 실패 분기만 본다.
 vi.mock('@pullim/shared', async () => {
@@ -58,9 +65,10 @@ describe('/processing — 이용권 403', () => {
     await waitFor(() =>
       expect(screen.getByText('진단을 시작할 수 없습니다')).toBeInTheDocument()
     );
+    // 이용권 등록 창구는 OS 설정이 정본 — 앱의 /mypage 는 2026-09-21 에 걷어냈다.
     expect(screen.getByRole('link', { name: /이용권·쿠폰 등록하기/ })).toHaveAttribute(
       'href',
-      '/mypage'
+      'https://os.example.test/settings'
     );
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
@@ -68,7 +76,7 @@ describe('/processing — 이용권 403', () => {
   it('서버 원문 대신 무엇을 해야 하는지 말한다', async () => {
     submitAndDiagnose.mockRejectedValue(apiError(403, 'FORBIDDEN', '접근 권한이 없습니다.'));
     render(<ProcessingPage />);
-    await waitFor(() => expect(screen.getByText(/마이페이지에서 등록/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/풀림 계정 설정에서 등록/)).toBeInTheDocument());
   });
 
   it('에러 상태에서는 "제출이 접수되었습니다" 를 감춘다', async () => {
