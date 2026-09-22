@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 
 /** 목록 항목 공통 — 아이콘 34px + (이름 + 태그라인) 2행. */
 const ITEM_CLASS =
-  'flex items-center gap-3 rounded-[var(--radius-md)] p-2.5 no-underline outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-action-primary)]';
+  'flex items-center gap-3 rounded-xl p-2.5 no-underline outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-action-primary)]';
 
 export function ServiceSwitcher() {
   // `nav` + 링크 목록이라 항목 선택자를 주입한다(훅 기본값은 `[role="menuitem"]`).
@@ -56,8 +56,8 @@ export function ServiceSwitcher() {
   if (services.length === 0) return null;
 
   return (
-    <div {...rootProps} className="relative ml-0.5 flex items-center">
-      {/* 트리거 = OS `.switcher-trigger` 정합 pill: 아이콘 26px + 현재 서비스명 + 셰브론. */}
+    <div {...rootProps} className="relative flex items-center">
+      {/* planner `.switcher-trigger` 정합: 30px 서비스 아이콘 + 서비스명 + 셰브론. */}
       <button
         {...triggerProps}
         type="button"
@@ -67,20 +67,18 @@ export function ServiceSwitcher() {
         aria-controls={open ? menuId : undefined}
         aria-label="서비스 전환"
         title="서비스 전환"
-        className="flex h-[38px] items-center gap-1.5 rounded-[11px] border border-[var(--border-default)] bg-[var(--surface-raised)] pl-1.5 pr-2 text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-sunken)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2"
+        className="flex items-center gap-2.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-raised)] py-[7px] pl-[9px] pr-3 text-[var(--text-secondary)] outline-none transition-[border-color,box-shadow] duration-150 hover:border-[var(--color-primary-300)] hover:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-[var(--color-action-primary)] focus-visible:ring-offset-2"
       >
-        <span className="flex h-[26px] w-[26px] items-center justify-center overflow-hidden rounded-[var(--radius-sm)]">
-          <ServiceIcon name={current?.icon ?? 'pullim'} size={26} aria-hidden />
+        <span className="flex h-[30px] w-[30px] items-center justify-center overflow-hidden rounded-lg">
+          <ServiceIcon name={current?.icon ?? 'pullim'} size={30} aria-hidden />
         </span>
-        {/* 현재 서비스명 — 초협폭(<380px)에서는 숨긴다. 브랜드 서브라벨(min-[561px])과 같은 규칙으로,
-            우측 액션(검색·알림·프로필)이 수평으로 밀려나는 걸 막는다(pullim-writing-coach #125 전례).
-            트리거 자체의 접근명은 aria-label 이 항상 들고 있어 이름이 사라져도 낭독은 유지된다. */}
-        <span className="hidden whitespace-nowrap text-[13px] font-bold tracking-[-0.02em] text-[var(--text-primary)] min-[380px]:inline">
+        {/* planner 와 같이 760px 이하에서는 서비스명을 숨긴다. 접근명은 aria-label 이 유지한다. */}
+        <span className="hidden whitespace-nowrap text-[14px] font-bold tracking-[-0.02em] text-[var(--text-primary)] min-[761px]:inline">
           {current?.name ?? '서비스'}
         </span>
         <svg
-          width="15"
-          height="15"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -115,7 +113,7 @@ export function ServiceSwitcher() {
           {...menuProps}
           id={menuId}
           aria-label="서비스 전환"
-          className="fixed inset-x-3 top-[68px] z-[80] max-h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-lg)] sm:absolute sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[330px]"
+          className="fixed left-[14px] right-[14px] top-[66px] z-[80] max-h-[calc(100dvh-80px)] max-w-[360px] overflow-y-auto overflow-x-hidden rounded-[20px] border border-[var(--border-default)] bg-[var(--surface-raised)] p-2.5 shadow-[var(--shadow-lg)] min-[761px]:absolute min-[761px]:inset-x-auto min-[761px]:left-0 min-[761px]:top-[calc(100%+10px)] min-[761px]:w-[330px]"
         >
           <div className="px-2.5 pb-1.5 pt-2 font-[var(--font-mono)] text-[10px] uppercase tracking-[.16em] text-[var(--text-tertiary)]">
             서비스 전환

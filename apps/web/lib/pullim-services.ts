@@ -61,8 +61,8 @@ function appOriginOverride(): Record<string, string | undefined> {
     studio: process.env.NEXT_PUBLIC_STUDIO_URL,
     jr: process.env.NEXT_PUBLIC_JR_URL,
     arcade: process.env.NEXT_PUBLIC_ARCADE_URL,
-    // 아래 3개는 현재 목록에서 숨김(맨 아래 노출 목록 주석 참고) — 복원 시 그대로 쓰려고 남겨 둔다.
     classbot: process.env.NEXT_PUBLIC_CLASSBOT_URL,
+    // 아래 2개는 현재 목록에서 숨김(맨 아래 노출 목록 주석 참고) — 복원 시 그대로 쓰려고 남겨 둔다.
     games: process.env.NEXT_PUBLIC_GAMES_URL,
     store: process.env.NEXT_PUBLIC_STORE_URL,
   };
@@ -138,15 +138,13 @@ export const CURRENT_SLUG = 'exam';
  * **스위처를 통째로 렌더하지 말라**는 신호다 — 설정 오류를 prod 링크로 가리지 않는다.
  * (현재 서비스인 입시 코치 항목도 함께 빠진다: 목록이 자기 자신 하나뿐인 스위처는 의미가 없다.)
  *
- * 노출 목록(사용자 확정) — 개통된 서비스만: 플래너·문제큐·라이팅 코치·스튜디오·주니어·아케이드
- * + 현재 서비스인 입시 코치. **숨김(완전 비노출)**: 클래스봇·게임즈·스토어 — '준비 중' 배지가
+ * 노출 목록(사용자 확정) — 순서 고정: 플래너·문제큐·라이팅 코치·주니어·아케이드·
+ * 현재 서비스인 입시 코치·클래스봇·스튜디오. **숨김(완전 비노출)**: 게임즈·스토어 — '준비 중' 배지가
  * 아니라 목록에서 제외한다. 개통·노출 결정 시 아래 항목을 되살린다(이름·설명은 OS os-services.ts 정본):
- *   { slug: 'classbot', name: '클래스봇', icon: 'classbot', href: appHref('classbot'), desc: … }
  *   { slug: 'games',    name: '게임즈',   icon: 'games',    href: appHref('games', '/games'), desc: … }
  *   { slug: 'store',    name: '스토어',   icon: 'store',    href: appHref('store'), desc: … }
- * (override 키는 복원이 쉽도록 이미 유지돼 있다. 다만 `ServiceIcon` 은 이 카탈로그가 실제로 쓰는
- *  글리프만 담고 있으므로, classbot·store 를 되살릴 땐 정본 writing-coach `service-icon.tsx` 에서
- *  해당 글리프를 함께 가져와야 한다 — `games` 글리프는 아케이드가 이미 쓰고 있어 그대로 쓸 수 있다.)
+ * (`ServiceIcon` 은 이 카탈로그가 실제로 쓰는 글리프만 담는다. store 를 되살릴 땐 정본
+ *  writing-coach `service-icon.tsx` 에서 글리프를 함께 가져와야 한다. games 는 아케이드가 이미 쓴다.)
  */
 export function switcherServices(): SwitcherService[] {
   if (!osUrl()) return [];
@@ -154,11 +152,12 @@ export function switcherServices(): SwitcherService[] {
     { slug: 'planner', name: '플래너', icon: 'planner', href: appHref('planner', '/planner'), desc: '내 공부, 내가 설계한다.' },
     { slug: 'q', name: '문제큐', icon: 'q', href: appHref('q'), desc: '풀고, 틀리고, 다시 자라난다.' },
     { slug: 'writing', name: '라이팅 코치', icon: 'writing', href: appHref('writing'), desc: '한 줄, 한 단락이 더 좋아진다.' },
-    { slug: 'studio', name: '스튜디오', icon: 'studio', href: appHref('studio'), desc: '제작은 AI가, 검증은 사람이.' },
     { slug: 'junior', name: '주니어', icon: 'junior', href: appHref('jr'), desc: '초등, 즐겁게 시작하는 첫 학습.' },
     { slug: 'arcade', name: '아케이드', icon: 'games', href: appHref('arcade'), desc: '무료로 즐기는 학습 아케이드.' },
     // 현재 서비스 — 외부 핸드오프가 아니라 자기 앱 루트. 태그라인은 정의 §6 가드레일 준수:
     //   '합격'·'정답'·'대본' 류 금지, 진단·준비 톤만(§6.1 생기부 진단 / §6.2 면접 준비).
     { slug: CURRENT_SLUG, name: '입시 코치', icon: 'exam', href: '/', desc: '생기부를 진단하고, 면접을 준비한다.' },
+    { slug: 'classbot', name: '클래스봇', icon: 'classbot', href: appHref('classbot'), desc: '선생님의 분신을 만든다.' },
+    { slug: 'studio', name: '스튜디오', icon: 'studio', href: appHref('studio'), desc: '제작은 AI가, 검증은 사람이.' },
   ];
 }
