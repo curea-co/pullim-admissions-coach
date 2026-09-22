@@ -35,6 +35,7 @@ describe('switcherServices — 티어 파생(NEXT_PUBLIC_OS_URL 앵커)', () => 
     expect(href(list, 'planner')).toBe('https://dev-planner.pullim.ai/planner');
     expect(href(list, 'q')).toBe('https://dev-q.pullim.ai');
     expect(href(list, 'writing')).toBe('https://dev-writing.pullim.ai');
+    expect(href(list, 'classbot')).toBe('https://dev-classbot.pullim.ai');
     expect(href(list, 'studio')).toBe('https://dev-studio.pullim.ai');
     // 주니어의 앱 slug 는 'jr'(표시명만 '주니어') — 서브도메인도 jr 다.
     expect(href(list, 'junior')).toBe('https://dev-jr.pullim.ai');
@@ -80,7 +81,7 @@ describe('switcherServices — 로컬 안전장치', () => {
     for (const svc of list) {
       expect(svc.href).not.toContain('.pullim.ai');
     }
-    for (const slug of ['planner', 'q', 'writing', 'studio', 'junior', 'arcade']) {
+    for (const slug of ['planner', 'q', 'writing', 'junior', 'arcade', 'classbot', 'studio']) {
       // path 미부착 — 허브는 그 앱이 아니므로 /planner 같은 하위 경로가 없다.
       expect(href(list, slug)).toBe(hub);
     }
@@ -134,19 +135,28 @@ describe('switcherServices — 노출 목록', () => {
     expect(exam!.icon).toBe('exam');
   });
 
-  it('숨김 서비스(클래스봇·게임즈·스토어)는 목록에 없다', () => {
+  it('숨김 서비스(게임즈·스토어)는 목록에 없다', () => {
     vi.stubEnv('NEXT_PUBLIC_OS_URL', 'https://pullim.ai');
     const slugs = switcherServices().map((s) => s.slug);
-    expect(slugs).not.toContain('classbot');
     expect(slugs).not.toContain('games');
     expect(slugs).not.toContain('store');
   });
 
-  it('확정된 7개 항목이 순서대로 노출된다', () => {
+  it('OS 홈 뒤에 붙을 8개 서비스가 확정 순서대로 노출된다', () => {
     vi.stubEnv('NEXT_PUBLIC_OS_URL', 'https://pullim.ai');
     expect(switcherServices().map((s) => s.slug)).toEqual([
-      'planner', 'q', 'writing', 'studio', 'junior', 'arcade', 'exam',
+      'planner', 'q', 'writing', 'junior', 'arcade', 'exam', 'classbot', 'studio',
     ]);
+  });
+
+  it('클래스봇은 공식 글리프와 서비스 URL을 사용한다', () => {
+    vi.stubEnv('NEXT_PUBLIC_OS_URL', 'https://pullim.ai');
+    const classbot = switcherServices().find((s) => s.slug === 'classbot');
+    expect(classbot).toMatchObject({
+      name: '클래스봇',
+      icon: 'classbot',
+      href: 'https://classbot.pullim.ai',
+    });
   });
 
   it('아케이드는 games 글리프를 재사용한다(전용 마크 없음)', () => {
@@ -207,7 +217,7 @@ describe('osHubHref — OS 홈 목적지(스위처 OS 홈 항목 + 로컬 폴백
     vi.stubEnv('NEXT_PUBLIC_OS_URL', 'http://pullim.local:3001/os/');
     const hub = osHubHref();
     expect(hub).toBe('http://pullim.local:3001');
-    for (const slug of ['planner', 'q', 'writing', 'studio', 'junior', 'arcade']) {
+    for (const slug of ['planner', 'q', 'writing', 'junior', 'arcade', 'classbot', 'studio']) {
       expect(href(switcherServices(), slug)).toBe(hub);
     }
   });

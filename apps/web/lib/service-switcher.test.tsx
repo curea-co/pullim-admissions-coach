@@ -19,7 +19,12 @@ import type { SwitcherService } from './pullim-services';
 const FULL_LIST: SwitcherService[] = [
   { slug: 'planner', name: '플래너', icon: 'planner', href: 'https://planner.pullim.ai/planner', desc: '내 공부, 내가 설계한다.' },
   { slug: 'q', name: '문제큐', icon: 'q', href: 'https://q.pullim.ai', desc: '풀고, 틀리고, 다시 자라난다.' },
+  { slug: 'writing', name: '라이팅 코치', icon: 'writing', href: 'https://writing.pullim.ai', desc: '한 줄, 한 단락이 더 좋아진다.' },
+  { slug: 'junior', name: '주니어', icon: 'junior', href: 'https://jr.pullim.ai', desc: '초등, 즐겁게 시작하는 첫 학습.' },
+  { slug: 'arcade', name: '아케이드', icon: 'games', href: 'https://arcade.pullim.ai', desc: '무료로 즐기는 학습 아케이드.' },
   { slug: 'exam', name: '입시 코치', icon: 'exam', href: '/', desc: '생기부를 진단하고, 면접을 준비한다.' },
+  { slug: 'classbot', name: '클래스봇', icon: 'classbot', href: 'https://classbot.pullim.ai', desc: '선생님의 분신을 만든다.' },
+  { slug: 'studio', name: '스튜디오', icon: 'studio', href: 'https://studio.pullim.ai', desc: '제작은 AI가, 검증은 사람이.' },
 ];
 
 let services: SwitcherService[] = FULL_LIST;
@@ -78,7 +83,12 @@ describe('ServiceSwitcher — 목록', () => {
       'OS 홈풀림 서비스를 한 곳에서',
       '플래너내 공부, 내가 설계한다.',
       '문제큐풀고, 틀리고, 다시 자라난다.',
+      '라이팅 코치한 줄, 한 단락이 더 좋아진다.',
+      '주니어초등, 즐겁게 시작하는 첫 학습.',
+      '아케이드무료로 즐기는 학습 아케이드.',
       '입시 코치현재생기부를 진단하고, 면접을 준비한다.',
+      '클래스봇선생님의 분신을 만든다.',
+      '스튜디오제작은 AI가, 검증은 사람이.',
     ]);
 
     const currentItem = screen.getByRole('link', { name: /입시 코치/ });
@@ -134,7 +144,7 @@ describe('ServiceSwitcher — 카탈로그 계약', () => {
     render(<ServiceSwitcher />);
     openMenu();
     expect(screen.queryByRole('link', { name: /OS 홈/ })).not.toBeInTheDocument();
-    expect(items()).toHaveLength(3);
+    expect(items()).toHaveLength(FULL_LIST.length);
   });
 });
 

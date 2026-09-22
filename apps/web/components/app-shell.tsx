@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DashboardShell } from '@/components/ui/dashboard-shell';
 import { OsRail } from '@/components/ui/os-rail';
-import { PullimLogo } from '@/components/pullim-logo';
+import { ServiceIcon } from '@/components/ui/service-icon';
 import { UserMenu } from '@/components/auth/user-menu';
 import { ServiceSwitcher } from '@/components/shell/service-switcher';
 import { CommandSearch } from '@/components/shell/command-search';
@@ -46,7 +46,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <DashboardShell
-      brand={{ logo: <PullimLogo size={30} />, title: '풀림', sub: '입시코치', href: '/' }}
+      // planner topbar 와 같은 mast: 공통 풀림 아이콘 뒤에 서비스명, 그 다음 서비스 전환.
+      // 현재 서비스 전용 아이콘은 바로 뒤 스위처가 소유하므로 mast 에서 중복하지 않는다.
+      brand={{
+        logo: <ServiceIcon name="pullim" size={30} aria-hidden />,
+        title: '풀림',
+        sub: '입시코치',
+        href: '/',
+      }}
       rail={<OsRail head="입시코치" items={items} linkComponent={Link} />}
       tabbar={items}
       collapsed={collapsed}
@@ -57,13 +64,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // 판정해 null 을 넘기는 이유: 슬롯이 비어야 셸이 본문 하단 여백도 되돌린다(보이지도 않는
       // 버튼 자리를 비워 두지 않게).
       floating={isFeedbackEnabled() ? <FeedbackWidget /> : null}
-      // topbar 좌측 [브랜드][스위처] — OS `OsShell` 순서. 스위처는 카탈로그가 비면(= OS URL 미설정)
+      // topbar 좌측 [열기/접기][공통 아이콘·브랜드][스위처] — planner `AppHeader` 순서.
+      // 스위처는 카탈로그가 비면(= OS URL 미설정)
       // 스스로 null 을 반환하므로 여기서 조건부로 감싸지 않는다.
       switcher={<ServiceSwitcher />}
       // topbar 우측 [검색][알림][프로필]. 세 버튼은 각자 자립형(트리거+패널+리스너 포함)이라
       // 여기서는 정렬만 준다. gap 은 헤더 자체 gap(2.5)보다 좁게 — 셋이 한 덩어리로 읽혀야 한다.
       actions={
-        <div className="flex items-center gap-0.5 min-[921px]:gap-1">
+        <div className="flex items-center gap-0.5 min-[421px]:gap-1.5">
           <CommandSearch />
           <NotificationsMenu />
           <UserMenu />

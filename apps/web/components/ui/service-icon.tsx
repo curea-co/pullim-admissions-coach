@@ -6,7 +6,7 @@ import * as React from 'react';
 //
 // 정본은 12개 글리프를 다 갖고 있지만 여기엔 **이 앱의 카탈로그가 실제로 쓰는 것만** 담는다
 // (lib/pullim-services.ts). 안 쓰는 마크를 들고 있으면 브랜드 갱신 때 조용히 낡는다.
-// 숨김 서비스(classbot·store)를 노출하게 되면 정본에서 해당 글리프를 가져온다.
+// 숨김 서비스(store 등)를 노출하게 되면 정본에서 해당 글리프를 가져온다.
 //
 // ⚠️ 색은 PUDS 시맨틱 토큰이 아니라 **브랜드 토큰**(`--color-brand-600`·`--color-lemon`, globals.css
 //    @theme)을 쓴다. 브랜드 가이드라인 doNot: **recolor** — 서비스 마크는 테마를 따라가면 안 된다
@@ -19,6 +19,7 @@ const WHITE = '#FFFFFF'; // 마크의 흰 획도 브랜드 고정값 — 표면 
 
 export type ServiceIconName =
   | 'planner'
+  | 'classbot'
   | 'q'
   | 'writing'
   | 'studio'
@@ -29,6 +30,7 @@ export type ServiceIconName =
 
 const LABELS: Record<ServiceIconName, string> = {
   planner: '풀림 플래너',
+  classbot: '풀림 클래스봇',
   q: '풀림 Q',
   writing: '풀림 라이팅',
   studio: '풀림 스튜디오',
@@ -55,6 +57,19 @@ const GLYPHS: Record<ServiceIconName, React.ReactNode> = {
       <rect x="30" y="62" width="8" height="8" fill={WHITE} />
       <rect x="46" y="62" width="8" height="8" fill={WHITE} />
       <rect x="62" y="62" width="8" height="8" fill={WHITE} />
+    </>
+  ),
+  classbot: (
+    <>
+      <rect x="4" y="4" width="92" height="92" rx="18" fill={BLUE} />
+      <rect x="30" y="30" width="40" height="8" fill={WHITE} />
+      <rect x="30" y="62" width="40" height="8" fill={WHITE} />
+      <rect x="30" y="38" width="8" height="24" fill={WHITE} />
+      <rect x="62" y="38" width="8" height="24" fill={WHITE} />
+      <rect x="38" y="46" width="8" height="8" fill={WHITE} />
+      <rect x="54" y="46" width="8" height="8" fill={WHITE} />
+      <rect x="46" y="54" width="8" height="8" fill={WHITE} />
+      <rect x="46" y="22" width="8" height="8" fill={LEMON} />
     </>
   ),
   q: (

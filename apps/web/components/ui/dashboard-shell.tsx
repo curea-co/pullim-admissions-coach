@@ -53,12 +53,16 @@ function Brand({
   if (!isBrandObject(brand)) return <>{brand}</>;
   const { logo, title, sub, href = "/" } = brand;
   return (
-    <Link href={href} className="flex min-w-0 items-center gap-2.5 text-[var(--text-primary)] no-underline">
+    <Link
+      href={href}
+      aria-label={`${title}${sub ? ` ${sub}` : ''} 홈`}
+      className="flex min-w-0 items-center gap-[7px] text-[var(--text-primary)] no-underline min-[761px]:gap-2.5"
+    >
       {logo}
       <span className="text-[18px] font-extrabold tracking-[-.04em]">{title}</span>
-      {/* 구분자는 문자가 아니라 세로 보더(OS `.mast .sub`). 560px 이하에서는 숨긴다. */}
+      {/* planner `.mast .sub` 와 같이 초소형(420px 이하)에서만 숨긴다. */}
       {sub && (
-        <span className="ml-0.5 hidden border-l border-[var(--border-default)] pl-[9px] font-[var(--font-mono)] text-[11px] tracking-[.04em] text-[var(--text-tertiary)] min-[561px]:inline">
+        <span className="ml-0.5 hidden border-l border-[var(--border-default)] pl-[9px] font-[var(--font-mono)] text-[11px] tracking-[.04em] text-[var(--text-tertiary)] min-[421px]:inline">
           {sub}
         </span>
       )}
@@ -80,20 +84,22 @@ function RailCollapseToggle({
       onClick={onToggle}
       aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
       aria-expanded={!collapsed}
+      aria-controls="app-rail"
+      title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
       className="mr-1 hidden h-[34px] w-[34px] shrink-0 place-items-center rounded-[9px] border border-[var(--border-default)] bg-[var(--surface-raised)] text-[var(--text-tertiary)] transition-colors duration-150 hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] min-[921px]:grid"
     >
       <svg
         viewBox="0 0 24 24"
-        width="17"
-        height="17"
+        width="20"
+        height="20"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <rect x="3" y="4" width="18" height="16" rx="2" />
         <path d="M9.5 4v16" />
       </svg>
     </button>
@@ -116,7 +122,7 @@ export function DashboardShell({
   const tabbarNode = Array.isArray(tabbar) ? <OsTabbar items={tabbar} linkComponent={linkComponent} /> : tabbar;
   return (
     <div className={cn("min-h-screen bg-[var(--surface-canvas)] text-[var(--text-primary)]", className)}>
-      <header className="sticky top-0 z-[60] flex h-[60px] items-center gap-2.5 border-b border-[var(--border-default)] bg-white/[.82] px-[14px] backdrop-blur-[14px] backdrop-saturate-[1.8] min-[921px]:gap-[18px] min-[921px]:px-[22px]">
+      <header className="sticky top-0 z-[60] flex h-[60px] items-center gap-2 border-b border-[var(--border-default)] bg-white/[.82] px-2.5 backdrop-blur-[14px] backdrop-saturate-[1.8] min-[421px]:gap-2.5 min-[421px]:px-[14px] min-[761px]:gap-[18px] min-[761px]:px-[22px]">
         {rail && onToggleCollapsed && (
           <RailCollapseToggle collapsed={collapsed} onToggle={onToggleCollapsed} />
         )}
@@ -126,8 +132,14 @@ export function DashboardShell({
         {actions}
       </header>
       <div className="flex w-full">
-        {rail && !collapsed && (
-          <aside className="sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 overflow-y-auto border-r border-[var(--border-default)] bg-[var(--surface-raised)] min-[921px]:block">
+        {rail && (
+          <aside
+            id="app-rail"
+            className={cn(
+              "sticky top-[60px] hidden h-[calc(100vh-60px)] shrink-0 overflow-y-auto border-r border-[var(--border-default)] bg-[var(--surface-raised)]",
+              collapsed ? "min-[921px]:hidden" : "min-[921px]:block",
+            )}
+          >
             {rail}
           </aside>
         )}

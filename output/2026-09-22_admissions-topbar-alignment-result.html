@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>입시 코치 Topbar 정렬 결과</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f4f7fb;
+      --paper: #ffffff;
+      --ink: #152033;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --line: #dfe5ee;
+      --line-strong: #c9d3e2;
+      --blue: #0362da;
+      --blue-deep: #004fb8;
+      --blue-soft: #eaf3ff;
+      --lime: #e6ff4c;
+      --green: #087443;
+      --green-soft: #e8f7ef;
+      --amber: #986500;
+      --amber-soft: #fff4d6;
+      --red: #ad2e24;
+      --red-soft: #fff0ed;
+      --rail: #f8fafc;
+      --shadow: 0 18px 50px rgba(38, 54, 80, .11);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 86% 2%, rgba(3, 98, 218, .10), transparent 28rem),
+        var(--canvas);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; }
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #eef2f7;
+      color: #344054;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .86em;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 64px 24px 100px; }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 16px; font-size: clamp(32px, 5vw, 56px); line-height: 1.12; letter-spacing: -.045em; }
+    h2 { margin-bottom: 14px; font-size: 24px; line-height: 1.3; letter-spacing: -.025em; }
+    h3 { margin-bottom: 8px; font-size: 17px; line-height: 1.4; }
+    .lede { max-width: 790px; margin: 0; color: var(--muted); font-size: 18px; }
+    .hero { padding-bottom: 38px; border-bottom: 1px solid var(--line-strong); }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+    .pill { padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.78); color: var(--muted); font-size: 12px; font-weight: 700; }
+    .pill.done { border-color: #b9e3cd; background: var(--green-soft); color: var(--green); }
+    section { margin-top: 56px; }
+    .section-copy { max-width: 790px; color: var(--muted); }
+
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+    .card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .card-head strong { font-size: 14px; }
+    .status { padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .status.before { background: var(--amber-soft); color: var(--amber); }
+    .status.done { background: var(--green-soft); color: var(--green); }
+    .mini-app { background: #f7f9fc; }
+    .mini-topbar { height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line); background: #fff; }
+    .mini-body { display: grid; grid-template-columns: 116px 1fr; min-height: 155px; }
+    .mini-rail { padding: 16px 10px; border-right: 1px solid var(--line); background: var(--rail); }
+    .mini-line { height: 9px; margin-bottom: 10px; border-radius: 9px; background: #d9e1eb; }
+    .mini-line.short { width: 66%; }
+    .mini-content { padding: 22px; }
+    .mini-content .hero-line { width: 42%; height: 16px; margin-bottom: 12px; border-radius: 6px; background: #cdd8e7; }
+    .mini-content .copy-line { width: 72%; height: 9px; margin-bottom: 8px; border-radius: 6px; background: #e2e8f0; }
+    .brand { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .brand-name { font-weight: 850; font-size: 16px; letter-spacing: -.04em; }
+    .brand-sub { padding-left: 8px; border-left: 1px solid var(--line-strong); color: var(--muted); font: 700 11px ui-monospace, monospace; letter-spacing: .04em; }
+    .service-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--blue); color: white; overflow: hidden; }
+    .service-mark svg { width: 30px; height: 30px; }
+    .service-mark .spark { fill: var(--lime); }
+    .spacer { flex: 1; }
+    .round-action { width: 30px; height: 30px; border-radius: 50%; background: #dce5f0; }
+    .square-action { width: 30px; height: 30px; border-radius: 9px; background: #edf1f6; }
+    .toggle-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: white; color: #475467; }
+    .panel-icon { width: 18px; height: 16px; position: relative; border: 2px solid currentColor; border-radius: 4px; }
+    .panel-icon::before { content: ""; position: absolute; top: -2px; bottom: -2px; left: 5px; border-left: 2px solid currentColor; }
+    .switcher-mini { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 10px 4px 8px; border: 1px solid var(--line-strong); border-radius: 12px; background: white; font-size: 13px; font-weight: 750; }
+    .switcher-mini .dot { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--blue); color: white; font-size: 10px; }
+    .switcher-mini .chev { color: var(--faint); font-size: 10px; }
+    .caption { padding: 15px 18px 17px; color: var(--muted); font-size: 13px; }
+    .caption strong { color: var(--ink); }
+
+    .prototype-wrap { overflow: hidden; margin-top: 22px; border: 1px solid var(--line-strong); border-radius: 20px; background: white; box-shadow: var(--shadow); }
+    .prototype-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: #f8fafc; color: var(--muted); font-size: 12px; }
+    .live-chip { display: inline-flex; align-items: center; gap: 7px; font-weight: 800; }
+    .live-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 4px #d9f7e7; }
+    .prototype { position: relative; }
+    .demo-topbar { position: relative; z-index: 4; height: 60px; display: flex; align-items: center; gap: 18px; padding: 0 22px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.92); }
+    .demo-toggle { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 9px; background: white; color: #475467; cursor: pointer; }
+    .demo-toggle:hover { background: #f1f5f9; }
+    .demo-toggle:focus-visible, .demo-switcher:focus-visible { outline: 3px solid rgba(3,98,218,.25); outline-offset: 2px; }
+    .demo-brand { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+    .demo-switcher { position: relative; display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 7px 12px 7px 9px; border: 1px solid var(--line-strong); border-radius: 12px; background: white; color: var(--ink); font-weight: 750; cursor: pointer; }
+    .demo-switcher:hover { border-color: #9fc8ff; box-shadow: 0 1px 3px rgba(13,26,31,.09); }
+    .demo-actions { display: flex; align-items: center; gap: 6px; }
+    .demo-action { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: #667085; font-size: 17px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #1f89f5, #004bb9); color: white; font-size: 13px; font-weight: 850; }
+    .menu { position: absolute; z-index: 10; top: 68px; left: 228px; width: 330px; display: none; max-height: 610px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 20px; background: white; box-shadow: 0 18px 50px rgba(15,23,42,.16); }
+    .menu.open { display: block; }
+    .menu-title { padding: 8px 10px 6px; color: var(--muted); font: 800 10px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+    .menu-item { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 9px 10px; border-radius: 12px; }
+    .menu-item.active { background: var(--blue-soft); }
+    .menu-item .tiny-mark { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; background: var(--blue); color: white; font-size: 11px; font-weight: 900; }
+    .menu-copy { min-width: 0; }
+    .menu-name { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 800; }
+    .menu-desc { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .current { padding: 2px 6px; border-radius: 999px; background: #fff; color: var(--blue); font-size: 10px; }
+    .demo-body { display: grid; grid-template-columns: 248px 1fr; min-height: 630px; transition: grid-template-columns .2s ease; }
+    .prototype.is-collapsed .demo-body { grid-template-columns: 0 1fr; }
+    .demo-rail { overflow: hidden; border-right: 1px solid var(--line); background: #fff; }
+    .rail-inner { width: 248px; padding: 18px 14px; }
+    .rail-label { margin: 4px 12px 10px; color: var(--faint); font: 800 10px ui-monospace, monospace; letter-spacing: .12em; }
+    .rail-item { display: flex; align-items: center; gap: 11px; min-height: 42px; margin-bottom: 4px; padding: 0 12px; border-radius: 11px; color: #475467; white-space: nowrap; }
+    .rail-item.active { background: var(--blue-soft); color: var(--blue-deep); font-weight: 800; }
+    .rail-symbol { width: 20px; flex: 0 0 20px; text-align: center; }
+    .demo-content { min-width: 0; padding: 38px 48px; background: #fbfcfe; }
+    .demo-content h3 { margin-bottom: 6px; font-size: 25px; }
+    .demo-content p { max-width: 600px; color: var(--muted); }
+    .demo-placeholder { display: grid; grid-template-columns: 1.35fr .65fr; gap: 14px; margin-top: 24px; }
+    .placeholder-card { height: 130px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+
+    .sequence { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-top: 22px; }
+    .sequence-item { position: relative; min-height: 104px; padding: 14px 10px; border: 1px solid var(--line); border-radius: 13px; background: white; text-align: center; }
+    .sequence-item:not(:last-child)::after { content: "›"; position: absolute; top: 34px; right: -8px; z-index: 2; color: #aab4c3; font-size: 20px; }
+    .sequence-num { display: grid; place-items: center; width: 23px; height: 23px; margin: 0 auto 10px; border-radius: 50%; background: var(--blue-soft); color: var(--blue-deep); font-size: 11px; font-weight: 850; }
+    .sequence-item.active { border-color: #9fc8ff; background: var(--blue-soft); }
+    .sequence-item.active .sequence-num { background: var(--blue); color: white; }
+    .sequence-item strong { display: block; font-size: 12px; line-height: 1.35; }
+
+    .matrix { width: 100%; margin-top: 20px; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: white; }
+    .matrix th, .matrix td { padding: 14px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .matrix tr:last-child th, .matrix tr:last-child td { border-bottom: 0; }
+    .matrix th { width: 23%; background: #f8fafc; font-size: 13px; }
+    .matrix td { color: var(--muted); font-size: 13px; }
+    .matrix td strong { color: var(--green); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
+    .info { padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: white; }
+    .info p, .info li { color: var(--muted); font-size: 14px; }
+    .info ul { margin: 10px 0 0; padding-left: 19px; }
+    .info li + li { margin-top: 6px; }
+    .good { border-top: 4px solid #12b76a; }
+    .scope { border-top: 4px solid var(--blue); }
+    .files { border-top: 4px solid #7f56d9; }
+    .notes { border-top: 4px solid #fdb022; }
+    .file-list { display: grid; gap: 9px; margin-top: 14px; }
+    .file { display: flex; align-items: flex-start; gap: 10px; color: var(--muted); font-size: 13px; }
+    .file b { min-width: 48px; color: var(--ink); font-size: 11px; letter-spacing: .05em; }
+
+    .checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+    .check-card { padding: 18px; border: 1px solid #b9e3cd; border-radius: 14px; background: var(--green-soft); }
+    .check-icon { color: var(--green); font-size: 20px; font-weight: 900; }
+    .check-card strong { display: block; margin: 7px 0 3px; }
+    .check-card span { color: #44705b; font-size: 12px; }
+
+    .decision { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 56px; padding: 28px; border: 1px solid #b8d4f5; border-radius: 18px; background: linear-gradient(135deg, #edf5ff, #fff); }
+    .decision h2 { margin-bottom: 7px; }
+    .decision p { margin: 0; color: var(--muted); }
+    .decision-badge { flex: 0 0 auto; padding: 10px 14px; border-radius: 10px; background: var(--green); color: white; font-weight: 850; }
+    footer { margin-top: 34px; color: var(--faint); font-size: 12px; text-align: center; }
+
+    @media (max-width: 960px) {
+      .sequence { grid-template-columns: repeat(3, 1fr); }
+      .sequence-item::after { display: none; }
+      .checks { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 840px) {
+      .compare, .grid { grid-template-columns: 1fr; }
+      .menu { left: 152px; }
+    }
+    @media (max-width: 680px) {
+      .wrap { padding: 42px 14px 72px; }
+      .prototype-tools span:last-child, .demo-brand .brand-name, .demo-brand .brand-sub, .demo-actions .optional, .demo-switcher .service-name { display: none; }
+      .demo-topbar { gap: 8px; padding: 0 10px; }
+      .demo-toggle { display: none; }
+      .demo-switcher { min-height: 40px; padding: 5px 8px; }
+      .menu { position: absolute; top: 66px; left: 14px; right: 14px; width: auto; max-height: 520px; }
+      .demo-body, .prototype.is-collapsed .demo-body { grid-template-columns: 1fr; min-height: 530px; }
+      .demo-rail { display: none; }
+      .demo-content { padding: 28px 18px; }
+      .demo-placeholder { grid-template-columns: 1fr; }
+      .sequence { grid-template-columns: 1fr 1fr; }
+      .matrix th, .matrix td { display: block; width: 100%; }
+      .matrix th { border-bottom: 0; padding-bottom: 4px; }
+      .matrix td { padding-top: 4px; }
+      .checks { grid-template-columns: 1fr; }
+      .decision { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <p class="eyebrow">Admissions × Planner · Topbar alignment result</p>
+      <h1>입시 코치 상단바를<br>플래너의 문법으로 맞췄습니다</h1>
+      <p class="lede">참고한 클래스봇 승인안과 같은 기준으로 <strong>사이드바 열기/접기 → 풀림 아이덴티티 → 서비스 전환</strong> 순서를 정렬했습니다. 서비스 전환은 요청한 9개 항목을 고정 순서로 제공하고, 입시 코치를 현재 서비스로 표시합니다.</p>
+      <div class="meta">
+        <span class="pill">기준: planner.pullim.ai/planner</span>
+        <span class="pill">대상: dev-admissions.pullim.ai</span>
+        <span class="pill done">상태: 구현·검증 완료</span>
+        <span class="pill">범위: Frontend shell only</span>
+        <span class="pill">서비스 전환: 지정 9개 · 순서 고정</span>
+      </div>
+    </header>
+
+    <section>
+      <p class="eyebrow">01 · Reference comparison</p>
+      <h2>클래스봇 승인안의 계약을 입시 코치에 적용했습니다</h2>
+      <p class="section-copy">입시 코치는 이미 토글과 전환 슬롯을 갖고 있었지만, mast가 입시 코치 전용 아이콘을 사용해 스위처 아이콘과 중복됐고 크기·간격·반응형 기준도 플래너와 달랐습니다. 공통 풀림 OS 아이콘과 플래너 치수로 정리했습니다.</p>
+      <div class="compare">
+        <article class="card">
+          <div class="card-head"><strong>변경 전 입시 코치</strong><span class="status before">부분 정합</span></div>
+          <div class="mini-app">
+            <div class="mini-topbar">
+              <button class="toggle-button" aria-label="사이드바 접기"><span class="panel-icon"></span></button>
+              <div class="brand">
+                <span class="service-mark"><svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="18" fill="#0362da"/><path d="M30 70h8v-8h8V54h8v-8h8V38h8V30h8" fill="none" stroke="white" stroke-width="8"/><rect class="spark" x="62" y="22" width="8" height="8"/></svg></span>
+                <span class="brand-name">풀림</span><span class="brand-sub">입시코치</span>
+              </div>
+              <span class="switcher-mini"><span class="dot">입</span>입시 코치<span class="chev">▼</span></span>
+              <span class="spacer"></span><span class="square-action"></span><span class="round-action"></span>
+            </div>
+            <div class="mini-body">
+              <div class="mini-rail"><div class="mini-line"></div><div class="mini-line short"></div><div class="mini-line"></div></div>
+              <div class="mini-content"><div class="hero-line"></div><div class="copy-line"></div><div class="copy-line"></div></div>
+            </div>
+          </div>
+          <p class="caption"><strong>역할 중복.</strong> mast와 서비스 전환이 모두 입시 코치 아이콘을 보여 주고, 스위처 크기와 반응형 기준이 플래너보다 작았습니다.</p>
+        </article>
+        <article class="card">
+          <div class="card-head"><strong>반영 결과</strong><span class="status done">플래너 정합</span></div>
+          <div class="mini-app">
+            <div class="mini-topbar">
+              <button class="toggle-button" aria-label="사이드바 접기"><span class="panel-icon"></span></button>
+              <div class="brand">
+                <span class="service-mark"><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="4" y="4" width="92" height="92" rx="18" fill="#0362da"/><path fill="white" d="M52 72c-1 1-2 0-2-1V61c0-1-1-2-2-2H37c-1 0-2-1-1-2l7-10c1-2 0-4-2-4H28c-1 0-2-1-1-2l10-14c0-1 1-1 2-1h29c1 0 2 1 1 2l-7 10c-1 2 0 4 2 4h11c1 0 2 1 1 2L52 72z"/><rect class="spark" x="74" y="14" width="9" height="9"/></svg></span>
+                <span class="brand-name">풀림</span><span class="brand-sub">입시코치</span>
+              </div>
+              <span class="switcher-mini"><span class="dot">입</span>입시 코치<span class="chev">▼</span></span>
+              <span class="spacer"></span><span class="square-action"></span><span class="round-action"></span>
+            </div>
+            <div class="mini-body">
+              <div class="mini-rail"><div class="mini-line"></div><div class="mini-line short"></div><div class="mini-line"></div></div>
+              <div class="mini-content"><div class="hero-line"></div><div class="copy-line"></div><div class="copy-line"></div></div>
+            </div>
+          </div>
+          <p class="caption"><strong>역할 분리.</strong> mast는 풀림 OS 아이덴티티, 스위처는 현재 서비스 아이덴티티를 담당합니다. 토글과 스위처 치수도 플래너 값으로 맞췄습니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <p class="eyebrow">02 · Interactive result</p>
+      <h2>반영된 데스크톱 동작</h2>
+      <p class="section-copy">첫 버튼으로 레일을 열고 접을 수 있고, ‘입시 코치’를 누르면 최종 서비스 목록을 확인할 수 있습니다. 실제 구현과 같이 바깥 클릭과 <kbd>Esc</kbd>로 메뉴가 닫힙니다.</p>
+      <div class="prototype-wrap">
+        <div class="prototype-tools"><span class="live-chip">구현 결과 시안</span><span>첫 버튼과 ‘입시 코치 ▾’을 눌러 확인</span></div>
+        <div class="prototype" id="prototype">
+          <div class="demo-topbar">
+            <button class="demo-toggle" id="railToggle" type="button" aria-label="사이드바 접기" aria-expanded="true"><span class="panel-icon"></span></button>
+            <div class="demo-brand" aria-label="풀림 입시코치 홈">
+              <span class="service-mark"><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="4" y="4" width="92" height="92" rx="18" fill="#0362da"/><path fill="white" d="M52 72c-1 1-2 0-2-1V61c0-1-1-2-2-2H37c-1 0-2-1-1-2l7-10c1-2 0-4-2-4H28c-1 0-2-1-1-2l10-14c0-1 1-1 2-1h29c1 0 2 1 1 2l-7 10c-1 2 0 4 2 4h11c1 0 2 1 1 2L52 72z"/><rect class="spark" x="74" y="14" width="9" height="9"/></svg></span>
+              <span class="brand-name">풀림</span><span class="brand-sub">입시코치</span>
+            </div>
+            <button class="demo-switcher" id="serviceToggle" type="button" aria-expanded="false" aria-controls="serviceMenu">
+              <span class="service-mark"><svg viewBox="0 0 100 100" aria-hidden="true"><rect x="4" y="4" width="92" height="92" rx="18" fill="#0362da"/><path d="M30 70h8v-8h8V54h8v-8h8V38h8V30h8" fill="none" stroke="white" stroke-width="8"/><rect class="spark" x="62" y="22" width="8" height="8"/></svg></span><span class="service-name">입시 코치</span><span class="chev">⌄</span>
+            </button>
+            <div class="menu" id="serviceMenu" role="navigation" aria-label="서비스 전환">
+              <div class="menu-title">서비스 전환</div>
+              <div class="menu-item"><span class="tiny-mark">OS</span><div class="menu-copy"><div class="menu-name">OS 홈</div><div class="menu-desc">풀림 서비스를 한 곳에서</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">P</span><div class="menu-copy"><div class="menu-name">플래너</div><div class="menu-desc">내 공부, 내가 설계한다.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">Q</span><div class="menu-copy"><div class="menu-name">문제큐</div><div class="menu-desc">풀고, 틀리고, 다시 자라난다.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">W</span><div class="menu-copy"><div class="menu-name">라이팅 코치</div><div class="menu-desc">한 줄, 한 단락이 더 좋아진다.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">J</span><div class="menu-copy"><div class="menu-name">주니어</div><div class="menu-desc">초등, 즐겁게 시작하는 첫 학습.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">A</span><div class="menu-copy"><div class="menu-name">아케이드</div><div class="menu-desc">무료로 즐기는 학습 아케이드.</div></div></div>
+              <div class="menu-item active"><span class="tiny-mark">입</span><div class="menu-copy"><div class="menu-name">입시 코치 <span class="current">현재</span></div><div class="menu-desc">생기부를 진단하고, 면접을 준비한다.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">C</span><div class="menu-copy"><div class="menu-name">클래스봇</div><div class="menu-desc">선생님의 분신을 만든다.</div></div></div>
+              <div class="menu-item"><span class="tiny-mark">S</span><div class="menu-copy"><div class="menu-name">스튜디오</div><div class="menu-desc">제작은 AI가, 검증은 사람이.</div></div></div>
+            </div>
+            <span class="spacer"></span>
+            <div class="demo-actions"><span class="demo-action optional">⌕</span><span class="demo-action optional">♢</span><span class="demo-action avatar">김</span></div>
+          </div>
+          <div class="demo-body">
+            <aside class="demo-rail" aria-label="입시코치 메뉴">
+              <div class="rail-inner">
+                <div class="rail-label">입시코치</div>
+                <div class="rail-item active"><span class="rail-symbol">⌂</span><span>홈</span></div>
+                <div class="rail-item"><span class="rail-symbol">↥</span><span>생기부 제출</span></div>
+                <div class="rail-item"><span class="rail-symbol">▥</span><span>진단 내역</span></div>
+              </div>
+            </aside>
+            <div class="demo-content">
+              <h3>입시 코치</h3>
+              <p>레일을 접으면 본문이 전체 폭을 사용합니다. 실제 앱은 선택을 <code>puds-rail-collapsed</code>에 저장하고 다음 방문에도 유지합니다.</p>
+              <div class="demo-placeholder"><div class="placeholder-card"></div><div class="placeholder-card"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="eyebrow">03 · Service order</p>
+      <h2>서비스 전환 순서를 요청값으로 고정했습니다</h2>
+      <div class="sequence">
+        <article class="sequence-item"><span class="sequence-num">1</span><strong>OS 홈</strong></article>
+        <article class="sequence-item"><span class="sequence-num">2</span><strong>플래너</strong></article>
+        <article class="sequence-item"><span class="sequence-num">3</span><strong>문제큐</strong></article>
+        <article class="sequence-item"><span class="sequence-num">4</span><strong>라이팅 코치</strong></article>
+        <article class="sequence-item"><span class="sequence-num">5</span><strong>주니어</strong></article>
+        <article class="sequence-item"><span class="sequence-num">6</span><strong>아케이드</strong></article>
+        <article class="sequence-item active"><span class="sequence-num">7</span><strong>입시 코치</strong></article>
+        <article class="sequence-item"><span class="sequence-num">8</span><strong>클래스봇</strong></article>
+        <article class="sequence-item"><span class="sequence-num">9</span><strong>스튜디오</strong></article>
+      </div>
+    </section>
+
+    <section>
+      <p class="eyebrow">04 · Contract delta</p>
+      <h2>참고안과 달라지는 것은 현재 서비스뿐입니다</h2>
+      <table class="matrix">
+        <tbody>
+          <tr><th>헤더 순서</th><td>클래스봇안과 동일: 열기/접기 → 풀림 아이덴티티 → 서비스 전환 → 기존 액션. <strong>반영 완료</strong></td></tr>
+          <tr><th>현재 서비스</th><td>클래스봇안은 클래스봇 active, 이 결과는 <strong>입시 코치 active</strong>.</td></tr>
+          <tr><th>서비스 목록</th><td>동일한 9개와 동일한 순서. 클래스봇 공식 아이콘과 환경별 URL 파생도 추가.</td></tr>
+          <tr><th>레일 접기</th><td>플래너 정본처럼 레일을 완전히 숨기되 DOM은 보존. 토글은 <code>aria-controls="app-rail"</code>로 연결.</td></tr>
+          <tr><th>반응형</th><td>920px 이하에서는 레일·토글을 숨기고, 760px 이하에서는 스위처 서비스명을 숨겨 충돌 방지.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <p class="eyebrow">05 · Implementation</p>
+      <h2>변경 범위와 회귀 잠금</h2>
+      <div class="grid">
+        <article class="info good">
+          <h3>반영한 동작</h3>
+          <ul>
+            <li>공통 풀림 OS mast 아이콘 적용</li>
+            <li>플래너의 토글·스위처 크기와 간격 적용</li>
+            <li>접은 레일 DOM 보존과 접근성 연결</li>
+            <li>서비스 전환 9개 순서 및 현재 배지 적용</li>
+          </ul>
+        </article>
+        <article class="info scope">
+          <h3>환경별 링크</h3>
+          <p><code>NEXT_PUBLIC_OS_URL</code>에서 dev/prod/local 티어를 파생합니다. 클래스봇은 prod에서 <code>classbot.pullim.ai</code>, dev에서 <code>dev-classbot.pullim.ai</code>로 이동하며 로컬은 OS 허브로 안전하게 폴백합니다.</p>
+        </article>
+        <article class="info files">
+          <h3>주요 변경 파일</h3>
+          <div class="file-list">
+            <div class="file"><b>SHELL</b><span><code>components/app-shell.tsx</code><br>공통 mast 아이콘과 좌측 순서 연결</span></div>
+            <div class="file"><b>UI</b><span><code>components/ui/dashboard-shell.tsx</code><br>토글·간격·반응형·레일 보존</span></div>
+            <div class="file"><b>MENU</b><span><code>components/shell/service-switcher.tsx</code><br>플래너 치수와 9개 목록 표시</span></div>
+            <div class="file"><b>DATA</b><span><code>lib/pullim-services.ts</code><br>순서·클래스봇 URL·설명 고정</span></div>
+          </div>
+        </article>
+        <article class="info notes">
+          <h3>테스트로 고정한 것</h3>
+          <ul>
+            <li>헤더 앞 3개 요소의 DOM 순서</li>
+            <li>접기 버튼과 레일의 <code>aria-controls</code></li>
+            <li>OS 홈 뒤 8개 서비스의 정확한 순서</li>
+            <li>클래스봇 공식 글리프와 환경별 목적지</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <p class="eyebrow">06 · Verification</p>
+      <h2>코드와 브라우저 양쪽에서 확인했습니다</h2>
+      <div class="checks">
+        <article class="check-card"><span class="check-icon">✓</span><strong>Unit tests</strong><span>56 files · 748 tests passed</span></article>
+        <article class="check-card"><span class="check-icon">✓</span><strong>TypeScript</strong><span><code>tsc --noEmit</code> passed</span></article>
+        <article class="check-card"><span class="check-icon">✓</span><strong>ESLint</strong><span>0 warnings · 0 errors</span></article>
+        <article class="check-card"><span class="check-icon">✓</span><strong>Production build</strong><span>Next.js optimized build passed</span></article>
+      </div>
+    </section>
+
+    <div class="decision">
+      <div>
+        <p class="eyebrow">Result</p>
+        <h2>플래너형 topbar와 지정 서비스 순서가 반영됐습니다</h2>
+        <p>브라우저 렌더링에서 레이아웃, 현재 서비스 강조, 9개 목록 순서까지 최종 확인했습니다.</p>
+      </div>
+      <span class="decision-badge">구현 완료</span>
+    </div>
+
+    <footer>2026-09-22 · Pullim Admissions Coach topbar alignment result</footer>
+  </main>
+
+  <script>
+    const prototype = document.querySelector('#prototype');
+    const railToggle = document.querySelector('#railToggle');
+    const serviceToggle = document.querySelector('#serviceToggle');
+    const serviceMenu = document.querySelector('#serviceMenu');
+
+    railToggle.addEventListener('click', () => {
+      const collapsed = prototype.classList.toggle('is-collapsed');
+      railToggle.setAttribute('aria-expanded', String(!collapsed));
+      railToggle.setAttribute('aria-label', collapsed ? '사이드바 펼치기' : '사이드바 접기');
+    });
+
+    serviceToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = serviceMenu.classList.toggle('open');
+      serviceToggle.setAttribute('aria-expanded', String(open));
+    });
+
+    serviceMenu.addEventListener('click', (event) => event.stopPropagation());
+
+    document.addEventListener('click', () => {
+      serviceMenu.classList.remove('open');
+      serviceToggle.setAttribute('aria-expanded', 'false');
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && serviceMenu.classList.contains('open')) {
+        serviceMenu.classList.remove('open');
+        serviceToggle.setAttribute('aria-expanded', 'false');
+        serviceToggle.focus();
+      }
+    });
+  </script>
+</body>
+</html>
