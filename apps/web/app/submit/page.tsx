@@ -300,7 +300,7 @@ export default function SubmitPage() {
           <StepIndicator current="submit" />
         </div>
         <p className="mb-6 text-ink-700">
-          진단에 필요한 5가지를 받습니다. 개인 식별정보는 입력 단계에서 가려주세요.
+          진단에 필요한 5가지를 입력해 주세요.
         </p>
 
         <GuardrailLabel variant="general" className="mb-6" />
@@ -310,7 +310,7 @@ export default function SubmitPage() {
           <Field
             label="1. 생기부 파일 또는 텍스트"
             required
-            help="개인 식별정보(이름·학교명·생년월일·전화·주소·교사명)를 가린 상태로 업로드하거나 붙여넣어 주세요."
+            help="PDF 또는 텍스트를 입력하면 개인정보를 자동으로 확인합니다. 제출 전에 감지 결과를 확인해 주세요."
           >
             <div role="tablist" aria-label="입력 방식 선택" className="mb-3 flex gap-2 rounded-xl bg-ink-100/60 p-1 text-sm">
               <TabButton
@@ -837,4 +837,3 @@ function FieldError({ msg }: { msg?: string }) {
     </p>
   );
 }
-
