@@ -26,13 +26,13 @@ const TRACK5_MAP: Record<StudentProfile['targetTrack'], AnalysisInput['track5']>
 }
 
 // ── schoolType mapping ───────────────────────────────────────────────────────
-// Source: schoolTypeEnum ('general'|'special_purpose'|'autonomous'|'ged')
+// Source: schoolTypeEnum ('general'|'special_purpose'|'autonomous'|'vocational'|'ged')
 // Target: schoolType    ('general'|'autonomous'|'special_purpose'|'vocational')
 // Notes:
-//   - 'general', 'special_purpose', 'autonomous' are 1:1 exact matches.
-//   - 'ged' (검정고시) → 'vocational': closest available target value; no
-//     exact analogue exists in AnalysisInput's enum (vocational is the catch-all
-//     for non-standard schooling paths including GED equivalency).
+//   - 'general', 'special_purpose', 'autonomous', 'vocational' are 1:1 exact matches.
+//   - 'ged' (검정고시) → 'general': AnalysisInput has no GED value. Mirrors the
+//     backend adapter (pullim-api submission-to-analysis-input.ts). 'vocational' is
+//     특성화고 now, so GED must not fold into it.
 const SCHOOL_TYPE_MAP: Record<
   StudentProfile['currentStanding']['schoolType'],
   AnalysisInput['schoolType']
@@ -40,7 +40,8 @@ const SCHOOL_TYPE_MAP: Record<
   general:         'general',
   special_purpose: 'special_purpose',
   autonomous:      'autonomous',
-  ged:             'vocational', // ⚠ nearest fit — see note above
+  vocational:      'vocational',
+  ged:             'general',    // ⚠ no GED in AnalysisInput — see note above
 }
 
 // ── main adapter ─────────────────────────────────────────────────────────────

@@ -84,7 +84,7 @@ DB 설계용 5 엔티티. 데이터 분류(T1~T4)는 [보안 정책 v0.1 §2](00
 | `isMinor` | boolean | ✅ | — | 만 19세 미만(민법상 미성년) 여부. **보호자 동의 축이 아니다** — 그건 `ageBand`(만14). 표시용 |
 | `gradeLevel` | int (1~3) | ✅ | T4 | 고1·고2·고3 |
 | `semester` | int (1\|2) | ✅ | T4 | 1·2학기 |
-| `schoolType` | enum | ✅ | T4 | `general`(일반고) / `special_purpose`(특목고) / `autonomous`(자사고·자율고) / `ged`(검정고시) |
+| `schoolType` | enum | ✅ | T4 | `general`(일반고) / `special_purpose`(특목고) / `autonomous`(자사고·자율고) / `vocational`(특성화고, 2026-09-28 추가) / `ged`(검정고시) |
 | `targetTrack` | enum | ✅ | T4 | `humanities`(인문) / `science_engineering`(이공) / `medical`(의치한) / `arts_athletics`(예체능) / `undeclared`(무전공·전공자율) / `other`(기타) |
 | `targetUniversities[]` | jsonb | ❌ | T4 | 최대 3 (선택) |
 | `weakAreas` | text | ❌ | T4 | 자유 텍스트 (선택) |

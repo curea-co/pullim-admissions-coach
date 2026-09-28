@@ -25,11 +25,14 @@ export const targetTrackEnum = z.enum([
 ]);
 export type TargetTrack = z.infer<typeof targetTrackEnum>;
 
-// 정의 v0.3.1 §3-4: 4종 (3→4 확장, 2026-05-29)
+// 정의 v0.3.1 §3-4: 4종 (3→4 확장, 2026-05-29). 2026-09-28 특성화고 추가로 5종 —
+// 분석 엔진(analysisInput)의 `vocational` 과 같은 키. 마이스터고는 법령상 특목고지만
+// 직업계라 여기에 묶는다. 영재학교는 특목고로 받는다(포함 범위 안내는 /submit 드롭다운).
 export const schoolTypeEnum = z.enum([
   'general',          // 일반고
-  'special_purpose',  // 특목고
+  'special_purpose',  // 특목고(영재학교 포함)
   'autonomous',       // 자사고·자율고
+  'vocational',       // 특성화고(마이스터고 포함)
   'ged',              // 검정고시
 ]);
 export type SchoolType = z.infer<typeof schoolTypeEnum>;
@@ -60,6 +63,7 @@ export const schoolTypeLabel: Record<SchoolType, string> = {
   general: '일반고',
   special_purpose: '특목고',
   autonomous: '자사고·자율고',
+  vocational: '특성화고',
   ged: '검정고시',
 };
 
@@ -84,7 +88,7 @@ export const recordSchema = z
       inputType: z.literal('text_paste'),
       text: z
         .string()
-        .min(1, '생기부 텍스트를 입력해주세요')
+        .min(1, '생기부 PDF를 올리거나 텍스트를 붙여넣어 주세요')
         .max(200000, '본문이 너무 깁니다(최대 20만 자)'),
       ...baseRecord,
     }),
