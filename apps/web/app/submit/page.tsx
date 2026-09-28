@@ -40,9 +40,19 @@ const tracks: { value: TargetTrack; label: string }[] = (
   Object.entries(targetTrackLabel) as [TargetTrack, string][]
 ).map(([value, label]) => ({ value, label }));
 
+// 드롭다운에서만 포함 범위를 덧붙인다. 공용 라벨(schoolTypeLabel)은 결과 헤더 요약
+// ("고3 2학기 · 특목고 · 이공")에도 쓰이므로 짧게 둔다.
+const SCHOOL_TYPE_HINT: Partial<Record<SchoolType, string>> = {
+  special_purpose: '영재학교 포함',
+  vocational: '마이스터고 포함',
+};
+
 const schoolTypes: { value: SchoolType; label: string }[] = (
   Object.entries(schoolTypeLabel) as [SchoolType, string][]
-).map(([value, label]) => ({ value, label }));
+).map(([value, label]) => ({
+  value,
+  label: SCHOOL_TYPE_HINT[value] ? `${label} (${SCHOOL_TYPE_HINT[value]})` : label,
+}));
 
 // 폼 초기값. 예전에는 박준호 데모 mock 에서 끌어왔는데, mock 을 걷어내면서 여기 상수로 옮겼다
 // (값은 그대로 — 주 이용자가 고3 2학기 일반고 이공계열이라 입력 횟수가 가장 적은 기본값이다).
@@ -61,7 +71,9 @@ export default function SubmitPage() {
   const [isPending, startTransition] = useTransition();
 
   // 폼 상태 — 박준호 mock으로 초기화 (Phase A 시연 흐름 유지)
-  const [inputType, setInputType] = useState<InputType>('text_paste');
+  // 기본 탭은 PDF — 주 이용자는 생기부 PDF를 가진 재학생이다. 텍스트 탭은 검정고시(생기부 없음)와
+  // PDF 추출 실패 시의 대체 경로.
+  const [inputType, setInputType] = useState<InputType>('pdf_upload');
   const [recordText, setRecordText] = useState('');
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ state: 'idle' });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -285,14 +297,6 @@ export default function SubmitPage() {
     <>
       <PageHeader />
       <div className="w-full max-w-3xl px-6 py-10">
-        {/* 유료 화면 표시 — 콘텐츠 영역 우측 상단. 제목·단계 표시와 같은 줄에 두면 좁은 화면에서
-            셋이 서로 밀리므로 한 줄을 따로 쓴다(우측 정렬 유지). 개발용 우회로 열려 있어도 이
-            화면이 이용권 전용이라는 사실은 변하지 않으므로 우회 여부와 무관하게 항상 보인다. */}
-        <div className="mb-2 flex justify-end">
-          <span className="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
-            유료 화면
-          </span>
-        </div>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">
             생기부 제출
@@ -314,18 +318,18 @@ export default function SubmitPage() {
           >
             <div role="tablist" aria-label="입력 방식 선택" className="mb-3 flex gap-2 rounded-xl bg-ink-100/60 p-1 text-sm">
               <TabButton
-                active={inputType === 'text_paste'}
-                onClick={() => setInputType('text_paste')}
-                panelId="tab-panel-text"
-              >
-                텍스트 붙여넣기
-              </TabButton>
-              <TabButton
                 active={inputType === 'pdf_upload'}
                 onClick={() => setInputType('pdf_upload')}
                 panelId="tab-panel-pdf"
               >
                 PDF 업로드
+              </TabButton>
+              <TabButton
+                active={inputType === 'text_paste'}
+                onClick={() => setInputType('text_paste')}
+                panelId="tab-panel-text"
+              >
+                텍스트 붙여넣기
               </TabButton>
             </div>
 
@@ -442,8 +446,9 @@ export default function SubmitPage() {
           </Field>
 
           {/* 4. 현재 학년·학기·학교 유형 */}
-          <Field label="4. 현재 학년·학기와 학교 유형" required>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label="4. 학년·학교 유형" required>
+            {/* 학교 유형 칸을 넓게 — "특성화고 (마이스터고 포함)" 이 잘리지 않게. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr,1fr,2fr]">
               <Select
                 label="학년"
                 value={String(grade)}

@@ -130,7 +130,8 @@ describe('toAnalysisInput', () => {
       ['general', 'general'],
       ['special_purpose', 'special_purpose'],
       ['autonomous', 'autonomous'],
-      ['ged', 'vocational'],
+      ['vocational', 'vocational'],
+      ['ged', 'general'],
     ]
     for (const [src, expected] of cases) {
       const profile = makeProfile({ currentStanding: { grade: 2, semester: 1, schoolType: src } })
