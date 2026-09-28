@@ -316,6 +316,9 @@ export default function SubmitPage() {
             required
             help="PDF 또는 텍스트를 입력하면 개인정보를 자동으로 확인합니다. 제출 전에 감지 결과를 확인해 주세요."
           >
+            {/* 에러 스크롤 앵커는 탭 영역 전체에 둔다. 텍스트 칸에만 두면 PDF 탭(기본)에서 제출 시
+                스크롤할 대상이 없다. */}
+            <div data-field-error="record.text">
             <div role="tablist" aria-label="입력 방식 선택" className="mb-3 flex gap-2 rounded-xl bg-ink-100/60 p-1 text-sm">
               <TabButton
                 active={inputType === 'pdf_upload'}
@@ -343,7 +346,6 @@ export default function SubmitPage() {
                   aria-label="생기부 본문 (식별정보를 가린 뒤 붙여넣기)"
                   className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
                   aria-invalid={!!errors['record.text']}
-                  data-field-error="record.text"
                 />
               </div>
             ) : (
@@ -359,6 +361,7 @@ export default function SubmitPage() {
               </div>
             )}
             <FieldError msg={errors['record.text']} />
+            </div>
 
             <PiiScanPanel matches={piiMatches} onAutoRedact={handleAutoRedact} hasText={recordText.trim().length > 0} scanned={scanned} />
 
@@ -406,7 +409,7 @@ export default function SubmitPage() {
               {universities.map((uni, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-1 gap-2 sm:grid-cols-[auto,1fr,1fr]"
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr_1fr]"
                 >
                   <span className="hidden self-center text-sm font-medium text-ink-500 sm:inline">
                     {idx + 1}순위
@@ -447,8 +450,10 @@ export default function SubmitPage() {
 
           {/* 4. 현재 학년·학기·학교 유형 */}
           <Field label="4. 학년·학교 유형" required>
-            {/* 학교 유형 칸을 넓게 — "특성화고 (마이스터고 포함)" 이 잘리지 않게. */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr,1fr,2fr]">
+            {/* 학교 유형 칸을 넓게 — "특성화고 (마이스터고 포함)" 이 잘리지 않게.
+                Tailwind v4 임의값은 쉼표를 공백으로 바꾸지 않는다. `[1fr,1fr,2fr]` 은 무효 CSS가 되어
+                데스크톱에서도 한 줄씩 쌓인다 — 구분자는 `_`. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_2fr]">
               <Select
                 label="학년"
                 value={String(grade)}

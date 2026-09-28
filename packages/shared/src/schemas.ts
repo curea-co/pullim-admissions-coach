@@ -88,7 +88,7 @@ export const recordSchema = z
       inputType: z.literal('text_paste'),
       text: z
         .string()
-        .min(1, '생기부 텍스트를 입력해주세요')
+        .min(1, '생기부 PDF를 올리거나 텍스트를 붙여넣어 주세요')
         .max(200000, '본문이 너무 깁니다(최대 20만 자)'),
       ...baseRecord,
     }),
