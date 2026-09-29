@@ -36,15 +36,24 @@ type PdfStatus =
   | { state: 'done'; fileName: string; pages: number; sizeBytes: number }
   | { state: 'error'; message: string };
 
+// "기타"는 선택지에서 뺀다 — 분석은 인문과 완전히 같게 돌아서(계열 기준·면접 유형 모두) 화면
+// 문구와 동작이 어긋났다. 값(`other`)은 스키마에 남긴다: 이미 들어온 제출이 보존 기간(30일)
+// 동안 재분석·결과 요약에서 이 값을 읽는다.
+const HIDDEN_TRACKS: readonly TargetTrack[] = ['other'];
+
 const tracks: { value: TargetTrack; label: string }[] = (
   Object.entries(targetTrackLabel) as [TargetTrack, string][]
-).map(([value, label]) => ({ value, label }));
+)
+  .filter(([value]) => !HIDDEN_TRACKS.includes(value))
+  .map(([value, label]) => ({ value, label }));
 
 // 드롭다운에서만 포함 범위를 덧붙인다. 공용 라벨(schoolTypeLabel)은 결과 헤더 요약
 // ("고3 2학기 · 특목고 · 이공")에도 쓰이므로 짧게 둔다.
 const SCHOOL_TYPE_HINT: Partial<Record<SchoolType, string>> = {
   special_purpose: '영재학교 포함',
   vocational: '마이스터고 포함',
+  // 분석이 아직 일반고 기준이다(서버가 ged → general). 검정고시 전용 기준은 후속 작업.
+  ged: '업데이트 예정',
 };
 
 const schoolTypes: { value: SchoolType; label: string }[] = (
