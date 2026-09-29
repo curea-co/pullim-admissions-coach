@@ -21,7 +21,7 @@ export const targetTrackEnum = z.enum([
   'medical',             // 의치한
   'arts_athletics',      // 예체능
   'undeclared',          // 무전공(전공자율)
-  'other',               // 기타
+  'other',               // 기타 — 2026-09-29 /submit 선택지에서 제외. 기존 제출 호환용으로 값 유지
 ]);
 export type TargetTrack = z.infer<typeof targetTrackEnum>;
 
