@@ -113,8 +113,8 @@
           "enum": [1, 2]
         },
         "schoolType": {
-          "description": "학교 유형 (정의 §3-4 v0.3.1). general=일반고, special_purpose=특목고, autonomous=자사고·자율고, ged=검정고시.",
-          "enum": ["general", "special_purpose", "autonomous", "ged"]
+          "description": "학교 유형 (정의 §3-4 v0.3.1). general=일반고, special_purpose=특목고(영재학교 포함), autonomous=자사고·자율고, vocational=특성화고(마이스터고 포함), ged=검정고시. 2026-09-28: vocational 추가(4→5종).",
+          "enum": ["general", "special_purpose", "autonomous", "vocational", "ged"]
         }
       }
     },
