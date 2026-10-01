@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -16,7 +16,6 @@ import {
   type PiiMatch,
 } from '@pullim/shared';
 import { PageHeader } from '@/components/page-header';
-import { PiiScanPanel } from '@/components/pii-scan-panel';
 import { StepIndicator } from '@/components/step-indicator';
 import { GuardrailLabel } from '@/components/guardrail-label';
 import { ErrorState } from '@/components/error-state';
@@ -65,11 +64,6 @@ const schoolTypes: { value: SchoolType; label: string }[] = (
 
 // 폼 초기값. 예전에는 박준호 데모 mock 에서 끌어왔는데, mock 을 걷어내면서 여기 상수로 옮겼다
 // (값은 그대로 — 주 이용자가 고3 2학기 일반고 이공계열이라 입력 횟수가 가장 적은 기본값이다).
-// 차단 PII 가 남아 있을 때의 문구 — 제출 에러와 버튼 title 이 **같은 조건**을 말하므로 한 곳에 둔다.
-// 예전에는 두 문장이 따로 있었고 띄어쓰기마저 달랐다("남아있어요" / "남아 있어요").
-const BLOCK_PII_MESSAGE =
-  '반드시 가려야 할 식별정보가 남아 있어요. [자동 가림]을 눌러주세요.';
-
 const DEFAULT_TRACK: TargetTrack = 'science_engineering';
 const DEFAULT_GRADE = 3;
 const DEFAULT_SEMESTER: 1 | 2 = 2;
@@ -83,7 +77,15 @@ export default function SubmitPage() {
   // 기본 탭은 PDF — 주 이용자는 생기부 PDF를 가진 재학생이다. 텍스트 탭은 검정고시(생기부 없음)와
   // PDF 추출 실패 시의 대체 경로.
   const [inputType, setInputType] = useState<InputType>('pdf_upload');
-  const [recordText, setRecordText] = useState('');
+  // 탭마다 본문을 따로 든다. PDF 추출본은 **서비스 안에서 고칠 수 없다** — 업로드한 파일이 원본이고,
+  // 여기서 A를 B로 바꿀 수 있으면 사용자가 B가 적힌 PDF를 가졌다고 착각한다. 고치려면 파일을 다시
+  // 올린다. 텍스트 탭은 사용자가 직접 쓰는 공간이라 수정할 수 있다. 한 상태를 공유하면 PDF 추출본이
+  // 텍스트 탭으로 넘어가 편집 가능해지므로 분리한다.
+  const [pdfText, setPdfText] = useState('');
+  const [pasteText, setPasteText] = useState('');
+  const recordText = inputType === 'pdf_upload' ? pdfText : pasteText;
+  // PDF 미리보기의 가리기/보이기. 기본은 가리기 — 제출 내용과는 무관하다(제출은 항상 가린 본문).
+  const [showOriginal, setShowOriginal] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ state: 'idle' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   // codex review P1: race guard. 가장 최근 요청 id만 반영. 이전 요청은 stale로 무시.
@@ -100,11 +102,12 @@ export default function SubmitPage() {
       currentPdfHandleRef.current = null;
     };
   }, []);
-  const [maskingApplied, setMaskingApplied] = useState(false);
-  const [maskedFields, setMaskedFields] = useState<string[]>([]);
-  const [piiMatches, setPiiMatches] = useState<PiiMatch[]>([]);
-  const [warnAck, setWarnAck] = useState(false);
-  const [scanned, setScanned] = useState(false);
+  // 텍스트 탭 하이라이트용 탐지 결과. 입력 중 매 키마다 돌지 않게 디바운스하고, 탐지 당시 본문을
+  // 함께 들고 있다가 **지금 본문과 같을 때만** 쓴다 — 오프셋이 어긋난 하이라이트를 그리지 않게.
+  const [pasteScan, setPasteScan] = useState<{ text: string; matches: PiiMatch[] }>({
+    text: '',
+    matches: [],
+  });
 
   const [targetTrack, setTargetTrack] = useState<TargetTrack>(DEFAULT_TRACK);
   const [universities, setUniversities] = useState<
@@ -118,28 +121,16 @@ export default function SubmitPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // recordText 변경 시 300ms 디바운스로 PII 스캔. 변경되면 warn 확인은 초기화.
   useEffect(() => {
-    setWarnAck(false);
-    setScanned(false);
     const id = setTimeout(() => {
-      setPiiMatches(detectPii(recordText));
-      setScanned(true);
+      setPasteScan({ text: pasteText, matches: detectPii(pasteText) });
     }, 300);
     return () => clearTimeout(id);
-  }, [recordText]);
+  }, [pasteText]);
+  const pasteMatches = pasteScan.text === pasteText ? pasteScan.matches : [];
 
-  const blockMatches = piiMatches.filter((m) => m.tier === 'block');
-  const warnMatches = piiMatches.filter((m) => m.tier === 'warn');
-
-  function handleAutoRedact() {
-    const matches = detectPii(recordText);
-    setRecordText(redactPii(recordText, matches));
-    setMaskedFields((prev) =>
-      Array.from(new Set([...prev, ...matches.map((m) => m.maskedField)]))
-    );
-    setMaskingApplied(true);
-  }
+  // PDF 추출본은 업로드 때 한 번만 바뀌므로 바로 탐지한다(가리기 전 원문이 잠깐이라도 보이지 않게).
+  const pdfMasked = useMemo(() => redactPii(pdfText, detectPii(pdfText)), [pdfText]);
 
   async function handlePdfFile(file: File) {
     // Phase A+B: 클라이언트 측 PDF → 텍스트 추출.
@@ -189,7 +180,8 @@ export default function SubmitPage() {
       pages: result.pages,
       sizeBytes: result.sizeBytes,
     });
-    setRecordText(result.text);
+    setPdfText(result.text);
+    setShowOriginal(false);
   }
 
   function clearPdf() {
@@ -198,21 +190,25 @@ export default function SubmitPage() {
     currentPdfHandleRef.current = null;
     pdfRequestIdRef.current++;
     setPdfStatus({ state: 'idle' });
-    setRecordText('');
+    setPdfText('');
+    setShowOriginal(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function buildPayload(maskingOverride?: boolean) {
+  function buildPayload() {
     // Phase A+B: PDF든 텍스트든 최종 제출은 항상 text_paste.
     // PDF 탭은 *입력 방법*이고, 추출된 텍스트가 recordText에 들어가 있다.
     // Phase D에서 백엔드 S3 업로드 도착 시 pdf_upload 변환 경로 추가.
+    //
+    // 탐지된 식별정보는 등급(block·warn)과 관계없이 **전부 가려서** 보낸다. 화면의 원문은 그대로 두고
+    // 여기서만 가린다 — 사용자가 버튼을 눌러야 가려지던 예전 방식은 홈의 "자동으로 가림"과 달랐다.
+    // 디바운스된 탐지 결과를 쓰지 않고 지금 본문으로 다시 탐지한다(오프셋 어긋남 방지).
+    const matches = detectPii(recordText);
     const recordPart = {
       inputType: 'text_paste' as const,
-      text: recordText,
-      // PII 게이트 통과 시점엔 마스킹이 적용된 상태 — setMaskingApplied(true) 직후 같은 렌더에서
-      // 호출 시 setState 비동기로 stale false가 잡히는 것을 막기 위해 명시 override 허용.
-      maskingApplied: maskingOverride ?? maskingApplied,
-      maskedFields,
+      text: redactPii(recordText, matches),
+      maskingApplied: true as const,
+      maskedFields: Array.from(new Set(matches.map((m) => m.maskedField))),
     };
 
     return {
@@ -246,23 +242,7 @@ export default function SubmitPage() {
     e.preventDefault();
     setSubmitError(null);
 
-    // 티어드 PII 게이트. block은 하드 차단, warn은 2차 확인.
-    const matches = detectPii(recordText);
-    const block = matches.filter((m) => m.tier === 'block');
-    const warn = matches.filter((m) => m.tier === 'warn');
-    if (block.length > 0) {
-      setSubmitError(BLOCK_PII_MESSAGE);
-      const node = document.querySelector('[data-field-error="record.text"]') as HTMLElement | null;
-      node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    if (warn.length > 0 && !warnAck) {
-      setSubmitError('이름·교사로 보이는 항목이 있어요. 자동 가림하거나, 식별정보가 아니면 확인란을 체크해주세요.');
-      return;
-    }
-    setMaskingApplied(true);
-
-    const result = validate(studentProfileSchema, buildPayload(true));
+    const result = validate(studentProfileSchema, buildPayload());
     if (!result.ok) {
       setErrors(result.errors);
       const first = Object.keys(result.errors)[0];
@@ -291,7 +271,7 @@ export default function SubmitPage() {
     // processing 페이지가 admissions 백엔드로 접수할 payload 를 sessionStorage 에 임시 저장.
     // 저장이 실패하면(프라이빗 모드 등) 다음 단계로 넘어가지 않는다 — 이전 제출 payload가
     // 남아 다른 학생 데이터가 분석되는 것을 막기 위한 fail-closed.
-    if (!saveSubmittedPayload(buildPayload(true))) {
+    if (!saveSubmittedPayload(buildPayload())) {
       setSubmitError('제출 데이터를 저장하지 못했어요. 브라우저 저장소 설정(프라이빗 모드 등)을 확인하고 다시 시도해주세요.');
       return;
     }
@@ -347,15 +327,15 @@ export default function SubmitPage() {
 
             {inputType === 'text_paste' ? (
               <div id="tab-panel-text" role="tabpanel">
-                <textarea
-                  rows={6}
-                  value={recordText}
-                  onChange={(e) => setRecordText(e.target.value)}
-                  placeholder="여기에 식별정보를 가린 생기부 본문을 붙여넣어주세요"
-                  aria-label="생기부 본문 (식별정보를 가린 뒤 붙여넣기)"
-                  className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 placeholder:text-ink-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                  aria-invalid={!!errors['record.text']}
+                <PiiHighlightTextarea
+                  value={pasteText}
+                  onChange={setPasteText}
+                  matches={pasteMatches}
+                  invalid={!!errors['record.text']}
                 />
+                {pasteMatches.length > 0 && (
+                  <p className="mt-2 text-xs text-amber-700">표시된 텍스트는 가려져서 업로드돼요.</p>
+                )}
               </div>
             ) : (
               <div id="tab-panel-pdf" role="tabpanel">
@@ -364,29 +344,15 @@ export default function SubmitPage() {
                   onFile={handlePdfFile}
                   onClear={clearPdf}
                   inputRef={fileInputRef}
-                  extractedText={recordText}
-                  onExtractedTextChange={setRecordText}
+                  extractedText={pdfText}
+                  maskedText={pdfMasked}
+                  showOriginal={showOriginal}
+                  onShowOriginalChange={setShowOriginal}
                 />
               </div>
             )}
             <FieldError msg={errors['record.text']} />
             </div>
-
-            <PiiScanPanel matches={piiMatches} onAutoRedact={handleAutoRedact} hasText={recordText.trim().length > 0} scanned={scanned} />
-
-            {warnMatches.length > 0 && blockMatches.length === 0 && (
-              <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={warnAck}
-                  onChange={(e) => setWarnAck(e.target.checked)}
-                  className="mt-0.5 size-4 shrink-0 accent-brand-600"
-                />
-                <span className="text-sm text-ink-900">
-                  표시된 항목은 식별정보가 아님을 확인했고, 이대로 진행합니다.
-                </span>
-              </label>
-            )}
           </Field>
 
           {/* 2. 지원 학부 */}
@@ -528,16 +494,7 @@ export default function SubmitPage() {
             </Link>
             <button
               type="submit"
-              // 하드 차단(block-tier) PII 가 남아 있으면 **버튼도 잠근다.** 이전에는 제출 시점에만
-              // 막아서, 화면은 "가리기 전에는 제출할 수 없어요" 라고 하는데 버튼은 눌리는 상태로
-              // 보였다(QA 2026-09-20). 눌러야만 막힌다는 걸 알 방법이 없었다.
-              // 제출 핸들러의 재검사는 그대로 둔다 — 버튼 비활성은 표시, 차단은 핸들러 소관.
-              disabled={isPending || blockMatches.length > 0}
-              title={
-                blockMatches.length > 0
-                  ? BLOCK_PII_MESSAGE
-                  : undefined
-              }
+              disabled={isPending}
               className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? '이동 중…' : '동의 단계로 →'}
@@ -615,14 +572,18 @@ function PdfUploader({
   onClear,
   inputRef,
   extractedText,
-  onExtractedTextChange,
+  maskedText,
+  showOriginal,
+  onShowOriginalChange,
 }: {
   status: PdfStatus;
   onFile: (f: File) => void;
   onClear: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
   extractedText: string;
-  onExtractedTextChange: (t: string) => void;
+  maskedText: string;
+  showOriginal: boolean;
+  onShowOriginalChange: (v: boolean) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -757,20 +718,127 @@ function PdfUploader({
               다시 선택
             </button>
           </div>
+          {/* 읽기 전용 — 업로드한 파일이 원본이라 여기서 고칠 수 없다(고치려면 파일을 다시 올린다).
+              가린 모습을 그대로 보여 주고, 토글로 원문을 확인한다. 가린 게 없으면 토글을 그리지 않는다. */}
           <div>
-            <label className="text-xs font-medium text-ink-500">
-              추출된 본문 (가림 확인 후 필요 시 직접 수정)
-            </label>
-            <textarea
-              rows={8}
-              value={extractedText}
-              onChange={(e) => onExtractedTextChange(e.target.value)}
-              aria-label="PDF에서 추출된 본문 (가림 확인 후 필요 시 직접 수정)"
-              className="mt-1 w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm leading-relaxed text-ink-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-            />
+            <div className="flex items-center justify-between gap-3">
+              <span id="pdf-extracted-label" className="text-xs font-medium text-ink-500">
+                추출된 본문
+              </span>
+              {maskedText !== extractedText && (
+                <MaskToggle showOriginal={showOriginal} onChange={onShowOriginalChange} />
+              )}
+            </div>
+            <div
+              tabIndex={0}
+              aria-labelledby="pdf-extracted-label"
+              className="mt-1 max-h-52 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-ink-100 bg-ink-100/30 px-4 py-3 text-sm leading-relaxed text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100"
+            >
+              {showOriginal ? extractedText : maskedText}
+            </div>
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function MaskToggle({
+  showOriginal,
+  onChange,
+}: {
+  showOriginal: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const options = [
+    { label: '가리기', value: false },
+    { label: '보이기', value: true },
+  ];
+  return (
+    <div role="group" aria-label="개인정보 표시" className="inline-flex rounded-lg bg-ink-100/60 p-0.5 text-xs font-medium">
+      {options.map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          aria-pressed={showOriginal === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'rounded-md px-2.5 py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
+            showOriginal === o.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// textarea 와 뒤 하이라이트 층이 **글자 단위로 같은 자리에** 줄바꿈돼야 한다. 그래서 둘이 같은
+// 패딩·글꼴·줄간격을 쓰고, 스크롤바 자리도 둘 다 미리 잡아 둔다(한쪽에만 스크롤바가 생기면 폭이
+// 달라져 줄바꿈 위치가 어긋난다).
+const HIGHLIGHT_BOX = 'px-4 py-3 text-sm leading-relaxed [scrollbar-gutter:stable]';
+
+/**
+ * 텍스트 탭 입력칸. 본문은 원문 그대로 편집하고, 가려서 올라갈 구간만 뒤에서 칠한다.
+ * 가린 모습([이름] 등)을 입력칸에 보여 주지 않는 이유: 계속 고쳐 쓰는 공간이라, 자리표시가 끼면
+ * 사용자가 원치 않는 수정을 해야 할 수 있다.
+ */
+function PiiHighlightTextarea({
+  value,
+  onChange,
+  matches,
+  invalid,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  matches: PiiMatch[];
+  invalid: boolean;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const m of [...matches].sort((a, b) => a.index - b.index)) {
+    if (m.index < cursor) continue;
+    parts.push(value.slice(cursor, m.index));
+    parts.push(
+      <mark key={m.index} className="rounded-sm bg-amber-200/70 text-transparent">
+        {value.slice(m.index, m.index + m.length)}
+      </mark>
+    );
+    cursor = m.index + m.length;
+  }
+  parts.push(value.slice(cursor));
+
+  return (
+    <div className="relative rounded-xl border border-ink-100 bg-white focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-100">
+      <div
+        ref={backdropRef}
+        aria-hidden
+        className={cn(
+          HIGHLIGHT_BOX,
+          'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-transparent'
+        )}
+      >
+        {parts}
+        {/* 마지막 줄이 개행으로 끝날 때 textarea 와 높이를 맞춘다. */}
+        {'\n'}
+      </div>
+      <textarea
+        rows={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={(e) => {
+          if (backdropRef.current) backdropRef.current.scrollTop = e.currentTarget.scrollTop;
+        }}
+        placeholder="여기에 생기부 본문을 붙여넣어 주세요"
+        aria-label="생기부 본문"
+        aria-invalid={invalid}
+        className={cn(
+          HIGHLIGHT_BOX,
+          'relative block w-full resize-y rounded-xl bg-transparent text-ink-900 placeholder:text-ink-300 focus:outline-none'
+        )}
+      />
     </div>
   );
 }
