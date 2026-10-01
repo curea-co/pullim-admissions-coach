@@ -94,11 +94,6 @@ const faqs = [
   },
 ];
 
-const seasons = [
-  { months: '7~9월', label: '수시 원서·학교생활기록부 마감' },
-  { months: '10~11월', label: '학생부 종합 전형 면접 시즌' },
-];
-
 // ── 페이지 ─────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -240,24 +235,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* 시즌 */}
-      <section className="w-full max-w-6xl px-6 pb-12">
-        <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-          시즌별 사용 시점
-        </h2>
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {seasons.map((s) => (
-            <div
-              key={s.months}
-              className="flex items-center justify-between rounded-xl border border-ink-100 bg-white px-5 py-4"
-            >
-              <span className="text-base font-medium text-ink-900">{s.label}</span>
-              <span className="text-sm text-ink-500">{s.months}</span>
-            </div>
-          ))}
         </div>
       </section>
 

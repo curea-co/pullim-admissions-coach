@@ -674,11 +674,6 @@ function ImprovementsPanelReal({
               <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
                 {competencyLabel[item.competency]}
               </span>
-              {item.estimatedMinutes !== undefined && (
-                <span className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
-                  약 {item.estimatedMinutes}분
-                </span>
-              )}
             </div>
             <p className="text-sm font-semibold text-ink-900">{item.text}</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-700">{item.rationale}</p>
