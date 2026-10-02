@@ -1,6 +1,6 @@
 'use client';
 
-import { createAuthCore } from './auth-core';
+import { AuthContextChangedError, AuthSessionExpiredError, createAuthCore } from './auth-core';
 
 /**
  * pullim-api HTTP 클라이언트 (B: 실 인증 연동).
@@ -45,6 +45,8 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 const MUTATING: Method[] = ['POST', 'PATCH', 'DELETE'];
 
 export interface ApiClient {
+  subscribeExpired(listener: () => void): () => void;
+  generation(): number;
   request<T = unknown>(method: Method, path: string, body?: unknown): Promise<T>;
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown>(path: string, body?: unknown): Promise<T>;
@@ -69,6 +71,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   const refreshPath = opts.refreshPath ?? '/auth/refresh';
 
   // 인스턴스 로컬 상태(모듈 전역 아님 — 테스트 격리/멀티 인스턴스 안전).
+  let generation = 0;
+  const expiryListeners = new Set<() => void>();
   let csrfToken: string | null = null;
   let csrfInFlight: Promise<void> | null = null;
 
@@ -152,17 +156,37 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         0
       );
     }
-    const res = await core.execute((token) => raw(method, path, body, token), {
-      mutation: MUTATING.includes(method),
-      refresh: path !== refreshPath && !path.endsWith('/login') && !path.endsWith('/logout'),
-    });
-    if (path.endsWith('/login') || path.endsWith('/logout')) { core.reset(); csrfToken = null; }
-    // 204/빈 본문 허용.
+    const started = generation;
+    let res: Response;
+    try {
+      res = await core.execute((token) => raw(method, path, body, token), {
+        mutation: MUTATING.includes(method),
+        refresh: path !== refreshPath && !path.endsWith('/login') && !path.endsWith('/logout'),
+      });
+    } catch (error) {
+      if (started !== generation) throw new AuthContextChangedError();
+      if (error instanceof AuthSessionExpiredError) {
+        generation += 1;
+        core.reset();
+        csrfToken = null;
+        for (const listener of expiryListeners) listener();
+      }
+      throw error;
+    }
+    if (started !== generation) throw new AuthContextChangedError();
     const text = await res.text();
+    if (started !== generation) throw new AuthContextChangedError();
+    if (path.endsWith('/login') || path.endsWith('/logout')) { generation += 1; core.reset(); csrfToken = null; }
+    // 204/빈 본문 허용.
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
   return {
+    generation: () => generation,
+    subscribeExpired(listener) {
+      expiryListeners.add(listener);
+      return () => { expiryListeners.delete(listener); };
+    },
     request,
     get: (path) => request('GET', path),
     post: (path, body) => request('POST', path, body),

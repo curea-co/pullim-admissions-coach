@@ -314,3 +314,46 @@ it('refresh Origin failure retains its error during backoff without a second POS
   await expect(api.get('/me')).rejects.toMatchObject({ status: 403, code: 'CSRF_ORIGIN_REJECTED' });
   expect(calls.filter((c) => c.url.endsWith('/auth/refresh'))).toHaveLength(1);
 });
+
+it.each([401, 403, 503])('notifies confirmed refresh expiry only: %s', async (status) => {
+  const client = createApiClient({ baseUrl: BASE, fetchImpl: vi.fn(async (url) => {
+    if (String(url).endsWith('/auth/csrf')) return Response.json({ csrfToken: 'synthetic' });
+    return new Response(null, { status: String(url).endsWith('/auth/refresh') ? status : 401 });
+  }) });
+  const listener = vi.fn();
+  client.subscribeExpired(listener);
+  await client.get('/me').catch(() => undefined);
+  expect(listener).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
+});
+
+it('does not notify for bootstrap 401 or repeated data 401 after refresh success', async () => {
+  for (const bootstrapFails of [true, false]) {
+    const client = createApiClient({ baseUrl: BASE, fetchImpl: vi.fn(async (url) => {
+      if (String(url).endsWith('/auth/csrf')) return bootstrapFails ? new Response(null, { status: 401 }) : Response.json({ csrfToken: 'synthetic' });
+      return new Response(null, { status: String(url).endsWith('/auth/refresh') ? 200 : 401 });
+    }) });
+    const listener = vi.fn(); client.subscribeExpired(listener);
+    await client.get('/me').catch(() => undefined);
+    expect(listener).not.toHaveBeenCalled();
+  }
+});
+
+it('rejects a late body after successful new login without expiry notification', async () => {
+  let finish!: () => void;
+  let reading!: () => void;
+  const started = new Promise<void>((resolve) => { reading = resolve; });
+  const delayed = new Response('{}');
+  vi.spyOn(delayed, 'text').mockImplementation(() => { reading(); return new Promise((resolve) => { finish = () => resolve('{}'); }); });
+  const client = createApiClient({ baseUrl: BASE, fetchImpl: vi.fn(async (url) => {
+    if (String(url).endsWith('/auth/csrf')) return Response.json({ csrfToken: 'synthetic' });
+    if (String(url).endsWith('/auth/login')) return Response.json({});
+    return delayed;
+  }) });
+  const expired = vi.fn(); client.subscribeExpired(expired);
+  const old = client.get('/me').catch((error: Error) => error);
+  await started;
+  await client.post('/auth/login');
+  finish();
+  expect(await old).toMatchObject({ name: 'AuthContextChangedError' });
+  expect(expired).not.toHaveBeenCalled();
+});

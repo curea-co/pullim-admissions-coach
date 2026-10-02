@@ -1,5 +1,6 @@
 'use client';
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { api } from '@/lib/api';
 import { auth, type User } from '@/lib/auth';
 import { setUserScope } from '@/lib/result';
 import { clearAdmissionsAccessCache } from '@/lib/admissions-api';
@@ -13,20 +14,24 @@ const AuthCtx = createContext<Ctx | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  const generation = useRef(0);
   const refresh = useCallback(async () => {
+    const started = ++generation.current;
+    const identity = api.generation();
     // 엔타이틀먼트 캐시 무효화 — 로그인/로그아웃(사용자 전환) 시 이전 사용자 admissions 판정이
     // 남지 않게(교차사용자 격리). 이후 게이트가 새 사용자로 재조회.
     clearAdmissionsAccessCache();
     try {
       const u = await auth.getMe();
+      if (started !== generation.current || identity !== api.generation()) return;
       setUser(u); setStatus(u ? 'authed' : 'guest');
       // 결과 저장 스코프를 현재 사용자로 동기화(C: 교차사용자 격리). 비로그인=null→익명 스코프.
       setUserScope(u?.id ?? null);
-    } catch (err) {
+    } catch {
+      if (started !== generation.current || identity !== api.generation()) return;
       // getMe 예외 = 401 만료가 아니라 서버/네트워크/DTO 오류(어댑터가 401은 null로 변환).
       // 로그아웃이 아니므로 'guest'(→/login)로 강등하지 않고 'error'로 둔다(일시 장애에
       // 사용자를 로그아웃시키지 않음). 단, 이전 사용자 스코프가 남지 않게 즉시 해제(격리).
-      console.error('[auth] getMe 실패 — 일시 오류로 처리, 결과 스코프 해제:', err);
       setUser(null); setStatus('error'); setUserScope(null);
     }
   }, []);
@@ -41,7 +46,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await refresh();
     }
   }, [refresh]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const unsubscribe = api.subscribeExpired(() => {
+      generation.current += 1;
+      clearAdmissionsAccessCache();
+      setUserScope(null);
+      setUser(null);
+      setStatus('guest');
+    });
+    void refresh();
+    return () => { generation.current += 1; unsubscribe(); };
+  }, [refresh]);
   return <AuthCtx.Provider value={{ user, status, refresh, logout }}>{children}</AuthCtx.Provider>;
 }
 
