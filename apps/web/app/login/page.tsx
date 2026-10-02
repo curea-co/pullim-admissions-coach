@@ -17,7 +17,7 @@ function LoginForm() {
   const { status, refresh } = useAuth();
 
   // 오픈 리다이렉트 가드(auth 설계 §5): 내부 경로만 허용, 외부 URL은 기본값 폴백.
-  const next = safeNext(searchParams.get('next'), '/mypage');
+  const next = safeNext(searchParams.get('next'), '/');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

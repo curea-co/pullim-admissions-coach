@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { createApiClient, type ApiError } from './api';
 
 // 프로그래머블 fetch 목: (url, init) → Response. 호출 기록도 보관.
@@ -17,6 +17,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 const BASE = 'http://api.test';
+beforeEach(() => localStorage.clear());
 
 describe('createApiClient', () => {
   it('변경 요청에 CSRF 토큰을 echo한다(부트스트랩 후)', async () => {
@@ -186,8 +187,8 @@ describe('CSRF recovery contract', () => {
     expect(attempts).toHaveLength(3);
     expect(attempts.map((call) => call.init.headers)).toEqual([
       { 'Content-Type': 'application/json', 'X-CSRF-Token': 'token-1' },
-      { 'Content-Type': 'application/json', 'X-CSRF-Token': 'token-2' },
       { 'Content-Type': 'application/json', 'X-CSRF-Token': 'token-3' },
+      { 'Content-Type': 'application/json', 'X-CSRF-Token': 'token-4' },
     ]);
     expect(attempts.every((call) => call.init.body === '{"value":1}')).toBe(true);
   });
@@ -283,7 +284,7 @@ describe('CSRF recovery contract', () => {
     expect(calls.filter((call) => call.url.endsWith('/write'))).toHaveLength(1);
   });
 
-  it('refresh 서버 오류를 만료로 오인하지 않고 다음 호출에서 다시 시도한다', async () => {
+  it('refresh 서버 오류는 backoff 동안 같은 오류로 보존한다', async () => {
     let refreshes = 0;
     const { fn } = mockFetch((url) => {
       if (url.endsWith('/auth/csrf')) return json({ csrfToken: 'token' });
@@ -297,7 +298,19 @@ describe('CSRF recovery contract', () => {
     for (let i = 0; i < 2; i++) {
       await expect(api.get('/me')).rejects.toMatchObject({ status: 503, code: 'UNAVAILABLE' });
     }
-    expect(refreshes).toBe(2);
+    expect(refreshes).toBe(1);
   });
 
+});
+
+it('refresh Origin failure retains its error during backoff without a second POST', async () => {
+  const { fn, calls } = mockFetch((url) => {
+    if (url.endsWith('/auth/csrf')) return json({ csrfToken: 'token' });
+    if (url.endsWith('/auth/refresh')) return json({ code: 'CSRF_ORIGIN_REJECTED' }, 403);
+    return json({}, 401);
+  });
+  const api = createApiClient({ baseUrl: BASE, fetchImpl: fn });
+  await expect(api.get('/me')).rejects.toMatchObject({ status: 403, code: 'CSRF_ORIGIN_REJECTED' });
+  await expect(api.get('/me')).rejects.toMatchObject({ status: 403, code: 'CSRF_ORIGIN_REJECTED' });
+  expect(calls.filter((c) => c.url.endsWith('/auth/refresh'))).toHaveLength(1);
 });
