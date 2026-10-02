@@ -1,5 +1,7 @@
 'use client';
 
+import { createAuthCore } from './auth-core';
+
 /**
  * pullim-api HTTP 클라이언트 (B: 실 인증 연동).
  *
@@ -69,7 +71,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
   // 인스턴스 로컬 상태(모듈 전역 아님 — 테스트 격리/멀티 인스턴스 안전).
   let csrfToken: string | null = null;
   let csrfInFlight: Promise<void> | null = null;
-  let refreshInFlight: Promise<Response> | null = null;
+
 
   const url = (path: string) => `${baseUrl}${path}`;
 
@@ -96,57 +98,31 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     return csrfInFlight;
   }
 
-  /** 동시 만료 요청은 CSRF 복구까지 포함한 refresh 작업 하나를 공유한다. */
-  function refreshOnce(): Promise<Response> {
-    if (!refreshInFlight) {
-      refreshInFlight = withCsrfRecovery('POST', refreshPath, undefined, { used: false })
-        .then((res) => {
-          if (res.ok) csrfToken = null;
-          return res;
-        })
-        .finally(() => {
-          refreshInFlight = null;
-        });
-    }
-    // 실패 본문을 여러 호출자가 각각 읽을 수 있어야 한다.
-    return refreshInFlight.then((res) => res.clone());
-  }
-
-  async function raw(method: Method, path: string, body: unknown): Promise<Response> {
+  async function raw(method: Method, path: string, body: unknown, token?: string): Promise<Response> {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (MUTATING.includes(method)) {
-      if (csrfToken === null) await bootstrapCsrf();
-      if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
-    }
-    return fetchImpl(url(path), {
-      method,
-      credentials: 'include',
-      headers,
+    if (token) headers['X-CSRF-Token'] = token;
+    const res = await fetchImpl(url(path), {
+      method, credentials: 'include', headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+    if (!res.ok) await normalizeError(res);
+    return res;
   }
 
-  /** 원요청의 refresh 전후에 동일한 CSRF 복구 예산을 사용한다. */
-  async function withCsrfRecovery(
-    method: Method,
-    path: string,
-    body: unknown,
-    budget: { used: boolean }
-  ): Promise<Response> {
-    const res = await raw(method, path, body);
-    if (res.status !== 403 || !MUTATING.includes(method) || budget.used) return res;
-    const error: unknown = await res.clone().json().catch(() => null);
-    if (
-      !error || typeof error !== 'object' || !('code' in error) ||
-      error.code !== 'CSRF_TOKEN_MISMATCH'
-    ) return res;
-
-    budget.used = true;
-    csrfToken = null;
-    await bootstrapCsrf();
-    return raw(method, path, body);
-  }
+  const core = createAuthCore({
+    scope: `${baseUrl}:${refreshPath.includes('/staff/') ? 'staff' : 'member'}`,
+    getCsrf: async (force) => {
+      if (force) csrfToken = null;
+      if (!csrfToken) await bootstrapCsrf();
+      return csrfToken!;
+    },
+    refresh: async (token) => { await raw('POST', refreshPath, undefined, token); csrfToken = null; },
+    describeError: (error) => {
+      const e = error as Partial<ApiError> | null;
+      return { status: e?.status ?? 0, code: e?.code };
+    },
+  });
 
   async function normalizeError(res: Response): Promise<never> {
     let message = '요청을 처리하지 못했습니다.';
@@ -176,23 +152,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
         0
       );
     }
-    const isRefresh = path === refreshPath;
-    const csrfBudget = { used: false };
-    let res = await withCsrfRecovery(method, path, body, csrfBudget);
-
-    // refresh만 401인 경우에 세션 만료로 판정한다. CSRF/Origin/서버 오류는 그대로 전달한다.
-    if (res.status === 401 && !isRefresh) {
-      const refreshed = await refreshOnce();
-      if (refreshed.status === 401) {
-        throw makeApiError('인증이 만료되었습니다. 다시 로그인해 주세요.', 401, {
-          authExpired: true,
-        });
-      }
-      if (!refreshed.ok) await normalizeError(refreshed);
-      res = await withCsrfRecovery(method, path, body, csrfBudget);
-    }
-
-    if (!res.ok) await normalizeError(res);
+    const res = await core.execute((token) => raw(method, path, body, token), {
+      mutation: MUTATING.includes(method),
+      refresh: path !== refreshPath && !path.endsWith('/login') && !path.endsWith('/logout'),
+    });
+    if (path.endsWith('/login') || path.endsWith('/logout')) { core.reset(); csrfToken = null; }
     // 204/빈 본문 허용.
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;

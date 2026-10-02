@@ -71,7 +71,7 @@ export const pullimApiAuthAdapter: AuthAdapter = {
       // 미인증/만료(401)만 게스트로. 500·네트워크·DTO 오류까지 null로 삼키면
       // 서버 장애 시 사용자가 조용히 로그아웃된 것처럼 보이고 감지도 어렵다 → 전파.
       const e = err as ApiError;
-      if (e?.status === 401 || e?.authExpired) return null;
+      if (e?.authExpired) return null;
       throw err;
     }
   },
